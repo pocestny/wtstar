@@ -1,0 +1,26 @@
+program ::= ( type_definition | ( "output" | ) variable_definition | input_variable_definition | alias_deifnition | function_definition ) + scoped_statement
+
+type_definition ::= "type" identifier "{" ( typename identifier ( "," identifier ) * ";" ) + "}"
+
+alias_definition ::= "alias" identifier "=" identifier "[[" range ("," range) *   "]]" ";"
+
+range ::= expression | expression ":" expression
+
+variable_definition ::= typename variable_declarator ( "," variable_declarator )*  ";"
+
+variable_declarator ::= identifier ( "[" expression ("," expression) * "]" | ) (| "=" initializer )
+
+input_variable_definition ::= "input" typename input_variable_declarator ( "," variable_declarator )*  ";"
+
+input_variable_declarator ::= identifier ( "[" "_" ("," "_")* "]" | )
+
+
+function_definition ::= typename identifier "(" (|parameter_declarator ("," parameter_declarator)*) ")" (";" | scoped_statement )
+
+parameter_declarator ::= typename identifier ( "[" _ ("," "_")* "]" | )
+
+expression ::= expression operator expression 
+
+
+
+

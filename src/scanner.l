@@ -1,0 +1,170 @@
+%{
+#include "parser.h"
+#include "driver.h"
+#include <stdarg.h>
+
+int yycolumn = 1;
+
+const char* const symbols[]={
+  "(",")","{","}","[","]",
+  ":",";",".",",",
+  "<",">","!","~",
+  "+","-","*","/", "%", "^","&","|","=",NULL};
+
+const char* const symbols2[]={
+  "==","!=","<=",">=",
+  "&&","||","<<",">>","|~","~|",
+  "++","--",
+  "+=","-=","*=","/=","%=","[[","]]",NULL
+  };
+
+const int  values2[]={
+TOK_EQ, TOK_NEQ, TOK_LEQ, TOK_GEQ,
+TOK_AND,TOK_OR,TOK_SHL,TOK_SHR,TOK_FIRST_BIT,TOK_LAST_BIT,
+TOK_INC,TOK_DEC,
+TOK_PLUS_ASSIGN, TOK_MINUS_ASSIGN, TOK_TIMES_ASSIGN, TOK_DIV_ASSIGN, TOK_MOD_ASSIGN,
+TOK_DBLBRACKET, TOK_DBRBRACKET,
+ -1};
+
+
+#define YY_USER_ACTION  \
+  yylloc->first_line = yylloc->last_line = yylineno;\
+  yylloc->first_column = yycolumn; yylloc->last_column = yycolumn + yyleng - 1; \
+  yycolumn += yyleng; 
+%}
+
+SPACE   [ \t]
+LETTER  [a-zA-Z]
+IDSYM   [a-zA-Z0-9_]
+DIGIT   [0-9]
+
+%x include
+%x comment
+%option noyywrap
+%option bison-bridge bison-locations
+
+%%
+
+  /* include directives are processed here */
+#include{SPACE}*\"   {BEGIN(include);}
+
+<include>[^\"]*\" {  
+    yytext[yyleng-1]=0;
+    driver_set_current_pos(yylineno,yycolumn);
+    driver_push_file(yytext);
+    yylineno=driver_current_line();
+    yycolumn=driver_current_column();
+    BEGIN(INITIAL);
+  } 
+
+  /* C-style comments */
+"/*"                 {BEGIN(comment);}
+<comment>"*/"      BEGIN(INITIAL);
+<comment>[^*\n]+   // eat comment in chunks
+<comment>"*"       // eat the lone star
+<comment>\n        yylineno++; yycolumn=1;
+
+  /* single line comment */
+"//".*\n             yylineno++;yycolumn=1;
+
+-?{DIGIT}+/[^{IDSYM}{DIGIT}] { 
+    yylval->int_val = atoi(yytext); 
+    return TOK_INT_LITERAL; 
+  }
+
+-?({DIGIT}*\.{DIGIT}+)|({DIGIT}*\.{DIGIT}+)/[^{IDSYM}{DIGIT}]  {
+    yylval->float_val = atof(yytext); 
+    return TOK_FLOAT_LITERAL; 
+}
+
+'.' {
+    yylval->char_val = yytext[1]; 
+    return TOK_CHAR_LITERAL;
+  }
+
+\"[^\"]*\" {
+    yytext[yyleng-1]=0;
+    yylval->string_val = strdup(yytext+1);
+    return TOK_STRING_LITERAL;
+  }
+
+
+  /* keywords */
+
+type/[^{IDSYM}{DIGIT}]      { return TOK_TYPE; }
+input/[^{IDSYM}{DIGIT}]     { return TOK_INPUT; }
+output/[^{IDSYM}{DIGIT}]    { return TOK_OUTPUT; }
+alias/[^{IDSYM}{DIGIT}]     { return TOK_ALIAS; }
+if/[^{IDSYM}{DIGIT}]        { return TOK_IF; }
+else/[^{IDSYM}{DIGIT}]      { return TOK_ELSE; }
+for/[^{IDSYM}{DIGIT}]       { return TOK_FOR; }
+while/[^{IDSYM}{DIGIT}]     { return TOK_WHILE; }
+pardo/[^{IDSYM}{DIGIT}]       { return TOK_PAR; }
+do/[^{IDSYM}{DIGIT}]        { return TOK_DO; }
+break/[^{IDSYM}{DIGIT}]     { return TOK_BREAK; }
+return/[^{IDSYM}{DIGIT}]    { return TOK_RETURN; }
+continue/[^{IDSYM}{DIGIT}]  { return TOK_CONTINUE; }
+.{SPACE}*size/[^{IDSYM}{DIGIT}]      { return TOK_SIZE; }
+dim/[^{IDSYM}{DIGIT}]       { return TOK_DIM; }
+
+  /* not a keyword  */
+[a-zA-Z_]{IDSYM}* {
+  yylval->string_val = strdup(yytext);
+  
+  if (yytext[0]=='_'&&yytext[1]==0) return TOK_DONT_CARE;
+
+  if (ast_node_find(ast->types,yytext)
+    return TOK_TYPENAME;
+  
+  return TOK_IDENT; 
+}
+
+
+{SPACE}+  /* eat whitespace */
+\n        yylineno++;yycolumn=1;
+
+  /* symbols */
+
+.. {
+  for (int i=0;symbols2[i];i++) 
+    if (!strcmp(symbols2[i],yytext)) 
+    return values2[i];
+  REJECT;  
+}
+
+. {
+  for (int i=0;symbols[i];i++) 
+    if (!strcmp(symbols[i],yytext)) 
+    return yytext[0];
+
+  yyerror(yylloc,ast,env,"lexical error, unexpected token %s",yytext);
+}
+
+<<EOF>> {
+    driver_set_current_pos(yylineno,yycolumn);
+    if (!driver_pop_file()) {
+      if (yy_buffer_stack) free(yy_buffer_stack);
+      yy_buffer_stack=NULL;
+      yyterminate();
+    }
+    else {
+     yylineno = driver_current_line();
+     yycolumn = driver_current_column();
+     }
+  }
+
+
+%%
+
+
+void yyerror(YYLTYPE *yylloc, ast_t *r,  context_t * env, char const *s, ...) { 
+  va_list args;
+  va_start(args,s);
+
+  r->error_occured=1;
+  fprintf(stderr,"%s:%d:%d: ", driver_current_file(), yylloc->first_line,  yylloc->first_column);
+  vfprintf(stderr, s, args);
+  fprintf(stderr,"\n");
+  va_end(args);
+}
+
