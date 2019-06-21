@@ -5,11 +5,19 @@
 #include <stdarg.h>
 
 #include "utils.h"
+#include "writer.h"
 
 struct _ast_node_t;
+#define AST_NODE_STATIC_TYPE 1
+#define AST_NODE_STATIC_TYPE_MEMBER 2
+#define AST_NODE_VARIABLE 4
+#define AST_NODE_ARRAY 8
+#define AST_NODE_SCOPE 16
+#define AST_NODE_FUNCTION 32
+#define AST_NODE_EXPRESSION 64
+
 
 /* static types */
-#define AST_NODE_STATIC_TYPE 1
 struct _static_type_member_t;
 
 typedef struct {
@@ -18,14 +26,21 @@ typedef struct {
   struct _static_type_member_t *members;  // owned
 } static_type_t;
 
+CONSTRUCTOR(static_type_t, char *name);
+DESTRUCTOR(static_type_t);
+
 typedef struct _static_type_member_t {
   char *name;                    // owned
   static_type_t *type, *parent;  // external
   uint32_t offset;
+  struct _static_type_member_t *next;
 } static_type_member_t;
 
+CONSTRUCTOR(static_type_member_t, char *name, static_type_t *type);
+DESTRUCTOR(static_type_member_t);
+static_type_member_t * static_type_member_find(static_type_member_t *list,char *name);
+
 /* variables */
-#define AST_NODE_VARIABLE 2
 
 #define IO_FLAG_NONE 0
 #define IO_FLAG_IN 1
@@ -42,7 +57,6 @@ typedef struct {
 } variable_t;
 
 /* arrays */
-#define AST_NODE_ARRAY 4
 
 typedef struct _array_t {
   uint8_t io_flag;
@@ -58,15 +72,16 @@ typedef struct _array_t {
 } array_t;
 
 /* scopes */
-#define AST_NODE_SCOPE 8
 
 typedef struct _scope_t {
   struct _scope_t *parent;    // NULL for root_scope (global or function)
   struct _ast_node_t *items;  // owned
 } scope_t;
 
+CONSTRUCTOR(scope_t);
+DESTRUCTOR(scope_t);
+
 /* functions */
-#define AST_NODE_FUNCTION 16
 
 typedef struct {
   char *name;  // owned
@@ -77,7 +92,6 @@ typedef struct {
 } function_t;
 
 /* expressions */
-#define AST_NODE_EXPRESSION 32
 struct _inferred_type_item_t;
 
 typedef struct _inferred_type_t {
@@ -158,32 +172,44 @@ typedef struct _ast_node_t {
 
   union {
     static_type_t *t;
+    static_type_member_t *tm;
     variable_t *v;
     array_t *a;
     scope_t *sc;
     function_t *f;
     expression_t *e;
-  };
+  } val;
 
-  struct _ast_node_t *prev, *next;
+  struct _ast_node_t *next;
 } ast_node_t;
 
-CONSTRUCTOR(ast_node_t,int node_type,...);
+CONSTRUCTOR(ast_node_t, YYLTYPE *iloc, int node_type, ...);
 DESTRUCTOR(ast_node_t);
-ast_node_t *ast_node_find(ast_node_t *start, char *name); 
-void ast_node_prepend(ast_node_t **dst,ast_node_t *src);
+char * ast_node_name(ast_node_t*n);
+ast_node_t *ast_node_find(ast_node_t *n, char *name);
 
 typedef struct {
   ast_node_t *types;      // list of AST_NODE_STATIC_TYPE
   ast_node_t *functions;  // list of AST_NODE_FUNCTION
-  ast_node_t *variables;  // list of AST_NODE_VARIABLE or AST_NODE_ARRAY
   scope_t *root_scope;
-  ast_node_t *current_node;
+  int error_occured;
+} ast_t;
 
-} context_t;
+CONSTRUCTOR(ast_t);
+DESTRUCTOR(ast_t);
 
-CONSTRUCTOR(context_t);
-DESTRUCTOR(context_t);
+#define IDENT_FREE 0x0U
+#define IDENT_FUNCTION 0x1U
+#define IDENT_GLOBAL_VAR 0x2U
+// local var is relative to current scope
+#define IDENT_LOCAL_VAR 0x4U
+#define IDENT_PARENT_LOCAL_VAR 0x8U
 
+#define IDENT_VAR 0xEU
+
+// returns combination of values
+int ident_role(ast_t *ast, scope_t *scope, char *ident);
+
+void emit_code(ast_t *ast, writer_t *out, writer_t *log);
 
 #endif

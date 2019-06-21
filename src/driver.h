@@ -17,7 +17,7 @@ void driver_set_file(const char *filename, const char *content);
  * caller should free it using ast_t_delete()
  *
  */
-ast_node_t *driver_parse(const char *filename);
+ast_t *driver_parse(const char *filename);
 
 void driver_push_file(const char *filename);
 

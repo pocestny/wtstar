@@ -13,9 +13,9 @@ CFLAGS+=-O3
 BISONFLAGS=
 endif
 
-WTC_SRC=parser.c driver.c parser_utils.c
-WTC_HDRS=ast.h code.h utils.h parser_utils.h parser.c
-WTC_DEPS=${WTC_SRC} ${WTC_HDRS}
+WTC_SRC = ast.c parser.c scanner.c driver.c writer.c wtc.c
+WTC_HDRS= ast.h parser.h scanner.h driver.h writer.h code.h utils.h
+WTC_DEPS=${WTC_SRC} ${WTC_HDRS} parser_utils.c
 
 all: wtc 
 
@@ -23,7 +23,7 @@ all: wtc
 wtc: ${BUILD_DIR}/cli/wtc
 
 
-${BUILD_DIR}/wtc: ${WTC_DEPS}
+${BUILD_DIR}/cli/wtc: ${WTC_DEPS}
 	mkdir -p ${BUILD_DIR}/cli
 	${CC} ${CFLAGS} ${WTC_SRC} -o ${BUILD_DIR}/cli/wtc
 
@@ -34,4 +34,4 @@ ${BUILD_DIR}/wtc: ${WTC_DEPS}
 	flex --header-file=`basename $< .l`.h -o $@ $<
 
 clean:
-	echo "."
+	rm -rf parser.output parser.c parser.h scanner.c scanner.h

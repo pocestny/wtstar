@@ -28,8 +28,9 @@ TOK_DBLBRACKET, TOK_DBRBRACKET,
 
 
 #define YY_USER_ACTION  \
-  yylloc->first_line = yylloc->last_line = yylineno;\
-  yylloc->first_column = yycolumn; yylloc->last_column = yycolumn + yyleng - 1; \
+  yylloc->fl = yylloc->ll = yylineno;\
+  yylloc->fc = yycolumn; yylloc->lc = yycolumn + yyleng - 1; \
+  yylloc->fn = yylloc->ln = driver_current_file();\
   yycolumn += yyleng; 
 %}
 
@@ -99,7 +100,7 @@ if/[^{IDSYM}{DIGIT}]        { return TOK_IF; }
 else/[^{IDSYM}{DIGIT}]      { return TOK_ELSE; }
 for/[^{IDSYM}{DIGIT}]       { return TOK_FOR; }
 while/[^{IDSYM}{DIGIT}]     { return TOK_WHILE; }
-pardo/[^{IDSYM}{DIGIT}]       { return TOK_PAR; }
+pardo/[^{IDSYM}{DIGIT}]       { return TOK_PARDO; }
 do/[^{IDSYM}{DIGIT}]        { return TOK_DO; }
 break/[^{IDSYM}{DIGIT}]     { return TOK_BREAK; }
 return/[^{IDSYM}{DIGIT}]    { return TOK_RETURN; }
@@ -113,7 +114,7 @@ dim/[^{IDSYM}{DIGIT}]       { return TOK_DIM; }
   
   if (yytext[0]=='_'&&yytext[1]==0) return TOK_DONT_CARE;
 
-  if (ast_node_find(ast->types,yytext)
+  if (ast_node_find(ast->types,yytext))
     return TOK_TYPENAME;
   
   return TOK_IDENT; 
@@ -137,7 +138,7 @@ dim/[^{IDSYM}{DIGIT}]       { return TOK_DIM; }
     if (!strcmp(symbols[i],yytext)) 
     return yytext[0];
 
-  yyerror(yylloc,ast,env,"lexical error, unexpected token %s",yytext);
+  yyerror(yylloc,ast,"lexical error, unexpected token %s",yytext);
 }
 
 <<EOF>> {
@@ -157,12 +158,12 @@ dim/[^{IDSYM}{DIGIT}]       { return TOK_DIM; }
 %%
 
 
-void yyerror(YYLTYPE *yylloc, ast_t *r,  context_t * env, char const *s, ...) { 
+void yyerror(YYLTYPE *yylloc, ast_t *r,  char const *s, ...) { 
   va_list args;
   va_start(args,s);
 
   r->error_occured=1;
-  fprintf(stderr,"%s:%d:%d: ", driver_current_file(), yylloc->first_line,  yylloc->first_column);
+  fprintf(stderr,"%s:%d:%d: ", yylloc->fn, yylloc->fl,  yylloc->fc);
   vfprintf(stderr, s, args);
   fprintf(stderr,"\n");
   va_end(args);

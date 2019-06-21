@@ -1,6 +1,5 @@
 %code top{
- // helper functions that are local for parser (basically those that call yyerror(...) )
- #include "parser_utils.h"
+  #define __PARSER_UTILS__
 }
 
 %code requires {
@@ -9,52 +8,36 @@
   #include <stdarg.h>
   #include <stdlib.h>
   #include "ast.h"
-
-  #define YYLTYPE YYLTYPE
-  typedef struct YYLTYPE
-  {
-    int fl,fc,ll,lc;
-    char *fname;
-  } YYLTYPE;
-
 }
 
 %debug
 %defines
 %locations
 %define parse.error verbose
-%param {ast_node_t *ast}
-%param {context_t *env}
+%param {ast_t *ast}
 %define api.pure full
 
 %code provides {
-typedef struct YYLTYPE YYLTYPE;
-struct YYLTYPE
-{
-  int first_line;
-  int first_column;
-  int last_line;
-  int last_column;
-};
-
    #define YY_DECL \
-       int yylex(YYSTYPE * yylval_param, YYLTYPE * yylloc_param, ast_t* ast, context_t *env)
+       int yylex(YYSTYPE * yylval_param, YYLTYPE * yylloc_param, ast_t* ast)
    YY_DECL;
-  void yyerror (YYLTYPE *yylloc, ast_node_t *, context_t *, char const *, ...);
-
+  void yyerror (YYLTYPE *yylloc, ast_t *, char const *, ...);
+  #include "parser_utils.c"
 }
 
 %initial-action {
+  add_basic_types(ast);
 }
 
 %define api.token.prefix {TOK_} 
 %union
 {
-  int32_t       int_val;
-  float         float_val;
-  char          char_val;
-  char*         string_val;
-  ast_node_t*   ast_node_t_val;
+  int32_t                 int_val;
+  float                   float_val;
+  char                    char_val;
+  char*                   string_val;
+  ast_node_t*             ast_node_val;
+  static_type_member_t *  static_type_member_val;
 }
 
 %token <int_val>    INT_LITERAL    
@@ -93,10 +76,24 @@ struct YYLTYPE
 
 
 %destructor { if ($$) free($$); $$=NULL;} <string_val>
+%destructor { if ($$) ast_node_t_delete($$); $$=NULL;} <ast_node_val>
+%destructor { if ($$) static_type_member_t_delete($$); $$=NULL;} <static_type_member_val>
 
-%type <int_val> placeholder_list array_dim_spec add_operator assign_operator eq_operator rel_operator mult_operator unary_operator
-%type <ast_node_t_val> expr expr_assign expr_or expr_and expr_eq expr_rel expr_add expr_mult expr_pow expr_cast expr_unary expr_postfix initializer_list initializer_item maybe_expr expr_primary
 
+
+%type <int_val> 
+    placeholder_list 
+    array_dim_spec
+    assign_operator eq_operator rel_operator add_operator mult_operator unary_operator
+
+%type <ast_node_val> 
+    expr expr_assign expr_or expr_and expr_eq expr_rel expr_add expr_mult
+    expr_pow expr_cast expr_unary expr_postfix expr_primary expr_literal
+    initializer_list initializer_item
+    expr_list maybe_expr
+
+%type <static_type_member_val>
+    typedef_list typedef_item typedef_ident_list
 %%
   
   /* ************************* PROGRAM ***************************** 
@@ -105,15 +102,18 @@ struct YYLTYPE
 
 program: preamble  stmt_scope;
 
-preamble: %empty | preamble preamble_item;
+preamble 
+        : %empty 
+        | preamble preamble_item;
 
-preamble_item: 
-  type_def | 
-  variable_declaration | 
-  input_declaration | 
-  output_declaration | 
-  alias_declaration | 
-  function_declaration ;
+preamble_item 
+             : typedef 
+             | variable_declaration 
+             | input_declaration 
+             | output_declaration  
+             | alias_declaration   
+             | function_declaration 
+             ;
 
   
   /* ******************************* TYPES *********************************** 
@@ -131,36 +131,47 @@ preamble_item:
 
    */
 
-      
-type_def: 
-    type_def__1 '{' type_def_list '}'
-    |
-    type_def__1 error '}'
-    ;
+typedef 
+       : TYPE IDENT '{' typedef_list '}' {if (!make_typedef(ast,&@$,$2,&@2,$4)) YYERROR;}
+       | TYPE error '}'
+       ;
 
-type_def__1: 
-    TYPE IDENT;
+typedef_list
+            : typedef_item {$$=$1;} 
+            | typedef_list typedef_item {$$=$1; append(static_type_member_t,&$$,$2);}
+
+typedef_item
+            : TYPENAME typedef_ident_list ';' 
+                {
+                  $$=$2;
+                  static_type_t *t = ast_node_find(ast->types,$1)->val.t;
+                  list_for(tt,static_type_member_t,$$) 
+                    tt->type=t;
+                  list_for_end
+                  free($1);
+                }
+            | TYPENAME error ';' {free($1);$$=NULL;}
+            ;
 
 
-type_def_list: type_def_item |  type_def_list type_def_item ;
-
-type_def_item: 
-    type_specifier typedef_id_list ';'
-    |
-    type_specifier error ';'
-    ;
-
-type_specifier: TYPENAME;
-
-typedef_id_list: 
-    typedef_id 
+typedef_ident_list: 
+    IDENT { $$=static_type_member_t_new($1,NULL); free($1); }
     | 
-    typedef_id_list ',' typedef_id 
-    | 
-    error ',' typedef_id
+    typedef_ident_list ',' IDENT 
+        {
+          if (static_type_member_find($1,$3)) {
+            yyerror(&@3,ast,"duplicate type member %s",$3);
+            free($3);
+            static_type_member_t_delete($1);            
+            $$=NULL;
+            YYERROR;
+          }
+          $$=$1;
+          append(static_type_member_t,&$$,static_type_member_t_new($3,NULL));
+          free($3);
+        }
     ;
 
-typedef_id: IDENT;
   
   /* ******************************* VARIABLES  ***********************************
  
@@ -215,9 +226,9 @@ range:
 
   /* possibly declare several variables of the same type */
 variable_declaration: 
-    type_specifier variable_declarator_list ';' 
+    TYPENAME variable_declarator_list ';' 
     |
-    type_specifier error ';' 
+    TYPENAME error ';' 
     ;
 
 variable_declarator_list: 
@@ -248,9 +259,9 @@ variable_declarator:
 
   */
 input_variable_declaration: 
-    type_specifier input_variable_declarator_list ';' 
+    TYPENAME input_variable_declarator_list ';' 
     |
-    type_specifier error ';' 
+    TYPENAME error ';' 
     ;
 
 input_variable_declarator_list: 
@@ -305,7 +316,7 @@ function_declaration:
 
 
 function_declaration__1: 
-    type_specifier IDENT '(' 
+    TYPENAME IDENT '(' 
     ;
 
 maybe_body: 
@@ -451,7 +462,7 @@ mult_operator:
 
 unary_operator: 
       '!' {$$='!';}
-    | '-' {$$='-'}
+    | '-' {$$='-';}
     | INC {$$=TOK_INC;}
     | DEC {$$=TOK_DEC;}
     ;
