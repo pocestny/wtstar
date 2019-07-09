@@ -13,8 +13,8 @@ CFLAGS+=-O3
 BISONFLAGS=
 endif
 
-WTC_SRC = ast.c parser.c scanner.c driver.c writer.c wtc.c
-WTC_HDRS= ast.h parser.h scanner.h driver.h writer.h code.h utils.h
+WTC_SRC = ast.c parser.c scanner.c driver.c writer.c wtc.c ast_debug_print.c code_generation.c
+WTC_HDRS= ast.h parser.h scanner.h driver.h writer.h code.h utils.h ast_debug_print.h code_generation.h
 WTC_DEPS=${WTC_SRC} ${WTC_HDRS} parser_utils.c
 
 all: wtc 

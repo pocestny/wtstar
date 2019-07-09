@@ -23,6 +23,7 @@
    YY_DECL;
   void yyerror (YYLTYPE *yylloc, ast_t *, char const *, ...);
   #include "parser_utils.c"
+
 }
 
 %initial-action {
@@ -38,12 +39,14 @@
   char*                   string_val;
   ast_node_t*             ast_node_val;
   static_type_member_t *  static_type_member_val;
+  static_type_t *         static_type_val;
 }
 
-%token <int_val>    INT_LITERAL    
-%token <float_val>  FLOAT_LITERAL  
-%token <char_val>   CHAR_LITERAL   
-%token <string_val> STRING_LITERAL IDENT TYPENAME 
+%token <int_val>          INT_LITERAL    
+%token <float_val>        FLOAT_LITERAL  
+%token <char_val>         CHAR_LITERAL   
+%token <string_val>       STRING_LITERAL IDENT 
+%token <static_type_val>  TYPENAME
 
 %token TYPE INPUT OUTPUT ALIAS IF ELSE FOR WHILE PARDO DO BREAK RETURN CONTINUE SIZE DIM
 
@@ -86,11 +89,22 @@
     array_dim_spec
     assign_operator eq_operator rel_operator add_operator mult_operator unary_operator
 
+%type <string_val>
+    open_function
+
 %type <ast_node_val> 
     expr expr_assign expr_or expr_and expr_eq expr_rel expr_add expr_mult
     expr_pow expr_cast expr_unary expr_postfix expr_primary expr_literal
     initializer_list initializer_item
     expr_list maybe_expr
+    input_variable_declaration variable_declaration variable_declarator_list
+    variable_init_declarator variable_declarator input_variable_declarator
+    static_variable_declarator input_variable_declarator_list
+    ranges_list range
+    nonempty_parameter_declarator_list parameter_declarator_list maybe_body
+    parameter_declarator
+    stmt_scope 
+
 
 %type <static_type_member_val>
     typedef_list typedef_item typedef_ident_list
@@ -100,19 +114,16 @@
       the golbal structure of a program (includes are handled in the lexer)
   */
 
-program: preamble  stmt_scope;
+program: program_item | program program_item;
 
-preamble 
-        : %empty 
-        | preamble preamble_item;
-
-preamble_item 
+program_item 
              : typedef 
-             | variable_declaration 
+             | variable_declaration { if (!append_variables(ast,$1)) YYERROR; }
              | input_declaration 
              | output_declaration  
              | alias_declaration   
              | function_declaration 
+             | stmt
              ;
 
   
@@ -144,13 +155,11 @@ typedef_item
             : TYPENAME typedef_ident_list ';' 
                 {
                   $$=$2;
-                  static_type_t *t = ast_node_find(ast->types,$1)->val.t;
                   list_for(tt,static_type_member_t,$$) 
-                    tt->type=t;
+                    tt->type=$1;
                   list_for_end
-                  free($1);
                 }
-            | TYPENAME error ';' {free($1);$$=NULL;}
+            | TYPENAME error ';' {$$=NULL;}
             ;
 
 
@@ -191,66 +200,95 @@ typedef_ident_list:
 
   */
 
-input_declaration: 
-    INPUT  input_variable_declaration 
-    |
-    INPUT error ';' 
-    ;
+input_declaration 
+                 : INPUT  input_variable_declaration 
+                    {
+                      add_variable_flag(IO_FLAG_IN,$2);
+                      if (!append_variables(ast,$2)) YYERROR;
+                    }
+                 | INPUT error ';' 
+                 ;
 
-output_declaration: 
-    OUTPUT variable_declaration 
-    |
-    OUTPUT error ';'
-    ;
+output_declaration
+                  : OUTPUT variable_declaration 
+                    {
+                      add_variable_flag(IO_FLAG_OUT,$2);
+                      if (!append_variables(ast,$2)) YYERROR;
+                    }
+                  | OUTPUT error ';'
+                  ;
 
-alias_declaration: 
-    alias_declaration__1 ranges_list "]]" ';'
-    | 
-    alias_declaration__1 error ';' 
-    ;
+alias_declaration
+                 : ALIAS IDENT '=' IDENT "[[" ranges_list "]]" ';'
+                    {
+                      if (!init_alias(ast,&@2,$2,&@4,$4,$6)) YYERROR;
+                    }
+                 | ALIAS error ';' 
+                 ;
 
-alias_declaration__1: ALIAS IDENT '=' IDENT "[[" ;
 
 ranges_list: 
-    range 
+    range {$$=$1;}
     |
-    ranges_list ',' range
+    ranges_list ',' range {$$=$1;append(ast_node_t,&$$,$3);}
     ;
 
 range: 
-    expr_assign ':' expr_assign 
+    expr_assign ':' expr_assign {$$=$1;append(ast_node_t,&$$,$3);}
     | 
-    expr_assign
+    expr_assign 
+      {
+        $$=$1;
+        append(ast_node_t,&$$,ast_node_t_new(&@1,AST_NODE_EXPRESSION,EXPR_EMPTY));
+      }
     ;
 
 
   /* possibly declare several variables of the same type */
 variable_declaration: 
     TYPENAME variable_declarator_list ';' 
+      {
+        $$=$2;
+        list_for(v,ast_node_t,$$) 
+          v->val.v->base_type=$1;  
+        list_for_end
+      }
     |
-    TYPENAME error ';' 
+    TYPENAME error ';' {$$=NULL;}
     ;
 
 variable_declarator_list: 
-    variable_init_declarator 
+    variable_init_declarator {$$=$1;}
     | 
     variable_declarator_list ',' variable_init_declarator 
+      {
+        $$=$1;
+        append(ast_node_t,&$$,$3); 
+      }
     | 
-    error ','  variable_init_declarator
+    error ','  variable_init_declarator {$$=$3;}
     ;
 
 
   /* declare variable, and possibly initialize it */
 variable_init_declarator: 
-    variable_declarator 
+    variable_declarator {$$=$1;}
     | 
     variable_declarator '=' initializer_item 
+      { 
+        $$=$1; 
+        $$->val.e->val.i = $3;
+      }
     ;
 
 variable_declarator: 
-    static_variable_declarator 
+    static_variable_declarator {$$=$1;}
     | 
     static_variable_declarator '[' expr_list ']'
+      {
+        $$=$1;
+        if (!init_array(ast,$1,$3)) YYERROR;
+      }
     ;
 
 
@@ -260,22 +298,36 @@ variable_declarator:
   */
 input_variable_declaration: 
     TYPENAME input_variable_declarator_list ';' 
+      {
+        $$=$2;
+        list_for(v,ast_node_t,$$) 
+          v->val.v->base_type=$1;  
+        list_for_end
+      }
     |
-    TYPENAME error ';' 
+    TYPENAME error ';' {$$=NULL;}
     ;
 
 input_variable_declarator_list: 
-    input_variable_declarator 
+    input_variable_declarator {$$=$1;}
     | 
     input_variable_declarator_list ',' input_variable_declarator 
+      {
+        $$=$1;
+        append(ast_node_t,&$$,$3); 
+      }
     | 
-    error ',' input_variable_declarator
+    error ',' input_variable_declarator {$$=$3;}
     ;
 
 input_variable_declarator: 
-    static_variable_declarator 
+    static_variable_declarator {$$=$1;}
     | 
     static_variable_declarator '[' placeholder_list ']' 
+      {
+        $$=$1;
+        if (!init_input_array(ast,$1,$3)) YYERROR;
+      }
     ;
 
 
@@ -291,7 +343,11 @@ placeholder_list:
       ***************************************
   */
 
-static_variable_declarator: IDENT;
+static_variable_declarator: IDENT 
+                            {
+                                $$=init_variable(ast,&@1,$1); 
+                                if (!$$) YYERROR;
+                            }
 
 
 
@@ -308,39 +364,56 @@ static_variable_declarator: IDENT;
   */
 
 
-function_declaration: 
-    function_declaration__1 parameter_declarator_list ')' maybe_body 
+function_declaration: open_function maybe_body {add_function_scope(ast,$1,$2);}
+
+open_function:
+    TYPENAME IDENT '(' parameter_declarator_list ')'
+      {
+        if (!define_function(ast,&@$,$1,$2,&@2,$4))
+          YYERROR;
+        else $$=$2;
+      }
     |
-    error ')' 
+    error ')' {$$=NULL;}
     ;
 
-
-function_declaration__1: 
-    TYPENAME IDENT '(' 
-    ;
 
 maybe_body: 
-    ';'
+    ';' {$$=NULL;}
     | 
-    stmt_scope 
+    stmt_scope {
+      $$=$1;
+      // remove from current scope
+      unchain_last(&ast->current_scope->items);
+    }
     ;
 
 parameter_declarator_list: 
-    %empty 
+    %empty {$$=NULL;}
     |  
-    nonempty_parameter_declarator_list
+    nonempty_parameter_declarator_list {$$=$1;}
     ;
 
 nonempty_parameter_declarator_list: 
-    parameter_declarator 
+    parameter_declarator {$$=$1;}
     | 
     nonempty_parameter_declarator_list ',' parameter_declarator
+      {
+        $$=$1;
+        if ($3) append(ast_node_t,&$$,$3);
+      }
     ;
 
-parameter_declarator: TYPENAME IDENT array_dim_spec;
+parameter_declarator 
+                    : TYPENAME IDENT array_dim_spec 
+                    {
+                       $$ = init_variable(ast,&@2,$2);
+                       $$->val.v->base_type=$1;
+                       $$->val.v->num_dim=$3;
+                    };
 
  
-array_dim_spec: %empty {$$=0;} | '{' placeholder_list '}' {$$=$2;};                                  
+array_dim_spec: %empty {$$=0;} | '[' placeholder_list ']' {$$=$2;};                                  
   
   
   /* ************************* EXPRESSIONS  ***************************** */
@@ -348,25 +421,40 @@ array_dim_spec: %empty {$$=0;} | '{' placeholder_list '}' {$$=$2;};
 expr: 
     expr_assign {$$=$1;} 
     |  
-    expr ',' expr_assign 
+    expr ',' expr_assign {$$=$1;append(ast_node_t,&$$,$3);}
     ;
 
 expr_assign:
     expr_or {$$=$1;} 
     | 
     expr_unary  assign_operator expr_assign 
+      {
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
     ;
 
 expr_or: 
     expr_and {$$=$1;} 
     | 
     expr_or OR expr_and
+      {
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,TOK_OR,$3);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
     ;
 
 expr_and: 
     expr_eq {$$=$1;} 
     | 
     expr_and AND expr_eq
+      {
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,TOK_AND,$3);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
     ;
 
 
@@ -374,6 +462,11 @@ expr_eq:
     expr_rel {$$=$1;} 
     | 
     expr_eq  eq_operator expr_rel
+      {
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
     ;
 
 
@@ -381,6 +474,11 @@ expr_rel:
     expr_add {$$=$1;} 
     | 
     expr_rel  rel_operator  expr_add
+      {
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
     ;
 
 
@@ -388,12 +486,22 @@ expr_add:
     expr_mult {$$=$1;} 
     | 
     expr_add    add_operator    expr_mult
+      {
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
     ;
 
 expr_mult: 
     expr_pow {$$=$1;} 
     | 
     expr_mult   mult_operator   expr_pow
+      {
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
     ;
 
 
@@ -401,6 +509,11 @@ expr_pow:
     expr_cast {$$=$1;} 
     | 
     expr_cast '^' expr_pow
+      {
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,'^',$3);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
     ;
 
 
@@ -408,13 +521,29 @@ expr_cast:
     expr_unary {$$=$1;} 
     | 
     '(' TYPENAME ')'  expr_cast
-    | '(' TYPENAME ')' '{' initializer_list '}'
+      {
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_CAST,$2,$4);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
+    | 
+    '(' TYPENAME ')' '{' initializer_list '}'
+      {
+         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_CAST,$2,$5);
+        if (!fix_expression_type($$))
+          YYERROR;
+       }
     ;
 
 expr_unary:   
     expr_postfix {$$=$1;}  
     | 
     unary_operator expr_postfix
+      {
+         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_PREFIX,$1,$2);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
     ;
 
 
@@ -422,10 +551,24 @@ expr_postfix:
     expr_primary  {$$=$1;}
     | 
     expr_postfix '.' IDENT
+      {
+        $$ = create_specifier_expr(&@$,ast,$1,$3,&@3);
+        if (!$$) YYERROR;
+      }
     |
     expr_postfix INC 
+      {
+         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_POSTFIX,$1,TOK_INC);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
     | 
     expr_postfix DEC
+      {
+         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_POSTFIX,$1,TOK_DEC);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
     ;
 
 assign_operator: 
@@ -470,106 +613,345 @@ unary_operator:
 
 expr_primary: 
     IDENT  
+      {
+        $$=expression_variable(ast,&@1,$1);
+      }
     |
     IDENT SIZE 
+      {
+        $$=expression_variable(ast,&@1,$1);
+        $$->val.e->variant=EXPR_SIZEOF;
+        $$->val.e->val.v->params=expression_zero();
+        if ($$->val.e->val.v->var->num_dim==0) {
+          yyerror(&@1,ast,"sizeof appied to non-array");
+          ast_node_t_delete($$);
+          YYERROR;
+        }
+      }
     |
     IDENT SIZE "(" expr_assign ")" 
+      {
+        $$=expression_variable(ast,&@1,$1);
+        $$->val.e->variant=EXPR_SIZEOF;
+        $$->val.e->val.v->params=$4;
+        if ($$->val.e->val.v->var->num_dim==0) {
+          yyerror(&@1,ast,"sizeof appied to non-array");
+          ast_node_t_delete($$);
+          YYERROR;
+        } else if (!expr_int($4->val.e)) {
+          yyerror(&@1,ast,"non integral array dimension");
+          ast_node_t_delete($$);
+          YYERROR;
+        }
+      }
     |
     IDENT "[["  ranges_list "]]"  
+      {
+        $$=expression_variable(ast,&@1,$1);
+        if ($$) {
+          if (!add_expression_array_parameters($$,$3,1))
+            YYERROR;
+        }
+        else {
+          ast_node_t_delete($3);
+          YYERROR;
+        }
+      }
     |
     IDENT '[' expr_list ']' 
+      {
+        $$=expression_variable(ast,&@1,$1);
+        if ($$) {
+          if (!add_expression_array_parameters($$,$3,0))
+            YYERROR;
+        }
+        else {
+          ast_node_t_delete($3);
+          YYERROR;
+        }
+      }
     | 
     IDENT '(' expr_list ')' 
+      {
+        $$=expression_call(ast,&@$,$1,$3);
+        if (!$$) YYERROR;
+      }
     | 
     IDENT '(' ')' 
+      {
+        $$=expression_call(ast,&@$,$1,NULL);
+        if (!$$) YYERROR;
+      }
     | 
-    '(' expr ')'
+    '(' expr ')' {$$=$2;}
     |
-    expr_literal 
+    expr_literal {$$=$1;}
     ;
 
 
 expr_literal: 
     INT_LITERAL
+      {
+        $$=ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
+        $$->val.e->type->type = __type__int->val.t;
+        $$->val.e->val.l = malloc(sizeof(int));
+        *(int *)($$->val.e->val.l) = $1;
+      }
     |
     FLOAT_LITERAL 
+      {
+        $$=ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
+        $$->val.e->type->type = __type__float->val.t;
+        $$->val.e->val.l = malloc(sizeof(float));
+        *(float *)($$->val.e->val.l) = $1;
+      }
     | 
     CHAR_LITERAL 
-    | 
-    STRING_LITERAL 
+      {
+        $$=ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
+        $$->val.e->type->type = __type__char->val.t;
+        $$->val.e->val.l = malloc(1);
+        *(char *)($$->val.e->val.l) = $1;
+      }
     ;
 
 
   /* bracketed comma separated initializer list - returns expression */
-initializer_list: 
-    initializer_item {$$=$1;} 
-    | 
-    initializer_list ',' initializer_item 
-    |
-    error ',' initializer_item 
-    ;
+initializer_list 
+                : initializer_item {$$=$1;} 
+                | STRING_LITERAL 
+                  {
+                    $$=ast_node_t_new(&@1,AST_NODE_EXPRESSION,EXPR_INITIALIZER);
+                    $$->val.e->type->compound=1;
+                    $$->val.e->type->list=NULL;
+                    for(int i=strlen($1)-1;i>=0;--i) {
+                        ast_node_t *tmp =
+                              ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
+                        tmp->val.e->type->type = __type__char->val.t;
+                        tmp->val.e->val.l = malloc(1);
+                        *(char *)(tmp->val.e->val.l) = $1[i];
+                        tmp->next=$$->val.e->val.i;
+                        $$->val.e->val.i=tmp;
 
-initializer_item: 
-    expr_assign {$$=$1;} 
-    | 
-    '{' initializer_list '}'
-    ;
+                        ALLOC_VAR(t,inferred_type_t);
+                        t->compound=0;
+                        t->type=__type__char->val.t;
 
+                        inferred_type_item_t *tt= inferred_type_item_t_new(t);
+                        tt->next=$$->val.e->type->list;
+                        $$->val.e->type->list=tt;
+                    }
+                  }
+                | initializer_list ',' initializer_item 
+                  {
+                    $$=$1;
+                    inferred_type_append($$->val.e->type,$3->val.e->type);
+                    append(ast_node_t,&($$->val.e->val.i),$3->val.e->val.i);
+                    free($3);
+                  }
+                | error ',' initializer_item {$$=$3;}
+                ;
+
+initializer_item 
+                : expr_assign 
+      {
+        if (!$1) $$=NULL;
+        else {
+          $$=ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_INITIALIZER);
+          $$->val.e->type = inferred_type_copy($1->val.e->type);
+          $$->val.e->val.i = $1;
+        }
+      }
+      | '{' initializer_list '}' 
+      {
+        inferred_type_item_t *t =inferred_type_item_t_new($2->val.e->type);
+        
+        ALLOC_VAR(nt,inferred_type_t);
+
+        $2->val.e->type = nt;
+        $2->val.e->type->compound = 1;
+        $2->val.e->type->list = t;
+        $$ = $2;
+      };
 
   /* list of expressions */
 expr_list: 
-    expr_assign 
+    expr_assign {$$=$1;}
     | 
     expr_list ',' expr_assign 
+      {
+        $$=$1;
+        append(ast_node_t,&$$,$3);
+      }
     |
-    error ',' expr_assign 
+    error ',' expr_assign {$$=$3;}
     ;
 
 
-  /* ************************* STATEMENTS  ***************************** */
+  /* ************************* STATEMENTS  ***************************** 
+  
+  STMT_COND:
+    par[0] = expression
+    following two nodes are "then" "else" statements
 
-stmt: stmt_scope | stmt_expr  | stmt_cond | stmt_iter | stmt_jump ';' | error ';';
+  STMT_WHILE and STMT_DO
+    par[0] = expression
+    next node is the statement
 
-stmt_scope: 
-    stmt_scope__1  scope_item_list '}'
+  STMT_FOR:
+    par[0] = encapsulating scope 
+             contains 4 nodes: three sections from the "for" definition 
+             and one resulting statement
+
+  STMT_PARDO:
+    par[0] = scope with first item the driving variable
+    par[1] = expression
+
+  STMT_RETURN:
+    par[0] = expression
+
+  */
+
+stmt: stmt_scope {ignore($1);}| stmt_expr  | stmt_cond | stmt_iter | stmt_jump ';' | error ';';
+
+stmt_scope
+            : '{' 
+            {
+              $<ast_node_val>$= ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
+              ast->current_scope=$<ast_node_val>$->val.sc;
+            } 
+            scope_item_list '}'
+            {
+              $$=$<ast_node_val>2;
+              ast->current_scope=$$->val.sc->parent;
+              append(ast_node_t,&ast->current_scope->items,$$);
+            }
+  
+            | '{' '}' {$$=NULL;}
+          ;
+
+scope_item_list:  scope_item | scope_item_list scope_item ;
+scope_item 
+          : variable_declaration  { if (!append_variables(ast,$1)) YYERROR; }
+          | stmt;
+
+stmt_expr 
+         : expr ';' 
+         {
+            append(ast_node_t,&ast->current_scope->items,$1);
+         }
     ;
 
-stmt_scope__1: '{' ;
+stmt_cond 
+         : IF '(' expr ')' 
+          {
+            ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_COND);
+            n->val.s->par[0]=$3;
+            append(ast_node_t,&ast->current_scope->items,n);
+          }
+          stmt maybe_else 
+         ;
 
-scope_item_list: %empty | scope_item_list scope_item ;
-scope_item: variable_declaration | stmt;
+maybe_else 
+          : %empty  
+            {
+                append(ast_node_t,&ast->current_scope->items,
+                      ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_EMPTY));
+            }
+          | ELSE stmt ;
 
-stmt_expr: 
-    expr ';'
-    ;
+stmt_iter
+         : WHILE '(' expr ')' 
+          {
+            ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_WHILE);
+            n->val.s->par[0]=$3;
+            append(ast_node_t,&ast->current_scope->items,n);
+          }
+          stmt
+         | DO 
+          {
+            $<ast_node_val>$ =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_DO);
+            append(ast_node_t,&ast->current_scope->items,$<ast_node_val>$);
+          }
+          stmt WHILE '(' expr ')' ';'
+          {
+            $<ast_node_val>2->val.s->par[0]=$6;
+          }
+         |  FOR '('  
+            {
+              $<ast_node_val>$= ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
+              ast->current_scope=$<ast_node_val>$->val.sc;
+            } 
+            for_specifier stmt 
+            {
+              ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_FOR);
+              ast->current_scope=$<ast_node_val>3->val.sc->parent;
+              n->val.s->par[0]=$<ast_node_val>3;
+              append(ast_node_t,&ast->current_scope->items,n);
+            }
+         | PARDO '(' IDENT ':'
+            {
+              $<ast_node_val>$= ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
+              ast->current_scope=$<ast_node_val>$->val.sc;
 
-stmt_cond: IF '(' expr ')' stmt maybe_else ;
-maybe_else: %empty | ELSE stmt ;
+              ast_node_t *v = init_variable(ast,&@3,$3);
+              v->val.v->base_type=__type__int->val.t;
+              append_variables(ast,v);
+            } 
+            expr ')' stmt
+            {
+              ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_PARDO);
+              ast->current_scope=$<ast_node_val>5->val.sc->parent;
+              n->val.s->par[0]=$<ast_node_val>5;
+              n->val.s->par[1]=$6;
+              append(ast_node_t,&ast->current_scope->items,n);
+            }
+         ;
 
-stmt_iter: 
-    WHILE '(' expr ')'  stmt
-    |
-    DO stmt WHILE '(' expr ')' ';'
-    |
-    FOR '('  for_specifier stmt 
-    |
-    PARDO '(' IDENT ':' expr ')' stmt
-    ;
+for_specifier
+             : first_for_item expr ';' maybe_expr ')'
+                {
+                  append(ast_node_t,&ast->current_scope->items,$2);
+                  if ($4) {
+                    append(ast_node_t,&ast->current_scope->items,$4);
+                  } else {
+                    append(ast_node_t,&ast->current_scope->items,
+                        ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_EMPTY));
+                  }
+                }
+             | error ')' 
+             ;
 
-for_specifier:
-    first_for_item expr ';' maybe_expr ')'
-    |
-    error ')'
-    ;
+first_for_item 
+              : stmt_expr 
+              | variable_declaration  
+                { 
+                  if (!append_variables(ast,$1)) YYERROR; 
+                }
+              | ';' 
+                {
+                  append(ast_node_t,&ast->current_scope->items,
+                    ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_EMPTY)
+                  );
+                }  
 
-first_for_item: stmt_expr | variable_declaration;
-
-stmt_jump: 
-    BREAK 
-    | 
-    CONTINUE 
-    | 
-    RETURN maybe_expr
-    ;
+stmt_jump
+         : BREAK 
+          {
+            ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_BREAK);
+            append(ast_node_t,&ast->current_scope->items,n);
+          }
+         | CONTINUE 
+          {
+            ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_CONTINUE);
+            append(ast_node_t,&ast->current_scope->items,n);
+          }
+         | RETURN maybe_expr
+          {
+            ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_RETURN);
+            n->val.s->par[0]=$2;
+            append(ast_node_t,&ast->current_scope->items,n);
+          }
+         ;
 
 maybe_expr: %empty {$$=NULL;} | expr{$$=$1;};

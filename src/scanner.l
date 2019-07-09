@@ -110,13 +110,16 @@ dim/[^{IDSYM}{DIGIT}]       { return TOK_DIM; }
 
   /* not a keyword  */
 [a-zA-Z_]{IDSYM}* {
-  yylval->string_val = strdup(yytext);
   
   if (yytext[0]=='_'&&yytext[1]==0) return TOK_DONT_CARE;
 
-  if (ast_node_find(ast->types,yytext))
+  ast_node_t *t=ast_node_find(ast->types,yytext);
+  if (t) {
+    yylval->static_type_val=t->val.t;
     return TOK_TYPENAME;
+  }
   
+  yylval->string_val = strdup(yytext);
   return TOK_IDENT; 
 }
 
