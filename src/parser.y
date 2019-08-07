@@ -277,7 +277,7 @@ variable_init_declarator:
     variable_declarator '=' initializer_item 
       { 
         $$=$1; 
-        $$->val.e->val.i = $3;
+        $$->val.v->initializer = $3;
       }
     ;
 
@@ -332,7 +332,7 @@ input_variable_declarator:
 
 
 placeholder_list: 
-    '_' {$$=1;}
+    "_" {$$=1;}
     |
     placeholder_list ',' "_" {$$=$1+1;}
     ;
@@ -484,7 +484,14 @@ expr_rel:
 
 expr_add: 
     expr_mult {$$=$1;} 
-    | 
+    |
+    expr_add expr_literal
+      {
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,'+',$2);
+        if (!fix_expression_type($$))
+          YYERROR;
+      }
+    |
     expr_add    add_operator    expr_mult
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
@@ -621,7 +628,7 @@ expr_primary:
       {
         $$=expression_variable(ast,&@1,$1);
         $$->val.e->variant=EXPR_SIZEOF;
-        $$->val.e->val.v->params=expression_zero();
+        $$->val.e->val.v->params=expression_int_val(0);
         if ($$->val.e->val.v->var->num_dim==0) {
           yyerror(&@1,ast,"sizeof appied to non-array");
           ast_node_t_delete($$);
@@ -805,6 +812,7 @@ expr_list:
 
   STMT_PARDO:
     par[0] = scope with first item the driving variable
+             contains the statement
     par[1] = expression
 
   STMT_RETURN:
@@ -882,7 +890,7 @@ stmt_iter
               $<ast_node_val>$= ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
               ast->current_scope=$<ast_node_val>$->val.sc;
             } 
-            for_specifier stmt 
+            for_specifier for_stmt 
             {
               ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_FOR);
               ast->current_scope=$<ast_node_val>3->val.sc->parent;
@@ -907,6 +915,8 @@ stmt_iter
               append(ast_node_t,&ast->current_scope->items,n);
             }
          ;
+
+for_stmt: ';' | stmt;
 
 for_specifier
              : first_for_item expr ';' maybe_expr ')'

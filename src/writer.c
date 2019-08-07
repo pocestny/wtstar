@@ -61,3 +61,5 @@ void out_raw(writer_t *w, void *base, int n) {
     fwrite(base,1,n,w->f);
   }
 }
+
+#undef WRITER_BASE_STRING_SIZE 

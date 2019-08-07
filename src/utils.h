@@ -2,23 +2,24 @@
 #define __UTILS_H__
 
 // lvalue of given type at given address
-#define LVAL(ptr, type) *((type *)(ptr))
+#define ptr(pntr, type) ((type *)(pntr))
+#define lval(pntr, type) (*ptr(pntr, type))
 
 #define ALLOC_VAR(var, type) type *var = (type *)malloc(sizeof(type));
 
 #define CONSTRUCTOR(name, ...) name *name##_new(__VA_ARGS__)
 #define DESTRUCTOR(name) void name##_delete(name *r)
 
-#define append(type, list, value)                   \
-  if (value) {                                      \
-    if (!(*(list)))                                 \
-      *(list) = (value);                            \
-    else {                                          \
-      type *tmp;                                    \
-      for (tmp = *list; tmp->next; tmp = tmp->next) \
-        ;                                           \
-      tmp->next = (value);                          \
-    }                                               \
+#define append(type, list, value)                                   \
+  if (value) {                                                      \
+    if (!(*(list)))                                                 \
+      *(list) = (value);                                            \
+    else {                                                          \
+      type *__tmp__;                                                \
+      for (__tmp__ = *list; __tmp__->next; __tmp__ = __tmp__->next) \
+        ;                                                           \
+      __tmp__->next = (value);                                      \
+    }                                                               \
   }
 
 #define list_for(var, type, list)        \

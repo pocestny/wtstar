@@ -5,10 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "code_generation.h"
+
 // extern int yydebug;
 #include "ast_debug_print.h"
 
-char *outf, *inf;
+char *outf, *inf, *astf;
 int ast_debug = 0, outf_spec = 0;
 
 void print_help(int argc, char **argv) {
@@ -16,7 +18,7 @@ void print_help(int argc, char **argv) {
   printf("options:\n");
   printf("-h,-?         print this screen and exit\n");
   printf("-o file       write output to file\n");
-  printf("-D            print intermediate AST\n");
+  printf("-D file       print intermediate AST to file (- = stderr)\n");
   exit(0);
 }
 
@@ -31,9 +33,18 @@ void parse_options(int argc, char **argv) {
         print_help(argc, argv);
         exit(1);
       }
-      outf_spec=1;
+      outf_spec = 1;
     } else if (!strcmp(argv[i], "-D")) {
-      ast_debug=1;
+      ast_debug = 1;
+      if (++i < argc)
+        astf = argv[i];
+      else {
+        print_help(argc, argv);
+        exit(1);
+      }
+    } else if (!strcmp(argv[i], "-D-")) {
+      ast_debug = 1;
+      astf = argv[i] + 2;
     } else
       inf = argv[i];
 }
@@ -41,32 +52,46 @@ void parse_options(int argc, char **argv) {
 int main(int argc, char **argv) {
   outf = "a.out";
   inf = NULL;
+  astf = NULL;
   parse_options(argc, argv);
   if (!inf) print_help(argc, argv);
-
 
   // yydebug=1;
   driver_init();
   ast_t *r = driver_parse(inf);
-  driver_destroy();
 
-  writer_t *out = writer_t_new(WRITER_FILE);
-  out->f = fopen(outf, "wb");
-  writer_t *log = writer_t_new(WRITER_FILE);
-  log->f = stderr;
-  if (r->error_occured)
-    out_text(log, "there were errors\n");
-  else {
-    emit_code(r, out, log);
-    if (ast_debug) ast_debug_print(r);
+  writer_t *write_out;
+
+  if (!ast_debug) {
+    write_out = writer_t_new(WRITER_FILE);
+    write_out->f = fopen(outf, "wb");
   }
+
+  writer_t *write_log = writer_t_new(WRITER_FILE);
+  write_log->f = stderr;
+
+  writer_t *write_ast;
+  if (ast_debug) {
+    write_ast = writer_t_new(WRITER_FILE);
+    if (!strcmp(astf, "-"))
+      write_ast->f = stderr;
+    else
+      write_ast->f = fopen(astf, "wt");
+  }
+
+  if (r->error_occured)
+    out_text(write_log, "there were errors\n");
+  else {
+    if (ast_debug)
+      ast_debug_print(r, write_ast);
+    else
+      emit_code(r, write_out, write_log);
+  }
+
+  driver_destroy();
   ast_t_delete(r);
 
-  writer_t_delete(out);
-  writer_t_delete(log);
-
-  /*for(int i=0;i<out->str.ptr;i++)
-    printf("%02x ",out->str.base[i]);
-  printf("\n");
-  */
+  if (!ast_debug) writer_t_delete(write_out);
+  writer_t_delete(write_log);
+  if (ast_debug) writer_t_delete(write_ast);
 }

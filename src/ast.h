@@ -18,6 +18,10 @@
  */
 
 struct _ast_node_t;
+struct _scope_t;
+struct _expression_t;
+struct _function_t;
+
 #define AST_NODE_STATIC_TYPE 52
 #define AST_NODE_VARIABLE 53
 #define AST_NODE_SCOPE 54
@@ -74,16 +78,13 @@ static_type_member_t *static_type_member_find(static_type_member_t *list,
 #define IO_FLAG_IN 1
 #define IO_FLAG_OUT 2
 
-struct _scope_t;
-struct _expression_t;
-
 typedef struct _variable_t {
   uint8_t io_flag;
   char *name;                         // owned
   static_type_t *base_type;           // external
   struct _scope_t *scope;             // external
   uint32_t addr;                      // address (set during code generation)
-  struct _expression_t *initializer;  // owned
+  struct _ast_node_t *initializer;  // owned AST_NODE_EXPRESSION
 
   uint8_t num_dim;  // >0 = array
                     // number of active dimensions (subsript length)
@@ -112,6 +113,8 @@ typedef struct _scope_t {
   struct _ast_node_t *items;  // owned
   struct _ast_node_t
       *params;  // external: function paramters (treated as local variables)
+  struct _function_t
+      *fn;  // scope belongs to a function (set in code_generation)
 } scope_t;
 
 CONSTRUCTOR(scope_t);
@@ -138,8 +141,12 @@ DESTRUCTOR(function_t);
  *
  * contains:
  *
- * inferred type (either pointing to a static_type or a structure from
- * initializer list)
+ * inferred type
+ * either static_type  ( points to already defined types) or list of
+ * inferred types
+ *
+ * for arrays and variables the inferred type points to a static type
+ * for initializers, it is the list of inferred types
  *
  * variant: (l,i,f,v,o,c,s)
  *
@@ -224,17 +231,17 @@ typedef struct {
 
 typedef struct {
   int oper;
-  struct _expression_t *first, *second;  // owned
+  struct _ast_node_t *first, *second;  // owned; AST_NODE_EXPRESSION
 } expr_oper_t;
 
 typedef struct {
-  static_type_t *type;       // external
-  struct _expression_t *ex;  // owned
+  static_type_t *type;     // external
+  struct _ast_node_t *ex;  // owned; AST_NODE_EXPRESSION
 } expr_cast_t;
 
 typedef struct {
   static_type_member_t *memb;  // external
-  struct _expression_t *ex;    // owned
+  struct _ast_node_t *ex;      // owned; AST_NODE_EXPRESSION
 } expr_specif_t;
 
 /*
@@ -245,7 +252,7 @@ typedef struct _expression_t {
   inferred_type_t *type;
   int variant;
   union {
-    void *l;
+    uint8_t *l;
     struct _ast_node_t *i;
     expr_function_t *f;
     expr_variable_t *v;
@@ -292,26 +299,23 @@ DESTRUCTOR(statement_t);
  *
  * constructor paramters: loc + variant + ...
  *
- * AST_NODE_STATIC_TYPE: ident (char*) 
- * AST_NODE_VARIABLE: ident (char*) 
+ * AST_NODE_STATIC_TYPE: ident (char*)
+ * AST_NODE_VARIABLE: ident (char*)
  * AST_NODE_SCOPE:      parent_scope
- * AST_NODE_FUNCTION: name (char*) 
- * AST_NODE_EXPRESSION: variant  
+ * AST_NODE_FUNCTION: name (char*)
+ * AST_NODE_EXPRESSION: variant
  *    for EXPR_BINARY: left , oper, right (int oper, ast_node_t* left,right)
- *          left,right are AST_NODE_EXPRESSIONs, make val.e part of new expression
- *          and deallocat rest
+ *          left,right are AST_NODE_EXPRESSIONs
  *    for EXPR_CAST:   type, cast_expr (static_type_t*,ast_node_t*, as above)
  *    for EXPR_PREFIX:  oper, expr
  *    for EXPR_POSTFIX: expr, oper
- * AST_NODE_STATEMENT:  variant 
+ * AST_NODE_STATEMENT:  variant
  *
  */
 
 typedef struct _ast_node_t {
   int node_type;
-
   YYLTYPE loc;
-
   union {
     static_type_t *t;
     variable_t *v;

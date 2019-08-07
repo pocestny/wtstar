@@ -66,6 +66,7 @@ int append_variables(ast_t *ast, ast_node_t *list) {
       return 0;
     }
     append(ast_node_t, &ast->current_scope->items, v);
+    v->val.v->scope=ast->current_scope;
   }
   list_for_end;
   return 1;
@@ -146,11 +147,11 @@ int init_alias(ast_t *ast, YYLTYPE *iloc, char *ident, YYLTYPE *aloc,
   return 1;
 }
 
-ast_node_t *expression_zero() {
+ast_node_t *expression_int_val(int val) {
   ast_node_t *zero = ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
   zero->val.e->type->type = __type__int->val.t;
   zero->val.e->val.l = malloc(sizeof(int));
-  *(int *)(zero->val.e->val.l) = 0;
+  *(int *)(zero->val.e->val.l) = val;
   return zero;
 }
 
@@ -185,16 +186,14 @@ int init_array(ast_t *ast, ast_node_t *var, ast_node_t *exprlist) {
 
   for (int i = 0; i < v->num_dim; i++) {
     v->active_dims[i] = i;
-    append(ast_node_t, &v->ranges, expression_zero());
+    append(ast_node_t, &v->ranges, expression_int_val(0));
     ast_node_t *tmp =
-        ast_node_t_new(&(exprlist->loc), AST_NODE_EXPRESSION, EXPR_POSTFIX);
-    tmp->val.e->val.o->oper = TOK_DEC;
-    tmp->val.e->val.o->first = exprlist->val.e;
-    tmp->val.e->val.o->second = NULL;
-    ast_node_t *tmp2 = exprlist;
+        ast_node_t_new(&(exprlist->loc), AST_NODE_EXPRESSION, EXPR_BINARY);
+    tmp->val.e->val.o->oper = '-';
+    tmp->val.e->val.o->first = exprlist;
+    tmp->val.e->val.o->second = expression_int_val(1);
     exprlist = exprlist->next;
-    free(tmp2);
-    tmp->next = NULL;
+    tmp->val.e->val.o->first->next = NULL;
     append(ast_node_t, &v->ranges, tmp);
   }
   return 1;
@@ -319,8 +318,7 @@ ast_node_t *create_specifier_expr(YYLTYPE *loc, ast_t *ast, ast_node_t *expr,
   ast_node_t *res = ast_node_t_new(loc, AST_NODE_EXPRESSION, EXPR_SPECIFIER);
   res->val.e->type->type = t->type;
   res->val.e->val.s->memb = t;
-  res->val.e->val.s->ex = expr->val.e;
-  free(expr);
+  res->val.e->val.s->ex = expr;
   free(ident);
   return res;
 }

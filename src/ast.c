@@ -75,7 +75,7 @@ CONSTRUCTOR(variable_t, char *name) {
 DESTRUCTOR(variable_t) {
   if (r == NULL) return;
   free(r->name);
-  expression_t_delete(r->initializer);
+  ast_node_t_delete(r->initializer);
   if (r->active_dims) free(r->active_dims);
   ast_node_t_delete(r->ranges);
   free(r);
@@ -90,6 +90,7 @@ CONSTRUCTOR(scope_t) {
   r->parent = NULL;
   r->items = NULL;
   r->params = NULL;
+  r->fn=NULL;
   return r;
 }
 
@@ -280,14 +281,14 @@ DESTRUCTOR(expression_t) {
     case EXPR_POSTFIX:
     case EXPR_PREFIX:
     case EXPR_BINARY:
-      expression_t_delete(r->val.o->first);
-      expression_t_delete(r->val.o->second);
+      ast_node_t_delete(r->val.o->first);
+      ast_node_t_delete(r->val.o->second);
       break;
     case EXPR_CAST:
-      expression_t_delete(r->val.c->ex);
+      ast_node_t_delete(r->val.c->ex);
       break;
     case EXPR_SPECIFIER:
-      expression_t_delete(r->val.s->ex);
+      ast_node_t_delete(r->val.s->ex);
       break;
   }
   free(r);
@@ -372,33 +373,27 @@ CONSTRUCTOR(ast_node_t, YYLTYPE *iloc, int node_type, ...) {
           ast_node_t *n1 = va_arg(args, ast_node_t *);
           int op = va_arg(args, int);
           ast_node_t *n2 = va_arg(args, ast_node_t *);
-          r->val.e->val.o->first = (n1)?n1->val.e:NULL;
-          r->val.e->val.o->second = (n2)?n2->val.e:NULL;
+          r->val.e->val.o->first = n1;
+          r->val.e->val.o->second = n2;
           r->val.e->val.o->oper = op;
-          if (n1) free(n1);
-          if (n2) free(n2);
         } break;
         case EXPR_CAST: {
           static_type_t *t = va_arg(args, static_type_t *);
           ast_node_t *ex = va_arg(args, ast_node_t *);
           r->val.e->val.c->type = t;
-          r->val.e->val.c->ex = (ex)?ex->val.e:NULL;
-          if (t) free(t);
-          if (ex) free(ex);
+          r->val.e->val.c->ex = ex;
         } break;
         case EXPR_PREFIX: {
           int op = va_arg(args, int);
           ast_node_t *ex = va_arg(args, ast_node_t *);
-          r->val.e->val.o->first = (ex)?ex->val.e:NULL;
+          r->val.e->val.o->first = ex;
           r->val.e->val.o->oper = op;
-          if (ex) free(ex);
         } break;
         case EXPR_POSTFIX: {
           ast_node_t *ex = va_arg(args, ast_node_t *);
           int op = va_arg(args, int);
-          r->val.e->val.o->first = (ex)?ex->val.e:NULL;
+          r->val.e->val.o->first = ex;
           r->val.e->val.o->oper = op;
-          if(ex) free(ex);
         } break;
       };
     } break;

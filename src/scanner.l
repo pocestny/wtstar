@@ -31,13 +31,16 @@ TOK_DBLBRACKET, TOK_DBRBRACKET,
   yylloc->fl = yylloc->ll = yylineno;\
   yylloc->fc = yycolumn; yylloc->lc = yycolumn + yyleng - 1; \
   yylloc->fn = yylloc->ln = driver_current_file();\
-  yycolumn += yyleng; 
+  yycolumn += yyleng; \
+  //printf("%3d %3d %3d |%s|\n",yylineno, yycolumn, yy_act, yytext);
 %}
 
 SPACE   [ \t]
 LETTER  [a-zA-Z]
 IDSYM   [a-zA-Z0-9_]
 DIGIT   [0-9]
+SYMBOL  [^a-zA-Z0-9 \t_'"]
+SYMBOL2  [^a-zA-Z0-9 \t_'";]
 
 %x include
 %x comment
@@ -111,7 +114,8 @@ dim/[^{IDSYM}{DIGIT}]       { return TOK_DIM; }
   /* not a keyword  */
 [a-zA-Z_]{IDSYM}* {
   
-  if (yytext[0]=='_'&&yytext[1]==0) return TOK_DONT_CARE;
+  if (yytext[0]=='_'&&yyleng==1) 
+  return TOK_DONT_CARE;
 
   ast_node_t *t=ast_node_find(ast->types,yytext);
   if (t) {
@@ -129,20 +133,22 @@ dim/[^{IDSYM}{DIGIT}]       { return TOK_DIM; }
 
   /* symbols */
 
-.. {
+{SYMBOL2}{SYMBOL2} {
   for (int i=0;symbols2[i];i++) 
     if (!strcmp(symbols2[i],yytext)) 
     return values2[i];
   REJECT;  
 }
 
-. {
+{SYMBOL} {
   for (int i=0;symbols[i];i++) 
     if (!strcmp(symbols[i],yytext)) 
     return yytext[0];
 
   yyerror(yylloc,ast,"lexical error, unexpected token %s",yytext);
 }
+
+
 
 <<EOF>> {
     driver_set_current_pos(yylineno,yycolumn);

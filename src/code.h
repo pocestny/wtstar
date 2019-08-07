@@ -23,19 +23,20 @@
 #define LDCH        0x9U  // same as above,  but addresses are relative to heap
 #define LDBH        0xAU 
 #define STCH        0xBU 
-#define STBJ        0xCU 
+#define STBH        0xCU 
 
 #define IDX         0xDU  // IDX(n)  addr,i1,...,in,... -> hoffs
-                          // addr - address of array variable, i1..in indices of active dimensions
+                          // addr - address of array variable, 
+                          //    i1..in indices of active dimensions
                           // hoffs - offset (in # of elements)
 
-#define SWO         0xEU  //  SWO      : a,b,...  -> b,a,...    
+#define SWS         0xEU  //  SWS      : a,b,...  -> b,a,...    
 #define POP         0xFU  //  POP      : discard top stack
 
 // accumulator  stack
-#define PUSHA       0x10U  //  PUSHA    : copy top acc to top stack
+#define A2S         0x10U  //  A2S      : copy top acc to top stack
 #define POPA        0x11U  //  POPA     : discard top accumulator
-#define LDA         0x12U  //  LDA      : top stack copy to acc
+#define S2A         0x12U  //  S2A      : top stack copy to acc
 #define RVA         0x13U  //  RVA      : reverse acc
 #define SWA         0x14U  //  SWA      : swap two top elements of acc
 
@@ -79,7 +80,8 @@
 #define FLOAT2INT   0x31U  //  cast top of stack
 #define INT2FLOAT   0x32U  //  cast top of stack
 
-#define FORK        0x33U  //  FORK  : n,... -> .... forks n new processes
+#define FORK        0x33U  //  FORK(a): n,... -> .... forks n new processes
+                           //          a is the address of the driving variable 
 #define SPLIT       0x34U  //  SPLIT    : c,... -> ... split current group based on stack top 
                            //  create two new groups (first for nonzero, second for zero)
                            //  each continues until join
@@ -88,26 +90,24 @@
 
 // these instructions do not count, and are executed only by the machine
 
-// hack to avoid heap allocation for scopes
-// has separate stack for every call frame
+// mark both static mem and heap
 #define MEM_MARK   0x36U  
 #define MEM_FREE   0x37U
 
 // give address (relative to heap) to block of size c
 #define ALLOC       0x38U  //  ALLOC    : c,... -> addr,.... (c,addr:uint32_t)
-#define MALLOC      0x39U  //  MALLOC(x) allocate static memory
+#define ENDVM       0x39U
 
-#define SECTION_HEADER  0x7U
-
-/*
-  so far, nothing here
-*/
-
+#define SECTION_HEADER  0x77U
 #define SECTION_INPUT   0x88U
 #define SECTION_OUTPUT  0x99U
-#define SECTION_CODE    0xaaU
+#define SECTION_FNMAP   0xaaU
+#define SECTION_CODE    0xbbU
 
 /*
+ 
+header: 1B version 1
+
 input/output section:
 
 n_vars uint32
@@ -116,8 +116,12 @@ n_vars uint32
 var: 
 addr    uint32
 num_dim uint8
-n_items (element description)
+n_items uint8 (element description)
 item1 .. itemn (elem = uint8 - type )
+
+the restriction means that there are at most 256 dimensions in an array, and at most
+256 subtypes in a type
+
 */
 
 #define TYPE_INT   0U
@@ -136,9 +140,9 @@ item1 .. itemn (elem = uint8 - type )
     uint32:  header address (relative to heap)
 
   header on heap:
-    nd uint8:   number of dimensions
-    nad uint8:  number of active dimensions
-    dim_1 ... dim_nd  uint32 offset, uint32 size
+    nd uint8:   number of (root) dimensions
+    nad uint8:  number of active (subscript length)  dimensions
+    dim_1 ... dim_nd  uint32 min, uint32 max
     ad_1 ... ad_nd    uint8  index of active dimension
 
 
