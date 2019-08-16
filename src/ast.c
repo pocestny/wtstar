@@ -330,6 +330,7 @@ DESTRUCTOR(statement_t) {
 CONSTRUCTOR(ast_node_t, YYLTYPE *iloc, int node_type, ...) {
   ALLOC_VAR(r, ast_node_t)
   r->next = NULL;
+  r->emitted=0;
 
   va_list args;
   va_start(args, node_type);

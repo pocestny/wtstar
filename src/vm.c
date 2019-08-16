@@ -61,7 +61,6 @@ CONSTRUCTOR(thread_t) {
   r->mem_base = 0;
   r->op_stack = stack_t_new();
   r->acc_stack = stack_t_new();
-  r->mem_mark = stack_t_new();
   r->mem = stack_t_new();
   r->parent = NULL;
   r->refcnt = 1;
@@ -84,9 +83,24 @@ DESTRUCTOR(thread_t) {
     stack_t_delete(r->op_stack);
     stack_t_delete(r->acc_stack);
     stack_t_delete(r->mem);
-    stack_t_delete(r->mem_mark);
     free(r);
   }
+}
+
+CONSTRUCTOR(frame_t, uint32_t base) {
+  ALLOC_VAR(r, frame_t)
+
+  r->base = base;
+  r->heap_mark = stack_t_new();
+  r->mem_mark = stack_t_new();
+  return r;
+}
+
+DESTRUCTOR(frame_t) {
+  if (r == NULL) return;
+  stack_t_delete(r->heap_mark);
+  stack_t_delete(r->mem_mark);
+  free(r);
 }
 
 /* create runtime */
@@ -101,11 +115,18 @@ CONSTRUCTOR(runtime_t, uint8_t *in, int len) {
   ALLOC_VAR(r, runtime_t)
 
   r->heap = stack_t_new();
-  r->heap_mark = stack_t_new();
   r->threads = stack_t_new();
   r->frames = stack_t_new();
-  uint32_t base = 0;
-  stack_t_push(r->frames, &base, 4);
+
+  frame_t *tf = frame_t_new(0);
+  stack_t_push(r->frames, (void *)(&tf), sizeof(frame_t *));
+
+  thread_t *main_thread = thread_t_new();
+  main_thread->mem_base = 0;
+  main_thread->refcnt = 1;
+  stack_t *grp = stack_t_new();
+  stack_t_push(grp, (void *)(&main_thread), sizeof(thread_t *));
+  stack_t_push(r->threads, (void *)(&grp), sizeof(stack_t *));
 
   // parse input file
   uint8_t section;
@@ -113,13 +134,11 @@ CONSTRUCTOR(runtime_t, uint8_t *in, int len) {
     GET(uint8_t, section, 1);
     switch (section) {
       case SECTION_HEADER: {
-        thread_t *main_thread = thread_t_new();
-        main_thread->mem_base = 0;
-        main_thread->refcnt = 1;
-        stack_t *grp = stack_t_new();
-        stack_t_push(grp, (void *)(&main_thread), sizeof(thread_t *));
-        stack_t_push(r->threads, (void *)(&grp), sizeof(stack_t *));
-
+        uint8_t version;
+        uint32_t global_size;
+        GET(uint8_t,version,1)
+        GET(uint32_t,global_size,4)
+        stack_t_alloc(main_thread->mem,global_size);
       } break;
       case SECTION_INPUT:
         GET(uint32_t, r->n_in_vars, 4)
@@ -147,8 +166,14 @@ CONSTRUCTOR(runtime_t, uint8_t *in, int len) {
             GET(uint8_t, r->out_vars[i].elems[j], 1);
         }
         break;
-      case SECTION_FNMAP:
-        break;
+      case SECTION_FNMAP: {
+        GET(uint32_t, r->fcnt, 4);
+        if (r->fcnt > 0)
+          r->fnmap = (uint32_t *)malloc(r->fcnt * 4);
+        else
+          r->fnmap = NULL;
+        for (uint32_t i = 0; i < r->fcnt; i++) GET(uint32_t, r->fnmap[i], 4);
+      } break;
       case SECTION_CODE:
         r->code_size = len - pos;
         r->code = (uint8_t *)malloc(len - pos);
@@ -184,14 +209,11 @@ DESTRUCTOR(runtime_t) {
     stack_t_delete(STACK(r->threads, stack_t *)[i]);
   }
 
+  // FIXME: delete contents of threads,frames
   stack_t_delete(r->threads);
   stack_t_delete(r->frames);
+  if (r->fnmap) free(r->fnmap);
   free(r);
-}
-
-void dump_memory(runtime_t *env) {
-  for (int i = 0; i < env->heap->top; i++) printf("%02u ", env->heap->data[i]);
-  printf("\n");
 }
 
 #define _PUSH(var, len) stack_t_push(thr[t]->op_stack, (void *)(&(var)), len)
@@ -205,19 +227,35 @@ void *get_addr(thread_t *thr, uint32_t addr, uint32_t len) {
   return (void *)(thr->mem->data + (addr - thr->mem_base));
 }
 
+static void mem_mark(frame_t *frame, runtime_t *env, int n_thr,
+                     thread_t **thr) {
+  stack_t_push(frame->heap_mark, (void *)&(env->heap->top), 4);
+  // TODO: assert all threads have the same memtop
+  stack_t_push(frame->mem_mark, (void *)&(thr[0]->mem->top), 4);
+}
+
+static void mem_free(frame_t *frame, runtime_t *env, int n_thr,
+                     thread_t **thr) {
+  stack_t_pop(frame->heap_mark, (void *)&(env->heap->top), 4);
+  uint32_t memtop;
+  stack_t_pop(frame->mem_mark, (void *)&memtop, 4);
+  for (int t = 0; t < n_thr; t++) thr[t]->mem->top = memtop;
+}
+
 void execute(runtime_t *env, int *W, int *T) {
   int n_thr = 1;
   uint32_t arr_sizes[257], arr_offs[257];
   thread_t **thr = STACK(STACK(env->threads, stack_t *)[0], thread_t *);
+  frame_t *frame = STACK(env->frames, frame_t *)[0];
 
   int virtual_grps = 0;
   *W = *T = 0;
 
-  stack_t *ret_addr = stack_t_new();
-
   if (EXEC_DEBUG) printf("code size: %d\n", env->code_size);
-  for (uint32_t pc = 0; pc < env->code_size;) {
+
+  for (uint32_t pc = 0; 1;) {
     uint8_t opcode = lval(env->code + pc, uint8_t);
+    if (opcode == ENDVM) break;
     pc++;
 
     if (EXEC_DEBUG) {
@@ -228,7 +266,6 @@ void execute(runtime_t *env, int *W, int *T) {
           printf(" %d", lval(&env->code[pc], int32_t));
           break;
         case CALL:
-        case FORK:
           printf(" %d", lval(&env->code[pc], uint32_t));
           break;
         case PUSHB:
@@ -240,30 +277,21 @@ void execute(runtime_t *env, int *W, int *T) {
 
     switch (opcode) {
       case MEM_MARK:
-        if (n_thr > 0) {
-          stack_t_push(env->heap_mark,(void *)&(env->heap->top),4);
-          for (int t = 0; t < n_thr; t++) 
-            stack_t_push(thr[t]->mem_mark,(void *)&(thr[t]->mem->top),4);
-        }
+        if (n_thr > 0) mem_mark(frame, env, n_thr, thr);
         break;
       case MEM_FREE:
-        if (n_thr > 0) {
-          stack_t_pop(env->heap_mark,(void *)&(env->heap->top),4);
-          for (int t = 0; t < n_thr; t++) 
-            stack_t_pop(thr[t]->mem_mark,(void *)&(thr[t]->mem->top),4);
-        }
+        if (n_thr > 0) mem_free(frame, env, n_thr, thr);
         break;
       case FORK:
         if (n_thr > 0) {
           (*W)++;
           (*T)++;
 
-          uint32_t a = lval(env->code + pc, uint32_t);
-
           stack_t *grp = stack_t_new();
 
           for (int t = 0; t < n_thr; t++) {
-            uint32_t n;
+            uint32_t a, n;
+            _POP(a, 4);
             _POP(n, 4);
             for (int j = 0; j < n; j++) {
               thread_t *nt = clone_thread(thr[t]);
@@ -276,7 +304,6 @@ void execute(runtime_t *env, int *W, int *T) {
           n_thr = STACK_SIZE(grp, thread_t *);
         } else
           virtual_grps++;
-        pc += 4;
         break;
       case SPLIT: {
         if (n_thr > 0) {
@@ -337,9 +364,15 @@ void execute(runtime_t *env, int *W, int *T) {
           (*W)++;
           (*T)++;
           uint32_t ra = pc + 4;
-          stack_t_push(ret_addr, &ra, 4);
-          stack_t_push(env->frames, &(thr[0]->mem->top), 4);
-          pc = lval(env->code + pc, uint32_t);
+
+          frame_t *nf = frame_t_new(thr[0]->mem->top);
+          nf->ret_addr = ra;
+          mem_mark(frame, env, n_thr, thr);
+
+          stack_t_push(env->frames, (void *)&nf, sizeof(frame_t *));
+          frame = nf;
+
+          pc = env->fnmap[lval(env->code + pc, uint32_t)];
         }
         break;
 
@@ -347,9 +380,15 @@ void execute(runtime_t *env, int *W, int *T) {
         if (n_thr > 0) {
           (*W)++;
           (*T)++;
-          stack_t_pop(ret_addr, &pc, 4);
-          uint32_t huh;
-          stack_t_pop(env->frames, &huh, 4);
+
+          pc = frame->ret_addr;
+
+          frame_t *of;
+          stack_t_pop(env->frames, (void *)&of, sizeof(frame_t *));
+          frame_t_delete(of);
+
+          frame = STACK_TOP(env->frames, frame_t*);
+          mem_free(frame, env, n_thr, thr);
         }
         break;
 
@@ -369,7 +408,7 @@ void execute(runtime_t *env, int *W, int *T) {
             } break;
 
             case FBASE:
-              _PUSH(STACK_TOP(env->frames, uint32_t), 4);
+              _PUSH(frame->base,4);
               break;
 
             case ALLOC: {
@@ -450,7 +489,7 @@ void execute(runtime_t *env, int *W, int *T) {
                 fprintf(stderr,
                         "fatal error, mismatched number of dimensions for "
                         "IDX\n");
-                dump_memory(env);
+                // dump_memory(env);
                 exit(1);
               }
               for (int i = 0; i < nd; i++) {
@@ -459,16 +498,16 @@ void execute(runtime_t *env, int *W, int *T) {
                     lval(env->heap->data + hdr + 2 + 8 * i + 4, uint32_t) -
                     arr_offs[i] + 1;
               }
+
               for (int i = 0; i < nad; i++) {
                 uint8_t d =
                     lval(env->heap->data + hdr + 2 + 8 * nd + i, uint8_t);
                 uint32_t v;
                 _POP(v, 4);
                 arr_offs[d] += v;
-                if (arr_offs[d] >= arr_sizes[d]) {
-                  fprintf(stderr,
-                          "range check error\n");
-                  //dump_memory(env);
+                if (v >= arr_sizes[d]) {
+                  fprintf(stderr, "range check error\n");
+                  // dump_memory(env);
                   exit(1);
                 }
               }
@@ -579,6 +618,12 @@ void execute(runtime_t *env, int *W, int *T) {
               a = a || b;
               _PUSH(a, 4);
             } break;
+            case NOT: {
+              int32_t a;
+              _POP(a, 4);
+              a = !a;
+              _PUSH(a, 4);
+            } break;
             case EQ_INT: {
               int32_t a, b;
               _POP(a, 4);
@@ -618,9 +663,10 @@ void execute(runtime_t *env, int *W, int *T) {
             } break;
 
             default:
-              fprintf(stderr,
-                      "fatal error, unknown instruction %s (opcode %0x)\n",
-                      instr_names[opcode], opcode);
+              fprintf(
+                  stderr,
+                  "fatal error, unknown instruction %s (opcode %0x) at %u\n",
+                  instr_names[opcode], opcode, pc - 1);
               exit(1);
           }
         switch (opcode) {
@@ -637,7 +683,9 @@ void execute(runtime_t *env, int *W, int *T) {
     if (EXEC_DEBUG) {
       printf("\n     n_thr=%2d\n", n_thr);
       if (n_thr > 0) {
+        printf("fbase=%d\n", frame->base);
         for (int t = 0; t < n_thr; t++) {
+          printf("mem_base=%d size=%d", thr[t]->mem_base, thr[t]->mem->top);
           printf("     [");
           for (int i = 0; i < thr[t]->op_stack->top; i++)
             printf("%d ", thr[t]->op_stack->data[i]);
@@ -647,7 +695,6 @@ void execute(runtime_t *env, int *W, int *T) {
         printf("\n");
     }
   }
-  // dump_memory(env);
 }
 #undef _PUSH
 #undef _POP

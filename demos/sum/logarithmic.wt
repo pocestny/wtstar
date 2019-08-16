@@ -2,7 +2,7 @@
 
 balanced binary tree computation
   
-input:  array of integers
+input:  array of integers (length power of 2)
 output: sum
 
 T = O(log n)

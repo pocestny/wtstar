@@ -11,7 +11,7 @@ int EXEC_DEBUG = 0;
 
 extern const char *const instr_names[];
 
-int print_file = 0, print_io = 0;
+int print_file = 0, print_io = 0, dump_heap=0;
 char *inf;
 
 void print_io_vars(int n, input_layout_item_t *vars) {
@@ -46,7 +46,6 @@ void print_code(uint8_t *code, int size) {
     switch (instr) {
       case PUSHC:
       case JMP:
-      case FORK:
         printf(" %d", lval(&code[i + 1], int32_t));
         i += 4;
         break;
@@ -70,6 +69,7 @@ void print_help(int argc, char **argv) {
   printf("-h,-?         print this screen and exit\n");
   printf("-i            dump io structure \n");
   printf("-D            dump file and exit\n");
+  printf("-m            dump heap after finish\n");
   printf("-t            trace run\n");
 
   exit(0);
@@ -83,6 +83,8 @@ void parse_options(int argc, char **argv) {
       print_file = 1;
     } else if (!strcmp(argv[i], "-i")) {
       print_io = 1;
+    } else if (!strcmp(argv[i], "-m")) {
+      dump_heap = 1;
     } else if (!strcmp(argv[i], "-t")) {
       EXEC_DEBUG = 1;
     } else
@@ -95,19 +97,19 @@ void read_var(runtime_t *env, thread_t *tt, input_layout_item_t *var) {
       case TYPE_INT: {
         uint32_t x;
         scanf("%d ", &x);
-        lval(get_addr(tt, var->addr + offs,4), uint32_t) = x;
+        lval(get_addr(tt, var->addr + offs, 4), uint32_t) = x;
         offs += 4;
       } break;
       case TYPE_FLOAT: {
         float x;
         scanf("%f ", &x);
-        lval(get_addr(tt, var->addr + offs,4), float) = x;
+        lval(get_addr(tt, var->addr + offs, 4), float) = x;
         offs += 4;
       } break;
       case TYPE_CHAR: {
         uint8_t x;
         scanf("%c ", &x);
-        lval(get_addr(tt, var->addr + offs,1), uint8_t) = x;
+        lval(get_addr(tt, var->addr + offs, 1), uint8_t) = x;
         offs += 1;
       } break;
     }
@@ -188,7 +190,7 @@ void read_input(runtime_t *env) {
       lval(env->heap->data + hdr, uint8_t) = 1;
       lval(env->heap->data + hdr + 1, uint8_t) = 1;
       lval(env->heap->data + hdr + 2, uint32_t) = 0;
-      lval(env->heap->data + hdr + 6, uint32_t) = n_elem;
+      lval(env->heap->data + hdr + 6, uint32_t) = n_elem - 1;
       lval(env->heap->data + hdr + 10, uint8_t) = 0;
 
       for (int j = 0; j < n_elem; j++) {
@@ -211,7 +213,7 @@ void write_output(runtime_t *env) {
       uint32_t base = lval(global_mem + env->out_vars[i].addr, uint32_t),
                hdr = lval(global_mem + env->out_vars[i].addr + 4, uint32_t);
 
-      // printf("%d %d\n",base,hdr);
+       //printf(">> base:%u=%u hdr:%u=%u\n",env->out_vars[i].addr,base,env->out_vars[i].addr + 4,hdr);
       uint8_t nd = lval(env->heap->data + hdr, uint8_t);
       int *sizes = (int *)malloc(nd * sizeof(int));
       for (int i = 0; i < nd; i++)
@@ -227,6 +229,15 @@ void write_output(runtime_t *env) {
     printf("\n");
   }
 }
+
+
+void dump_memory(runtime_t *env) {
+  printf("mem (size=%d): ",env->heap->size);
+  for (int i = 0; i < env->heap->size; i++) printf("%02u ", env->heap->data[i]);
+  printf("\n");
+}
+
+
 
 int main(int argc, char **argv) {
   inf = NULL;
@@ -256,6 +267,10 @@ int main(int argc, char **argv) {
     printf("output variables:\n");
     print_io_vars(env->n_out_vars, env->out_vars);
     printf("\n");
+    printf("function addresses:\n");
+    for (uint32_t i = 0; i < env->fcnt; i++)
+      printf("%3u %05u\n", i, env->fnmap[i]);
+    printf("\n");
     printf("code:\n");
     print_code(env->code, env->code_size);
   } else if (print_io) {
@@ -270,5 +285,6 @@ int main(int argc, char **argv) {
     execute(env, &W, &T);
     write_output(env);
     printf("W/T: %d %d\n", W, T);
+    if (dump_heap) dump_memory(env); 
   }
 }

@@ -50,8 +50,8 @@
 
 %token TYPE INPUT OUTPUT ALIAS IF ELSE FOR WHILE PARDO DO BREAK RETURN CONTINUE SIZE DIM
 
-%token < > DBLBRACKET "[["
-%token < > DBRBRACKET "]]"
+%token < > DBLBRACKET "[<"
+%token < > DBRBRACKET ">]"
 
 %token < > EQ "=="
 %token < > NEQ "!="
@@ -89,9 +89,6 @@
     array_dim_spec
     assign_operator eq_operator rel_operator add_operator mult_operator unary_operator
 
-%type <string_val>
-    open_function
-
 %type <ast_node_val> 
     expr expr_assign expr_or expr_and expr_eq expr_rel expr_add expr_mult
     expr_pow expr_cast expr_unary expr_postfix expr_primary expr_literal
@@ -101,9 +98,9 @@
     variable_init_declarator variable_declarator input_variable_declarator
     static_variable_declarator input_variable_declarator_list
     ranges_list range
-    nonempty_parameter_declarator_list parameter_declarator_list maybe_body
+    nonempty_parameter_declarator_list parameter_declarator_list 
     parameter_declarator
-    stmt_scope 
+    stmt_scope open_function
 
 
 %type <static_type_member_val>
@@ -191,7 +188,7 @@ typedef_ident_list:
       
       <type> <new_name> [<size_1>,<size_2>,...,<size_d>];
       
-      alias <new_name> = <existing_array> [[ <from>:<to> , <fixed>, <from>:<to> ]];
+      alias <new_name> = <existing_array> [< <from>:<to> , <fixed>, <from>:<to> >];
      
       variables other from alias at global scope can be input / output 
 
@@ -219,7 +216,7 @@ output_declaration
                   ;
 
 alias_declaration
-                 : ALIAS IDENT '=' IDENT "[[" ranges_list "]]" ';'
+                 : ALIAS IDENT '=' IDENT "[<" ranges_list ">]" ';'
                     {
                       if (!init_alias(ast,&@2,$2,&@4,$4,$6)) YYERROR;
                     }
@@ -364,34 +361,52 @@ static_variable_declarator: IDENT
   */
 
 
-function_declaration: open_function maybe_body {add_function_scope(ast,$1,$2);}
+function_declaration 
+    : open_function ';'
+    | open_function '{'
+        {
+            if ($1) {
+               $<ast_node_val>$ = ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
+               $1->val.f->root_scope = $<ast_node_val>$->val.sc;
+               $<ast_node_val>$->val.sc->params = $1->val.f->params;
+               for (ast_node_t *p=$1->val.f->params;p;p=p->next)
+                  p->val.v->scope = $<ast_node_val>$->val.sc;
+               ast->current_scope=$<ast_node_val>$->val.sc;
+            }
+         } 
+      maybe_scope_item_list '}'
+         {
+           ast->current_scope=$<ast_node_val>3->val.sc->parent;
+           // TODO free
+         }
+
 
 open_function:
     TYPENAME IDENT '(' parameter_declarator_list ')'
       {
-        if (!define_function(ast,&@$,$1,$2,&@2,$4))
+        $$=define_function(ast,&@$,$1,$2,&@2,$4);
+        if (!$$)
           YYERROR;
-        else $$=$2;
       }
     |
     error ')' {$$=NULL;}
     ;
 
-
-maybe_body: 
-    ';' {$$=NULL;}
-    | 
-    stmt_scope {
-      $$=$1;
-      // remove from current scope
-      unchain_last(&ast->current_scope->items);
-    }
-    ;
+maybe_scope_item_list: %empty | scope_item_list; 
 
 parameter_declarator_list: 
     %empty {$$=NULL;}
     |  
-    nonempty_parameter_declarator_list {$$=$1;}
+    { 
+      $<ast_node_val>$ = ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
+      ast->current_scope=$<ast_node_val>$->val.sc;
+    }
+    nonempty_parameter_declarator_list 
+    {
+      $$=$2;
+      ast->current_scope=$<ast_node_val>1->val.sc->parent;
+      // TODO free
+    }
     ;
 
 nonempty_parameter_declarator_list: 
@@ -652,7 +667,7 @@ expr_primary:
         }
       }
     |
-    IDENT "[["  ranges_list "]]"  
+    IDENT "[<"  ranges_list ">]"  
       {
         $$=expression_variable(ast,&@1,$1);
         if ($$) {

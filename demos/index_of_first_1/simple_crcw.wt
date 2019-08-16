@@ -1,0 +1,23 @@
+/*
+
+  find the index of the first '1' in an array on common CRCW
+
+  T = O(1)
+  W = O(n^2)
+
+*/
+input int A[_];
+int n = A.size;
+int B[n];
+output int x;
+
+pardo(i : n) {
+  if (A[i] == 1)
+    B[i] = 1;
+  else
+    B[i] = 0;
+
+  if (i > 0) pardo(j : i) if (A[j] == 1) B[i] = 0;
+
+  if (B[i] == 1) x = i;
+}

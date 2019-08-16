@@ -1,8 +1,8 @@
 /* 
 
-non-recursive prefix sums with additional memory 
+non-recursive prefix sums with additional n log(n) memory 
 
-input:  array of integers 
+input:  array of integers (length power of 2)
 output: array of prefix sums
 
 T = O(log n)

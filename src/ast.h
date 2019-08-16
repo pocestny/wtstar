@@ -130,7 +130,9 @@ typedef struct _function_t {
   static_type_t *out_type;     // external
   struct _ast_node_t *params;  // (owned) list of AST_NODE_VARIABLE
   scope_t *root_scope;         // owned
-  uint32_t addr;  // absolute address in code (set during code generation)
+
+  uint32_t n,     // entry in the fnmap table
+           addr;  // absolute address in code (set during code generation)
 } function_t;
 
 CONSTRUCTOR(function_t, char *name);
@@ -326,6 +328,7 @@ typedef struct _ast_node_t {
   } val;
 
   struct _ast_node_t *next;
+  int emitted;
 } ast_node_t;
 
 CONSTRUCTOR(ast_node_t, YYLTYPE *iloc, int node_type, ...);

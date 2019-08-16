@@ -161,6 +161,11 @@ static void print_node(int ofs, ast_node_t *node) {
   if (node->node_type == AST_NODE_VARIABLE) {
     LOG("%s type:'%s' ", ioflag_names[node->val.v->io_flag],
         node->val.v->base_type->name);
+    if (node->val.v->num_dim>0) {
+      LOG("num_dim=%d orig=%lx root=%lx ",node->val.v->num_dim,node->val.v->orig,
+          node->val.v->root);
+
+    }
   }
 
   if (node->node_type == AST_NODE_STATIC_TYPE && node->val.t->members) {
@@ -207,7 +212,9 @@ static void print_node(int ofs, ast_node_t *node) {
 
   if (node->node_type == AST_NODE_EXPRESSION &&
       (node->val.e->variant == EXPR_ARRAY_ELEMENT ||
-       node->val.e->variant == EXPR_SIZEOF)) {
+       node->val.e->variant == EXPR_SIZEOF ||
+       node->val.e->variant == EXPR_CALL ||
+       node->val.e->variant == EXPR_IMPLICIT_ALIAS)) {
     for (ast_node_t *t = node->val.e->val.v->params; t; t = t->next)
       print_node(ofs + 5, t);
   }

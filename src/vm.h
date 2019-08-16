@@ -33,7 +33,7 @@ void stack_t_pop(stack_t *s, void *data, uint32_t len);
 
 typedef struct _thread_t {
   uint32_t mem_base;
-  stack_t *op_stack, *acc_stack, *mem, *mem_mark;
+  stack_t *op_stack, *acc_stack, *mem;
   struct _thread_t *parent;
   int refcnt;
 } thread_t;
@@ -47,15 +47,24 @@ void *get_addr(thread_t *thr, uint32_t addr, uint32_t len);
 thread_t *clone_thread(thread_t *src);
 
 typedef struct {
+  uint32_t base, ret_addr;
+  stack_t *heap_mark,*mem_mark; // use this to mark/free memory in current frame
+} frame_t;
+
+CONSTRUCTOR(frame_t, uint32_t base);
+DESTRUCTOR(frame_t);
+
+typedef struct {
   input_layout_item_t *in_vars, *out_vars;
   uint32_t n_in_vars, n_out_vars;
+  uint32_t *fnmap,fcnt;
 
   uint8_t *code;
   uint32_t code_size;
-  stack_t *heap, *heap_mark;
+  stack_t *heap;
 
   stack_t *threads;        
-  stack_t *frames;         // stack of uint32_t -> frame_base
+  stack_t *frames;         // stack of frame_t *
 } runtime_t;
 
 

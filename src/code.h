@@ -71,17 +71,17 @@
 
 #define JMP         0x2EU  //  JMP(x)   : jump to addr x (relative, x int32_t)
 
-#define CALL        0x2FU  //  CALL(x)  : call function at (code absolute) addr x, 
-                           //             p1,p2,...,pn,s... -> s,...
+#define CALL        0x2FU  //  CALL(n)  : call function n (from ftable) 
                            //  cretes new callframe, and jumps to the address
                            //  the function code transfers parameters from stack
+                           //             p1,p2,...,pn,s... -> s,...
 #define RETURN      0x30U  //  removes the callframe (top of stack is return value)         
 
 #define FLOAT2INT   0x31U  //  cast top of stack
 #define INT2FLOAT   0x32U  //  cast top of stack
 
-#define FORK        0x33U  //  FORK(a): n,... -> .... forks n new processes
-                           //          a is the address of the driving variable 
+#define FORK        0x33U  //  FORK: a,n,... -> .... forks n new processes
+                           //        a is the address of the driving variable 
 #define SPLIT       0x34U  //  SPLIT    : c,... -> ... split current group based on stack top 
                            //  create two new groups (first for nonzero, second for zero)
                            //  each continues until join
@@ -106,7 +106,9 @@
 
 /*
  
-header: 1B version 1
+header: 
+version     byte (1)
+global_size uint32 
 
 input/output section:
 
@@ -121,6 +123,11 @@ item1 .. itemn (elem = uint8 - type )
 
 the restriction means that there are at most 256 dimensions in an array, and at most
 256 subtypes in a type
+
+fnmap section: 
+uint32_t n
+addr_1 ... addr_n   - addresses in the code segment of respective functions
+
 
 */
 
@@ -144,8 +151,5 @@ the restriction means that there are at most 256 dimensions in an array, and at 
     nad uint8:  number of active (subscript length)  dimensions
     dim_1 ... dim_nd  uint32 min, uint32 max
     ad_1 ... ad_nd    uint8  index of active dimension
-
-
-    
 */
 #endif

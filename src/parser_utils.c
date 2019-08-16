@@ -66,7 +66,7 @@ int append_variables(ast_t *ast, ast_node_t *list) {
       return 0;
     }
     append(ast_node_t, &ast->current_scope->items, v);
-    v->val.v->scope=ast->current_scope;
+    v->val.v->scope = ast->current_scope;
   }
   list_for_end;
   return 1;
@@ -137,12 +137,13 @@ int init_alias(ast_t *ast, YYLTYPE *iloc, char *ident, YYLTYPE *aloc,
   v->active_dims = (int *)malloc(v->num_dim * sizeof(int));
   {
     int i = 0, j = 0;
-    for (ast_node_t *e = exprlist->next; e; e = e->next->next, j++)
+    for (ast_node_t *e = exprlist->next; e && e->next; e = e->next->next, j++)
       if (e->val.e->variant != EXPR_EMPTY)
         v->active_dims[i++] = v->orig->active_dims[j];
   }
 
   v->ranges = exprlist;
+  v->base_type = v->root->base_type;
   append_variables(ast, vn);
   return 1;
 }
@@ -240,10 +241,10 @@ ast_node_t *init_variable(ast_t *ast, YYLTYPE *loc, char *vname) {
 #define __define_function_abort__ \
   free(name);                     \
   ast_node_t_delete(params);      \
-  return 0;
+  return NULL;
 
-int define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type, char *name,
-                    YYLTYPE *nameloc, ast_node_t *params) {
+ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
+                            char *name, YYLTYPE *nameloc, ast_node_t *params) {
   ast_node_t *fn;
   int role = ident_role(ast, name, &fn);
   if (role == IDENT_FUNCTION) {
@@ -292,7 +293,7 @@ int define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type, char *name,
     append(ast_node_t, &ast->functions, fn);
   }
 
-  return 1;
+  return fn;
 }
 
 ast_node_t *create_specifier_expr(YYLTYPE *loc, ast_t *ast, ast_node_t *expr,
@@ -364,16 +365,6 @@ ast_node_t *expression_call(ast_t *ast, YYLTYPE *loc, char *name,
   e->val.f->params = params;
   free(name);
   return res;
-}
-
-void add_function_scope(ast_t *ast, char *name, ast_node_t *sn) {
-  if (sn) {
-    ast_node_t *fn = ast_node_find(ast->functions, name);
-    fn->val.f->root_scope = sn->val.sc;
-    sn->val.sc->params = fn->val.f->params;
-    free(sn);
-  }
-  free(name);
 }
 
 // AST_NODE_EXPRESSION initialized with variant and parameters
