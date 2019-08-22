@@ -48,10 +48,7 @@
 %token <string_val>       STRING_LITERAL IDENT 
 %token <static_type_val>  TYPENAME
 
-%token TYPE INPUT OUTPUT ALIAS IF ELSE FOR WHILE PARDO DO BREAK RETURN CONTINUE SIZE DIM
-
-%token < > DBLBRACKET "[<"
-%token < > DBRBRACKET ">]"
+%token TYPE INPUT OUTPUT IF ELSE FOR WHILE PARDO DO RETURN SIZE DIM
 
 %token < > EQ "=="
 %token < > NEQ "!="
@@ -118,7 +115,6 @@ program_item
              | variable_declaration { if (!append_variables(ast,$1)) YYERROR; }
              | input_declaration 
              | output_declaration  
-             | alias_declaration   
              | function_declaration 
              | stmt
              ;
@@ -188,10 +184,6 @@ typedef_ident_list:
       
       <type> <new_name> [<size_1>,<size_2>,...,<size_d>];
       
-      alias <new_name> = <existing_array> [< <from>:<to> , <fixed>, <from>:<to> >];
-     
-      variables other from alias at global scope can be input / output 
-
       input arrays don't specify sizes, only dimensions:
       input <type> <name> [ _ , ... , _ ];
 
@@ -214,31 +206,6 @@ output_declaration
                     }
                   | OUTPUT error ';'
                   ;
-
-alias_declaration
-                 : ALIAS IDENT '=' IDENT "[<" ranges_list ">]" ';'
-                    {
-                      if (!init_alias(ast,&@2,$2,&@4,$4,$6)) YYERROR;
-                    }
-                 | ALIAS error ';' 
-                 ;
-
-
-ranges_list: 
-    range {$$=$1;}
-    |
-    ranges_list ',' range {$$=$1;append(ast_node_t,&$$,$3);}
-    ;
-
-range: 
-    expr_assign ':' expr_assign {$$=$1;append(ast_node_t,&$$,$3);}
-    | 
-    expr_assign 
-      {
-        $$=$1;
-        append(ast_node_t,&$$,ast_node_t_new(&@1,AST_NODE_EXPRESSION,EXPR_EMPTY));
-      }
-    ;
 
 
   /* possibly declare several variables of the same type */
@@ -368,7 +335,7 @@ function_declaration
             if ($1) {
                $<ast_node_val>$ = ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
                $1->val.f->root_scope = $<ast_node_val>$->val.sc;
-               $<ast_node_val>$->val.sc->params = $1->val.f->params;
+               $<ast_node_val>$->val.sc->fn = $1->val.f;
                for (ast_node_t *p=$1->val.f->params;p;p=p->next)
                   p->val.v->scope = $<ast_node_val>$->val.sc;
                ast->current_scope=$<ast_node_val>$->val.sc;
@@ -667,24 +634,11 @@ expr_primary:
         }
       }
     |
-    IDENT "[<"  ranges_list ">]"  
-      {
-        $$=expression_variable(ast,&@1,$1);
-        if ($$) {
-          if (!add_expression_array_parameters($$,$3,1))
-            YYERROR;
-        }
-        else {
-          ast_node_t_delete($3);
-          YYERROR;
-        }
-      }
-    |
     IDENT '[' expr_list ']' 
       {
         $$=expression_variable(ast,&@1,$1);
         if ($$) {
-          if (!add_expression_array_parameters($$,$3,0))
+          if (!add_expression_array_parameters($$,$3))
             YYERROR;
         }
         else {
@@ -961,17 +915,8 @@ first_for_item
                 }  
 
 stmt_jump
-         : BREAK 
-          {
-            ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_BREAK);
-            append(ast_node_t,&ast->current_scope->items,n);
-          }
-         | CONTINUE 
-          {
-            ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_CONTINUE);
-            append(ast_node_t,&ast->current_scope->items,n);
-          }
-         | RETURN maybe_expr
+         : 
+         RETURN maybe_expr
           {
             ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_RETURN);
             n->val.s->par[0]=$2;

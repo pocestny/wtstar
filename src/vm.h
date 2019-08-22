@@ -63,7 +63,7 @@ typedef struct {
   uint32_t code_size;
   stack_t *heap;
 
-  stack_t *threads;        
+  stack_t *threads;        // stack of stack of thread_t* 
   stack_t *frames;         // stack of frame_t *
 } runtime_t;
 

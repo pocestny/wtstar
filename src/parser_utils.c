@@ -72,82 +72,6 @@ int append_variables(ast_t *ast, ast_node_t *list) {
   return 1;
 }
 
-#define __init_alias_abort__     \
-  {                              \
-    free(ident);                 \
-    free(array);                 \
-    ast_node_t_delete(exprlist); \
-    ast_node_t_delete(vn);       \
-    return 0;                    \
-  }
-
-// create alias variable, and store it in the current scope
-int init_alias(ast_t *ast, YYLTYPE *iloc, char *ident, YYLTYPE *aloc,
-               char *array, ast_node_t *exprlist) {
-  if (!exprlist) {
-    free(ident);
-    free(array);
-    return 1;
-  }
-  ast_node_t *vn = ast_node_t_new(iloc, AST_NODE_VARIABLE, ident), *an;
-  variable_t *v = vn->val.v;
-
-  if (!(ident_role(ast, array, &an) & IDENT_VAR)) {
-    yyerror(aloc, ast, "expected array variable, got %s", array);
-    __init_alias_abort__
-  }
-
-  variable_t *a = an->val.v;
-
-  if (a->num_dim == 0) {
-    yyerror(aloc, ast, "expected array variable, got scalar (%s)", array);
-    __init_alias_abort__
-  }
-
-  v->root = a->root;
-  v->orig = a;
-  v->scope = ast->current_scope;
-
-  if (length(exprlist) != 2 * a->num_dim) {
-    yyerror(iloc, ast, "array %s has %d dimensions, alias %s specified %d",
-            array, a->num_dim, ident, length(exprlist) / 2);
-    __init_alias_abort__
-  }
-
-  for (ast_node_t *e = exprlist; e; e = e->next)
-    if (e->val.e->variant != EXPR_EMPTY && !expr_int(e->val.e)) {
-      char *tname = inferred_type_name(e->val.e->type);
-      yyerror(&(e->loc), ast, "range subscript must be integral, has type %s",
-              tname);
-      free(tname);
-      __init_alias_abort__
-    }
-
-  v->num_dim = 0;
-  for (ast_node_t *e = exprlist; e; e = e->next) {
-    e = e->next;
-    if (e->val.e->variant != EXPR_EMPTY) v->num_dim++;
-  }
-
-  if (v->num_dim == 0) {
-    yyerror(aloc, ast, "alias must have at least one dimension");
-    __init_alias_abort__
-  }
-
-  v->active_dims = (int *)malloc(v->num_dim * sizeof(int));
-  {
-    int i = 0, j = 0;
-    for (ast_node_t *e = exprlist->next; e && e->next; e = e->next->next, j++)
-      if (e->val.e->variant != EXPR_EMPTY)
-        v->active_dims[i++] = v->orig->active_dims[j];
-  }
-
-  v->ranges = exprlist;
-  v->base_type = v->root->base_type;
-  append_variables(ast, vn);
-  return 1;
-}
-
 ast_node_t *expression_int_val(int val) {
   ast_node_t *zero = ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
   zero->val.e->type->type = __type__int->val.t;
@@ -180,23 +104,8 @@ int init_array(ast_t *ast, ast_node_t *var, ast_node_t *exprlist) {
 
   variable_t *v = var->val.v;
   v->num_dim = length(exprlist);
-  v->root = v;
-  v->orig = v;
-  v->ranges = NULL;
-  v->active_dims = (int *)malloc(v->num_dim * sizeof(int));
+  v->ranges = exprlist;
 
-  for (int i = 0; i < v->num_dim; i++) {
-    v->active_dims[i] = i;
-    append(ast_node_t, &v->ranges, expression_int_val(0));
-    ast_node_t *tmp =
-        ast_node_t_new(&(exprlist->loc), AST_NODE_EXPRESSION, EXPR_BINARY);
-    tmp->val.e->val.o->oper = '-';
-    tmp->val.e->val.o->first = exprlist;
-    tmp->val.e->val.o->second = expression_int_val(1);
-    exprlist = exprlist->next;
-    tmp->val.e->val.o->first->next = NULL;
-    append(ast_node_t, &v->ranges, tmp);
-  }
   return 1;
 }
 
@@ -210,14 +119,8 @@ int init_input_array(ast_t *ast, ast_node_t *var, int num_dim) {
 
   variable_t *v = var->val.v;
   v->num_dim = num_dim;
-  v->root = v;
-  v->orig = v;
   v->ranges = NULL;
-  v->active_dims = (int *)malloc(v->num_dim * sizeof(int));
 
-  for (int i = 0; i < v->num_dim; i++) {
-    v->active_dims[i] = i;
-  }
   return 1;
 }
 
@@ -340,8 +243,8 @@ ast_node_t *expression_variable(ast_t *ast, YYLTYPE *loc, char *name) {
   return res;
 }
 
-int add_expression_array_parameters(ast_node_t *ve, ast_node_t *p, int alias) {
-  ve->val.e->variant = (alias) ? EXPR_IMPLICIT_ALIAS : EXPR_ARRAY_ELEMENT;
+int add_expression_array_parameters(ast_node_t *ve, ast_node_t *p) {
+  ve->val.e->variant =  EXPR_ARRAY_ELEMENT;
   // TODO: check type, number of dimensions, etc.
   ve->val.e->val.v->params = p;
   return 1;

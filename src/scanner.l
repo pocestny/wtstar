@@ -15,7 +15,7 @@ const char* const symbols2[]={
   "==","!=","<=",">=",
   "&&","||","<<",">>","|~","~|",
   "++","--",
-  "+=","-=","*=","/=","%=","[<",">]",NULL
+  "+=","-=","*=","/=","%=",NULL
   };
 
 const int  values2[]={
@@ -23,7 +23,6 @@ TOK_EQ, TOK_NEQ, TOK_LEQ, TOK_GEQ,
 TOK_AND,TOK_OR,TOK_SHL,TOK_SHR,TOK_FIRST_BIT,TOK_LAST_BIT,
 TOK_INC,TOK_DEC,
 TOK_PLUS_ASSIGN, TOK_MINUS_ASSIGN, TOK_TIMES_ASSIGN, TOK_DIV_ASSIGN, TOK_MOD_ASSIGN,
-TOK_DBLBRACKET, TOK_DBRBRACKET,
  -1};
 
 
@@ -98,16 +97,13 @@ SYMBOL2  [^a-zA-Z0-9 \t_'";]
 type/[^{IDSYM}{DIGIT}]      { return TOK_TYPE; }
 input/[^{IDSYM}{DIGIT}]     { return TOK_INPUT; }
 output/[^{IDSYM}{DIGIT}]    { return TOK_OUTPUT; }
-alias/[^{IDSYM}{DIGIT}]     { return TOK_ALIAS; }
 if/[^{IDSYM}{DIGIT}]        { return TOK_IF; }
 else/[^{IDSYM}{DIGIT}]      { return TOK_ELSE; }
 for/[^{IDSYM}{DIGIT}]       { return TOK_FOR; }
 while/[^{IDSYM}{DIGIT}]     { return TOK_WHILE; }
 pardo/[^{IDSYM}{DIGIT}]       { return TOK_PARDO; }
 do/[^{IDSYM}{DIGIT}]        { return TOK_DO; }
-break/[^{IDSYM}{DIGIT}]     { return TOK_BREAK; }
 return/[^{IDSYM}{DIGIT}]    { return TOK_RETURN; }
-continue/[^{IDSYM}{DIGIT}]  { return TOK_CONTINUE; }
 .{SPACE}*size/[^{IDSYM}{DIGIT}]      { return TOK_SIZE; }
 dim/[^{IDSYM}{DIGIT}]       { return TOK_DIM; }
 

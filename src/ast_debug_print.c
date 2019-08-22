@@ -21,7 +21,7 @@ static const char *const stmt_names[] = {
 #define EXPR_BASE 18
 static const char *const expr_names[] = {
     "EXPR_EMPTY",         "EXPR_LITERAL",  "EXPR_INITIALIZER",    "EXPR_CALL",
-    "EXPR_ARRAY_ELEMENT", "EXPR_VAR_NAME", "EXPR_IMPLICIT_ALIAS", "EXPR_SIZEOF",
+    "EXPR_ARRAY_ELEMENT", "EXPR_VAR_NAME", "EXPR_SIZEOF",
     "EXPR_POSTFIX",       "EXPR_PREFIX",   "EXPR_BINARY",         "EXPR_CAST",
     "EXPR_SPECIFIER"};
 
@@ -33,12 +33,6 @@ static void print_node(int ofs, ast_node_t *node);
 
 static void print_token(int op) {
   switch (op) {
-    case TOK_DBLBRACKET:
-      LOG("[[");
-      break;
-    case TOK_DBRBRACKET:
-      LOG("]]");
-      break;
     case TOK_EQ:
       LOG("==");
       break;
@@ -124,8 +118,7 @@ static void print_expr_props(expression_t *e) {
     LOG("array:'%s' ", e->val.v->var->name);
   }
 
-  if (e->variant == EXPR_SIZEOF)
-    LOG("variable:'%s' ",e->val.v->var->name);
+  if (e->variant == EXPR_SIZEOF) LOG("variable:'%s' ", e->val.v->var->name);
 
   if (e->variant == EXPR_BINARY || e->variant == EXPR_PREFIX ||
       e->variant == EXPR_POSTFIX) {
@@ -161,10 +154,8 @@ static void print_node(int ofs, ast_node_t *node) {
   if (node->node_type == AST_NODE_VARIABLE) {
     LOG("%s type:'%s' ", ioflag_names[node->val.v->io_flag],
         node->val.v->base_type->name);
-    if (node->val.v->num_dim>0) {
-      LOG("num_dim=%d orig=%lx root=%lx ",node->val.v->num_dim,node->val.v->orig,
-          node->val.v->root);
-
+    if (node->val.v->num_dim > 0) {
+      LOG("num_dim=%d ", node->val.v->num_dim);
     }
   }
 
@@ -213,8 +204,7 @@ static void print_node(int ofs, ast_node_t *node) {
   if (node->node_type == AST_NODE_EXPRESSION &&
       (node->val.e->variant == EXPR_ARRAY_ELEMENT ||
        node->val.e->variant == EXPR_SIZEOF ||
-       node->val.e->variant == EXPR_CALL ||
-       node->val.e->variant == EXPR_IMPLICIT_ALIAS)) {
+       node->val.e->variant == EXPR_CALL )) {
     for (ast_node_t *t = node->val.e->val.v->params; t; t = t->next)
       print_node(ofs + 5, t);
   }
@@ -234,10 +224,12 @@ static void print_scope(int ofs, scope_t *s) {
   OFS(ofs);
   LOG("scope this:%lx parent:%lx\n", (unsigned long)s,
       (unsigned long)s->parent);
-  OFS(ofs);
-  LOG("params:\n");
-  list_for(it, ast_node_t, s->params) { print_node(ofs, it); }
-  list_for_end;
+  if (s->fn) {
+    OFS(ofs);
+    LOG("params:\n");
+    list_for(it, ast_node_t, s->fn->params) { print_node(ofs, it); }
+    list_for_end;
+  }
   OFS(ofs);
   LOG("items:\n");
   list_for(it, ast_node_t, s->items) { print_node(ofs, it); }

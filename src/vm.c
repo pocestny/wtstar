@@ -136,9 +136,9 @@ CONSTRUCTOR(runtime_t, uint8_t *in, int len) {
       case SECTION_HEADER: {
         uint8_t version;
         uint32_t global_size;
-        GET(uint8_t,version,1)
-        GET(uint32_t,global_size,4)
-        stack_t_alloc(main_thread->mem,global_size);
+        GET(uint8_t, version, 1)
+        GET(uint32_t, global_size, 4)
+        stack_t_alloc(main_thread->mem, global_size);
       } break;
       case SECTION_INPUT:
         GET(uint32_t, r->n_in_vars, 4)
@@ -259,7 +259,7 @@ void execute(runtime_t *env, int *W, int *T) {
     pc++;
 
     if (EXEC_DEBUG) {
-      printf("%3d: %s", pc - 1, instr_names[opcode]);
+      printf("\n%3d: %s", pc - 1, instr_names[opcode]);
       switch (opcode) {
         case PUSHC:
         case JMP:
@@ -365,7 +365,7 @@ void execute(runtime_t *env, int *W, int *T) {
           (*T)++;
           uint32_t ra = pc + 4;
 
-          frame_t *nf = frame_t_new(thr[0]->mem->top);
+          frame_t *nf = frame_t_new(thr[0]->mem->top + thr[0]->mem_base);
           nf->ret_addr = ra;
           mem_mark(frame, env, n_thr, thr);
 
@@ -387,7 +387,7 @@ void execute(runtime_t *env, int *W, int *T) {
           stack_t_pop(env->frames, (void *)&of, sizeof(frame_t *));
           frame_t_delete(of);
 
-          frame = STACK_TOP(env->frames, frame_t*);
+          frame = STACK_TOP(env->frames, frame_t *);
           mem_free(frame, env, n_thr, thr);
         }
         break;
@@ -408,7 +408,7 @@ void execute(runtime_t *env, int *W, int *T) {
             } break;
 
             case FBASE:
-              _PUSH(frame->base,4);
+              _PUSH(frame->base, 4);
               break;
 
             case ALLOC: {
@@ -479,33 +479,17 @@ void execute(runtime_t *env, int *W, int *T) {
             } break;
 
             case IDX: {
-              uint8_t n = lval(&env->code[pc], uint8_t);
-              uint32_t addr, hdr;
+              uint8_t nd = lval(&env->code[pc], uint8_t);
+              uint32_t addr;
               _POP(addr, 4);
-              hdr = lval((uint8_t *)(get_addr(thr[t], addr, 4)) + 4, int32_t);
-              uint8_t nd = lval(env->heap->data + hdr, uint8_t),
-                      nad = lval(env->heap->data + hdr + 1, uint8_t);
-              if (n != nad) {
-                fprintf(stderr,
-                        "fatal error, mismatched number of dimensions for "
-                        "IDX\n");
-                // dump_memory(env);
-                exit(1);
-              }
-              for (int i = 0; i < nd; i++) {
-                arr_offs[i] = lval(env->heap->data + hdr + 2 + 8 * i, uint32_t);
-                arr_sizes[i] =
-                    lval(env->heap->data + hdr + 2 + 8 * i + 4, uint32_t) -
-                    arr_offs[i] + 1;
-              }
 
-              for (int i = 0; i < nad; i++) {
-                uint8_t d =
-                    lval(env->heap->data + hdr + 2 + 8 * nd + i, uint8_t);
+              for (int i = 0; i < nd; i++) {
+                arr_sizes[i] =
+                    lval(get_addr(thr[t], addr + 4 * (i + 1), 4), uint32_t);
                 uint32_t v;
                 _POP(v, 4);
-                arr_offs[d] += v;
-                if (v >= arr_sizes[d]) {
+                arr_offs[i] = v;
+                if (v >= arr_sizes[i]) {
                   fprintf(stderr, "range check error\n");
                   // dump_memory(env);
                   exit(1);
@@ -681,6 +665,9 @@ void execute(runtime_t *env, int *W, int *T) {
     }
 
     if (EXEC_DEBUG) {
+      printf("\nthread groups: ");
+      for (int i=0;i<STACK_SIZE(env->threads,stack_t*);i++)
+        printf(" %lu ",STACK_SIZE(STACK(env->threads,stack_t*)[i],thread_t*));
       printf("\n     n_thr=%2d\n", n_thr);
       if (n_thr > 0) {
         printf("fbase=%d\n", frame->base);

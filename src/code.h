@@ -142,14 +142,8 @@ addr_1 ... addr_n   - addresses in the code segment of respective functions
   float = float (4 bytes) -> unfortunately, not portable
   char  = int8_t
 
-  array/alias:
+  array:
     uint32:  base address (relative to heap)
-    uint32:  header address (relative to heap)
-
-  header on heap:
-    nd uint8:   number of (root) dimensions
-    nad uint8:  number of active (subscript length)  dimensions
-    dim_1 ... dim_nd  uint32 min, uint32 max
-    ad_1 ... ad_nd    uint8  index of active dimension
+    dim_1 ... dim_nd  uint32 range n (0..n-1) of dimensions 1..nd
 */
 #endif

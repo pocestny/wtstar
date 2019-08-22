@@ -80,21 +80,17 @@ static_type_member_t *static_type_member_find(static_type_member_t *list,
 
 typedef struct _variable_t {
   uint8_t io_flag;
-  char *name;                         // owned
-  static_type_t *base_type;           // external
-  struct _scope_t *scope;             // external
-  uint32_t addr;                      // address (set during code generation)
+  char *name;                       // owned
+  static_type_t *base_type;         // external
+  struct _scope_t *scope;           // external
+  uint32_t addr;                    // address (set during code generation)
   struct _ast_node_t *initializer;  // owned AST_NODE_EXPRESSION
 
   uint8_t num_dim;  // >0 = array
-                    // number of active dimensions (subsript length)
 
-  // following is defined only for arryas
-  int *active_dims;          // indices of active dimensions (length=num_dim)
-  struct _variable_t *root;  // either self or the root array of alias chain
-  struct _variable_t *orig;  // external - original array for alias
-  struct _ast_node_t
-      *ranges;  // for each dimension of orig two entries: min, max (owned)
+  // following is defined only for arrays
+  struct _ast_node_t *ranges;  // expressions; for each dimension the number of
+                               // elements n (0..n-1)
 } variable_t;
 
 CONSTRUCTOR(variable_t, char *name);
@@ -111,10 +107,7 @@ DESTRUCTOR(variable_t);
 typedef struct _scope_t {
   struct _scope_t *parent;    // NULL for root_scope
   struct _ast_node_t *items;  // owned
-  struct _ast_node_t
-      *params;  // external: function paramters (treated as local variables)
-  struct _function_t
-      *fn;  // scope belongs to a function (set in code_generation)
+  struct _function_t *fn;     // scope belongs to a function
 } scope_t;
 
 CONSTRUCTOR(scope_t);
@@ -131,8 +124,8 @@ typedef struct _function_t {
   struct _ast_node_t *params;  // (owned) list of AST_NODE_VARIABLE
   scope_t *root_scope;         // owned
 
-  uint32_t n,     // entry in the fnmap table
-           addr;  // absolute address in code (set during code generation)
+  uint32_t n,  // entry in the fnmap table
+      addr;    // absolute address in code (set during code generation)
 } function_t;
 
 CONSTRUCTOR(function_t, char *name);
@@ -158,8 +151,6 @@ DESTRUCTOR(function_t);
  * function call: (expr_function_t*) function_t* and parameters (ast_node_t*)
  * variable name: (expr_variable_t*) variable_t* (parameters are NULL)
  * array element: (expr_variable_t*) variable_t* and parameters (ast_node_t*)
- * implicit alias: (expr_variable_t*) variable_t* and parameters (ast_node_t*)
- *                 parameters are ranges expr:expr, expr:empty
  * sizeof: (expr_variable_t*) variable_t* and one parameter = dimension
  * operator (postfix,prefix,binary):
  *                 (expr_oper_t *) oper (TOK_*), expression_t *first,*second
@@ -173,13 +164,12 @@ DESTRUCTOR(function_t);
 #define EXPR_CALL 21
 #define EXPR_ARRAY_ELEMENT 22
 #define EXPR_VAR_NAME 23
-#define EXPR_IMPLICIT_ALIAS 24
-#define EXPR_SIZEOF 25
-#define EXPR_POSTFIX 26
-#define EXPR_PREFIX 27
-#define EXPR_BINARY 28
-#define EXPR_CAST 29
-#define EXPR_SPECIFIER 30
+#define EXPR_SIZEOF 24
+#define EXPR_POSTFIX 25
+#define EXPR_PREFIX 26
+#define EXPR_BINARY 27
+#define EXPR_CAST 28
+#define EXPR_SPECIFIER 29
 
 /*
  * stuff for inferred types
@@ -283,9 +273,7 @@ int expr_int(expression_t *e);
 #define STMT_DO 71
 #define STMT_FOR 72
 #define STMT_PARDO 73
-#define STMT_BREAK 74
-#define STMT_CONTINUE 75
-#define STMT_RETURN 76
+#define STMT_RETURN 75
 
 typedef struct _statement_t {
   int variant;

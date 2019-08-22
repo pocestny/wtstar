@@ -114,46 +114,41 @@ void add_instr(code_block_t *out, int code, ...) {
 
 /* ----------------------------------------------------------------------------
  * assign_variable_addresses
- *
- * traverse the ast tree from given scope, and assign addresses to variables
- * vars      - process local variables + parameters
- * subscopes - recurse into subscopes
- *
  */
-static int assign_variable_addresses(uint32_t base, scope_t *sc, int vars,
-                                     int subscopes) {
-  DEBUG("assign_variable_addresses(base=%d, vars=%d, subcopes=%d)\n", base,
-        vars, subscopes);
-  if (vars) {
-    list_for(p, ast_node_t, sc->params) {
-      assert(p->node_type == AST_NODE_VARIABLE);
-      p->val.v->addr = base;
-      if (p->val.v->num_dim > 0)
-        base += 8;
-      else
-        base += p->val.v->base_type->size;
-      DEBUG("'%s' %lx %u\n", p->val.v->name, (unsigned long)p, p->val.v->addr);
-    }
-    list_for_end;
-  }
 
-  for (ast_node_t *p = sc->items; p; p = p->next) {
-    if (p->node_type == AST_NODE_VARIABLE && vars) {
-      p->val.v->addr = base;
-      if (p->val.v->num_dim > 0)
-        base += 8;
-      else
-        base += p->val.v->base_type->size;
-      DEBUG("'%s' %lx %u\n", p->val.v->name, (unsigned long)p, p->val.v->addr);
-    } else if (p->node_type == AST_NODE_SCOPE && subscopes) {
-      assign_variable_addresses(base, p->val.sc, 1, 1);
-    } else if (p->node_type == AST_NODE_STATEMENT && subscopes &&
-               (p->val.s->variant == STMT_FOR ||
-                p->val.s->variant == STMT_PARDO)) {
-      assign_variable_addresses(base, p->val.s->par[0]->val.sc, 1, 1);
-    }
+static int assign_single_variable_address(uint32_t base, variable_t *var) {
+  var->addr = base;
+  if (var->num_dim > 0)
+    base += 4 * (var->num_dim + 1);
+  else
+    base += var->base_type->size;
+  DEBUG("'%s' %lx %u\n", var->name, (unsigned long)var, var->addr);
+  return base;
+}
+
+static int assign_node_variable_addresses(uint32_t base, ast_node_t *node) {
+  switch (node->node_type) {
+    case AST_NODE_VARIABLE:
+      base = assign_single_variable_address(base, node->val.v);
+      break;
+    case AST_NODE_SCOPE: {
+      int b = base;
+      for (ast_node_t *p = node->val.sc->items; p; p = p->next)
+        b = assign_node_variable_addresses(b, p);
+    } break;
+    case AST_NODE_STATEMENT:
+      if (node->val.s->variant == STMT_FOR ||
+          node->val.s->variant == STMT_PARDO)
+        base = assign_node_variable_addresses(base, node->val.s->par[0]);
+      break;
   }
-  DEBUG("leaving\n");
+  return base;
+}
+
+static int assign_scope_variable_addresses(uint32_t base, scope_t *sc) {
+  int b = base;
+  for (ast_node_t *p = sc->items; p; p = p->next)
+    b = assign_node_variable_addresses(b, p);
   return base;
 }
 
@@ -327,31 +322,8 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
             p++;
           }
         }
-      };
+      }
       break;
-
-    case IMPLICIT_ALIAS: {
-        variable_t *v = ex->val.v->var;
-
-        // allocate header (see also AST_NODE_VARIABLE)
-        add_instr(code, PUSHC, 2 + 8 * v->root->num_dim + v->num_dim, ALLOC,
-                  S2A, 0);
-
-        // store number of dimensions
-        // (acc contains the address of v.header)
-        add_instr(code, PUSHB, v->root->num_dim, A2S, STBH, 0);
-
-        // store number of active dimensions
-        // (acc contains the address of v.header)
-        add_instr(code, PUSHB, v->num_dim, A2S, PUSHB, 1, ADD_INT, STBH, 0);
-
-        // store indices of active dimensions
-        // (acc contains the address of v.header)
-        for (int i = 0; i < v->num_dim; i++)
-          add_instr(code, PUSHB, v->active_dims[i], A2S, PUSHC,
-                    2 + 8 * v->root->num_dim + i, ADD_INT, STBH, 0);
-      
-    } break;
 
     case EXPR_CALL: {
       int np = length(ex->val.f->params);
@@ -367,18 +339,26 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
 
     case EXPR_VAR_NAME:
       emit_code_var_addr(code, ex->val.v->var);
-      if (ex->val.v->var->num_dim > 0) {
-        assert(!addr);
-        // for array, load two addresses
-        add_instr(code, S2A, PUSHB, 4, ADD_INT, LDC, A2S, POPA, LDC, 0);
-      } else {
-        if (!addr) add_instr(code, LDC, 0);
+      if (!addr) {
+        // we want the value
+        int nd=ex->val.v->var->num_dim;
+        if (nd == 0)
+          add_instr(code, LDC, 0);
+        else {
+          // the value of an array is num_dim + 1 ints
+          // stack: base, dim1,...,dim_nd,.... bottom
+          add_instr(code,S2A,0);
+          for (int i=0;i<=nd;i++) {
+              if (i<nd) add_instr(code, PUSHC, 4*(nd-i), ADD_INT, LDC, A2S,0);
+              else add_instr(code, LDC,0);
+          }
+          add_instr(code,POPA,0);
+        }
       }
       break;
 
     case EXPR_ARRAY_ELEMENT: {
-      int n = 0;
-      for (ast_node_t *x = ex->val.v->params; x; x = x->next) n++;
+      int n = ex->val.v->var->num_dim;
 
       for (ast_node_t *x = ex->val.v->params; x; x = x->next) {
         emit_code_expression(code, x, 0, clear);
@@ -390,7 +370,7 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
         emit_code_var_addr(code, ex->val.v->var);
         add_instr(code, S2A, IDX, n, PUSHC, ex->val.v->var->base_type->size,
                   MULT_INT, A2S, POPA, LDC, ADD_INT, 0);
-        if (!addr) add_instr(code, LDCH, 0);
+        if (!addr) add_instr(code, LDCH, 0); // FIXME: not only ints
       }
     } break;
 
@@ -398,15 +378,8 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
       // TODO typecheck
       variable_t *v = ex->val.v->var;
       emit_code_var_addr(code, v);
-      add_instr(code, PUSHB, 4, ADD_INT, LDC, S2A,
-                0);  // get header address of var
-      add_instr(code, PUSHC, 2 + 8 * v->root->num_dim, ADD_INT, 0);
       emit_code_expression(code, ex->val.v->params, 0, 0);
-      add_instr(code, ADD_INT, LDBH, 0);  // index of queried dimension
-      add_instr(code, PUSHB, 8, MULT_INT, PUSHB, 2, ADD_INT, A2S, POPA,
-                ADD_INT,  // min
-                S2A, PUSHB, 4, ADD_INT, LDCH, A2S, POPA, LDCH, SWS, SUB_INT,
-                PUSHB, 1, ADD_INT, 0);
+      add_instr(code, PUSHB, 1, ADD_INT, PUSHB, 4, MULT_INT, ADD_INT, LDC,0);
     } break;
     case EXPR_BINARY:
       if (assign_oper(ex->val.o->oper)) {
@@ -537,82 +510,26 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
       // init array/alias
       if (node->val.v->num_dim > 0) {
         variable_t *v = node->val.v;
+
         ast_node_t *rng = v->ranges;
         if (!rng) break;  // input array - will be handled during loading
 
-        // allocate header (see also EXPR_IMLICIT_ALIAS)
-        add_instr(code, PUSHC, 2 + 8 * v->root->num_dim + v->num_dim, ALLOC,
-                  S2A, PUSHC, v->addr + 4, 0);
-        if (v->scope->fn) add_instr(code, FBASE, ADD_INT, 0);
+        for (int i = 0; i < v->num_dim; i++) {
+          emit_code_expression(code, rng, 0, 0);
+          add_instr(code, S2A, 0);
+          emit_code_var_addr(code, v);
+          add_instr(code, PUSHC, 4 * (i + 1), ADD_INT, STC, 0);
+          rng = rng->next;
+        }
+
+        // alloc base
+        add_instr(code, PUSHB, 1, 0);
+        for (int i = 0; i < v->num_dim; i++)
+          add_instr(code, A2S, POPA, MULT_INT, 0);
+        add_instr(code, PUSHC, v->base_type->size, MULT_INT, ALLOC, 0);
+        emit_code_var_addr(code, v);
         add_instr(code, STC, 0);
 
-        // store number of dimensions
-        // (acc contains the address of v.header)
-        add_instr(code, PUSHB, v->root->num_dim, A2S, STBH, 0);
-
-        // store number of active dimensions
-        // (acc contains the address of v.header)
-        add_instr(code, PUSHB, v->num_dim, A2S, PUSHB, 1, ADD_INT, STBH, 0);
-
-        // store indices of active dimensions
-        // (acc contains the address of v.header)
-        for (int i = 0; i < v->num_dim; i++)
-          add_instr(code, PUSHB, v->active_dims[i], A2S, PUSHC,
-                    2 + 8 * v->root->num_dim + i, ADD_INT, STBH, 0);
-
-        if (v->root == v) {
-          // dealing with array
-          for (int i = 0; i < v->num_dim; i++) {
-            add_instr(code, PUSHB, 0, A2S, PUSHC, 2 + 8 * i, ADD_INT, STCH, 0);
-            rng = rng->next;
-            emit_code_expression(code, rng, 0, 0);
-            add_instr(code, S2A, SWA, A2S, PUSHC, 6 + 8 * i, ADD_INT, STCH, 0);
-            rng = rng->next;
-          }
-
-          add_instr(code, POPA, PUSHB, 1, 0);
-          for (int i = 0; i < v->num_dim; i++)
-            add_instr(code, A2S, POPA, PUSHB, 1, ADD_INT, MULT_INT, 0);
-          add_instr(code, PUSHC, v->base_type->size, MULT_INT, ALLOC, 0);
-          emit_code_var_addr(code, v);
-          add_instr(code, STC, 0);
-        } else {
-          // dealing with alias
-
-          // v.header is in acc, add orig.header below
-          add_instr(code, PUSHC, v->orig->addr + 4, 0);
-          if (v->orig->scope->fn) add_instr(code, FBASE, ADD_INT, 0);
-          add_instr(code, LDC, S2A, POP, SWA, 0);
-
-          // copy base
-          add_instr(code, PUSHC, v->orig->addr, 0);
-          if (v->orig->scope->fn) add_instr(code, FBASE, ADD_INT, 0);
-          add_instr(code, LDC, PUSHC, v->addr, 0);
-          if (v->scope->fn) add_instr(code, FBASE, ADD_INT, 0);
-          add_instr(code, STC, 0);
-
-          for (int i = 0, a = 0; i < v->root->num_dim; i++) {
-            if (a < v->orig->num_dim && v->orig->active_dims[a] == i) {
-              // i is a-th active dimension of orig
-              add_instr(code, SWA, A2S, PUSHC, 2 + 8 * i, ADD_INT, LDCH, S2A,
-                        A2S, POPA, 0);
-              emit_code_expression(code, rng, 0, 0);
-              add_instr(code, ADD_INT, SWA, A2S, PUSHC, 2 + 8 * i, ADD_INT,
-                        STCH, 0);
-              rng = rng->next;
-              emit_code_expression(code, rng, 0, 0);
-              add_instr(code, ADD_INT, A2S, PUSHC, 6 + 8 * i, ADD_INT, STCH, 0);
-              a++;
-            } else {
-              // i is not active in orig, just copy
-              add_instr(code, SWA, A2S, PUSHC, 2 + 8 * i, ADD_INT, LDCH, SWA,
-                        A2S, PUSHC, 2 + 8 * i, ADD_INT, STCH, SWA, A2S, PUSHC,
-                        6 + 8 * i, ADD_INT, LDCH, SWA, A2S, PUSHC, 6 + 8 * i,
-                        ADD_INT, STCH, 0);
-            }
-          }
-          add_instr(code, POPA, POPA, 0);
-        }
       }
       // handle initializer
       // FIXME: arrays
@@ -643,7 +560,10 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, SPLIT, JOIN, 0);
           if (D) emit_code_node(code, D);
           emit_code_node(code, C);
-          add_instr(code, JMP, ret - code->pos - 1, JOIN, MEM_FREE, 0);
+          add_instr(code, 
+              JMP, 10, JOIN, JMP, 10, JOIN,
+              0);
+          add_instr(code, JMP, ret - code->pos - 1,  MEM_FREE, 0);
         } break;
         case STMT_PARDO: {
           emit_code_expression(code, node->val.s->par[1], 0, 0);
@@ -661,6 +581,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, JOIN, 0);
         } break;
         case STMT_RETURN: {
+          // FIXME: return within pardo has to join threads                  
           if (node->val.s->par[0])
             emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, RETURN, 0);
@@ -681,7 +602,6 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
  */
 static void emit_code_scope(code_block_t *code, scope_t *sc) {
   add_instr(code, MEM_MARK, 0);
-  for (ast_node_t *p = sc->params; p; p = p->next) emit_code_node(code, p);
   for (ast_node_t *p = sc->items; p; p = p->next) emit_code_node(code, p);
   add_instr(code, MEM_FREE, 0);
 }
@@ -692,35 +612,10 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
   // load parameters
   // FIXME: not only ints
   for (ast_node_t *p = fn->val.f->params; p; p = p->next)
-    if (p->val.v->num_dim == 0)
-      add_instr(code, PUSHC, p->val.v->addr, FBASE, ADD_INT, STC, 0);
-    else  // array
-      add_instr(code, PUSHC, p->val.v->addr, FBASE, ADD_INT, STC, PUSHC,
-                p->val.v->addr, FBASE, ADD_INT, PUSHB, 4, ADD_INT, STC, 0);
+      for (int i=0;i<=p->val.v->num_dim;i++)
+        add_instr(code, PUSHC, p->val.v->addr + 4*i, FBASE, ADD_INT, STC,0);
 
   emit_code_scope(code, fn->val.f->root_scope);
-}
-
-/* ----------------------------------------------------------------------------
- * set the scope_t.fn value correctly
- */
-static void fix_function_scopes(scope_t *sc, function_t *fn) {
-  sc->fn = fn;
-  for (ast_node_t *n = sc->items; n; n = n->next) switch (n->node_type) {
-      case AST_NODE_SCOPE:
-        fix_function_scopes(n->val.sc, fn);
-        break;
-      case AST_NODE_STATEMENT:
-        switch (n->val.s->variant) {
-          case STMT_FOR:
-            fix_function_scopes(n->val.s->par[0]->val.sc, fn);
-            break;
-          case STMT_PARDO:
-            fix_function_scopes(n->val.s->par[0]->val.sc, fn);
-            break;
-        }
-        break;
-    }
 }
 
 /* ----------------------------------------------------------------------------
@@ -753,13 +648,25 @@ void emit_code(ast_t *_ast, writer_t *out, writer_t *log) {
     for (ast_node_t *fn = ast->functions; fn; fn = fn->next) {
       assert(fn->node_type == AST_NODE_FUNCTION);
       fn->val.f->n = n++;
-      fix_function_scopes(fn->val.f->root_scope, fn->val.f);
-      assign_variable_addresses(0, fn->val.f->root_scope, 1, 1);
+      uint32_t base = 0;
+      DEBUG("function #%d: %s\n",fn->val.f->n,fn->val.f->name);
+      for (ast_node_t *p = fn->val.f->params; p; p = p->next)
+        base = assign_single_variable_address(base, p->val.v);
+      DEBUG("items:\n");
+      assign_scope_variable_addresses(base, fn->val.f->root_scope);
+      DEBUG("function #%d done\n",fn->val.f->n);
     }
   }
 
-  uint32_t base = assign_variable_addresses(0, ast->root_scope, 1, 0);
-  assign_variable_addresses(base, ast->root_scope, 0, 1);
+  uint32_t base = 0;
+  DEBUG("root variables\n");
+  for (ast_node_t *p = ast->root_scope->items; p; p = p->next)
+    if (p->node_type == AST_NODE_VARIABLE)
+      base = assign_node_variable_addresses(base, p);
+  DEBUG("root subscopes\n");
+  for (ast_node_t *p = ast->root_scope->items; p; p = p->next)
+    if (p->node_type != AST_NODE_VARIABLE)
+      base = assign_node_variable_addresses(base, p);
 
   code_block_t *code = code_block_t_new();
   emit_code_scope(code, ast->root_scope);
@@ -778,7 +685,7 @@ void emit_code(ast_t *_ast, writer_t *out, writer_t *log) {
       if (var->num_dim == 0)
         sz += var->base_type->size;
       else
-        sz += 8;
+        sz += 4*(1+var->num_dim);
       if (sz > global_size) global_size = sz;
     }
 

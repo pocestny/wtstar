@@ -65,9 +65,6 @@ CONSTRUCTOR(variable_t, char *name) {
   r->io_flag = IO_FLAG_NONE;
   r->initializer = NULL;
 
-  r->active_dims = NULL;
-  r->root = r;
-  r->orig = r;
   r->ranges = NULL;
   return r;
 }
@@ -76,7 +73,6 @@ DESTRUCTOR(variable_t) {
   if (r == NULL) return;
   free(r->name);
   ast_node_t_delete(r->initializer);
-  if (r->active_dims) free(r->active_dims);
   ast_node_t_delete(r->ranges);
   free(r);
 }
@@ -89,7 +85,6 @@ CONSTRUCTOR(scope_t) {
   ALLOC_VAR(r, scope_t)
   r->parent = NULL;
   r->items = NULL;
-  r->params = NULL;
   r->fn=NULL;
   return r;
 }
@@ -228,7 +223,6 @@ CONSTRUCTOR(expression_t, int variant) {
     } break;
     case EXPR_ARRAY_ELEMENT:
     case EXPR_VAR_NAME:
-    case EXPR_IMPLICIT_ALIAS:
     case EXPR_SIZEOF: {
       ALLOC_VAR(v, expr_variable_t);
       v->var = NULL;
@@ -274,7 +268,6 @@ DESTRUCTOR(expression_t) {
       break;
     case EXPR_ARRAY_ELEMENT:
     case EXPR_VAR_NAME:
-    case EXPR_IMPLICIT_ALIAS:
     case EXPR_SIZEOF:
       ast_node_t_delete(r->val.v->params);
       break;
@@ -362,6 +355,7 @@ CONSTRUCTOR(ast_node_t, YYLTYPE *iloc, int node_type, ...) {
     case AST_NODE_SCOPE:
       r->val.sc = scope_t_new();
       r->val.sc->parent = va_arg(args, scope_t *);
+      if (r->val.sc->parent) r->val.sc->fn = r->val.sc->parent->fn;
       break;
     case AST_NODE_FUNCTION:
       r->val.f = function_t_new(va_arg(args, char *));
@@ -505,7 +499,9 @@ int ident_role(ast_t *ast, char *ident, ast_node_t **result) {
   if (ast->current_scope != ast->root_scope)
     for (scope_t *sc = ast->current_scope->parent; sc != ast->root_scope;
          sc = sc->parent) {
-      nd = ast_node_find(sc->params, ident);
+      nd=NULL;
+      if (sc->fn)
+        nd = ast_node_find(sc->fn->params, ident);
       if (nd) {
         res |= IDENT_PARENT_LOCAL_VAR;
         if (result) (*result) = nd;
@@ -518,7 +514,9 @@ int ident_role(ast_t *ast, char *ident, ast_node_t **result) {
       }
     }
 
-  nd = ast_node_find(ast->current_scope->params, ident);
+  nd=NULL;
+  if (ast->current_scope->fn)  
+    nd = ast_node_find(ast->current_scope->fn->params, ident);
   if (nd) {
     res |= IDENT_LOCAL_VAR;
     if (result) (*result) = nd;

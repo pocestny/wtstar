@@ -181,17 +181,9 @@ void read_input(runtime_t *env) {
 
       uint32_t base = env->heap->top;
       stack_t_alloc(env->heap, n_elem * elem_size);
-      uint32_t hdr = env->heap->top;
-      stack_t_alloc(env->heap, 11);
 
       lval(get_addr(tt, env->in_vars[i].addr, 4), uint32_t) = base;
-      lval(get_addr(tt, env->in_vars[i].addr + 4, 4), uint32_t) = hdr;
-
-      lval(env->heap->data + hdr, uint8_t) = 1;
-      lval(env->heap->data + hdr + 1, uint8_t) = 1;
-      lval(env->heap->data + hdr + 2, uint32_t) = 0;
-      lval(env->heap->data + hdr + 6, uint32_t) = n_elem - 1;
-      lval(env->heap->data + hdr + 10, uint8_t) = 0;
+      lval(get_addr(tt, env->in_vars[i].addr + 4, 4), uint32_t) = n_elem;
 
       for (int j = 0; j < n_elem; j++) {
         int x;
@@ -210,14 +202,12 @@ void write_output(runtime_t *env) {
       int elem_size = count_size(&(env->out_vars[i]));
       uint8_t *global_mem =
           STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0]->mem->data;
-      uint32_t base = lval(global_mem + env->out_vars[i].addr, uint32_t),
-               hdr = lval(global_mem + env->out_vars[i].addr + 4, uint32_t);
-
-       //printf(">> base:%u=%u hdr:%u=%u\n",env->out_vars[i].addr,base,env->out_vars[i].addr + 4,hdr);
-      uint8_t nd = lval(env->heap->data + hdr, uint8_t);
+      uint32_t base = lval(global_mem + env->out_vars[i].addr, uint32_t);
+      
+      uint8_t nd = env->out_vars[i].num_dim;
       int *sizes = (int *)malloc(nd * sizeof(int));
-      for (int i = 0; i < nd; i++)
-        sizes[i] = lval(env->heap->data + hdr + 2 + 8 * i + 4, uint32_t) + 1;
+      for (int j = 0; j < nd; j++)
+        sizes[j] = lval(global_mem +  env->out_vars[i].addr + 4*(j+1), uint32_t) ;
       print_array(env, &(env->out_vars[i]), nd, sizes, base, 0, 0);
       free(sizes);
     } else
