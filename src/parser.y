@@ -28,6 +28,8 @@
 
 %initial-action {
   add_basic_types(ast);
+  #define LOG(...) fprintf(stderr,__VA_ARGS__)
+
 }
 
 %define api.token.prefix {TOK_} 
@@ -94,10 +96,11 @@
     input_variable_declaration variable_declaration variable_declarator_list
     variable_init_declarator variable_declarator input_variable_declarator
     static_variable_declarator input_variable_declarator_list
-    ranges_list range
     nonempty_parameter_declarator_list parameter_declarator_list 
     parameter_declarator
     stmt_scope open_function
+
+%type <static_type_val> type_decl
 
 
 %type <static_type_member_val>
@@ -111,12 +114,12 @@
 program: program_item | program program_item;
 
 program_item 
-             : typedef 
-             | variable_declaration { if (!append_variables(ast,$1)) YYERROR; }
-             | input_declaration 
-             | output_declaration  
-             | function_declaration 
-             | stmt
+             :  typedef 
+             | variable_declaration {ignore($1);} 
+             |  input_declaration 
+             |  output_declaration  
+             |  function_declaration 
+             |  stmt
              ;
 
   
@@ -193,7 +196,6 @@ input_declaration
                  : INPUT  input_variable_declaration 
                     {
                       add_variable_flag(IO_FLAG_IN,$2);
-                      if (!append_variables(ast,$2)) YYERROR;
                     }
                  | INPUT error ';' 
                  ;
@@ -202,7 +204,6 @@ output_declaration
                   : OUTPUT variable_declaration 
                     {
                       add_variable_flag(IO_FLAG_OUT,$2);
-                      if (!append_variables(ast,$2)) YYERROR;
                     }
                   | OUTPUT error ';'
                   ;
@@ -210,15 +211,12 @@ output_declaration
 
   /* possibly declare several variables of the same type */
 variable_declaration: 
-    TYPENAME variable_declarator_list ';' 
+      type_decl variable_declarator_list ';' 
       {
         $$=$2;
-        list_for(v,ast_node_t,$$) 
-          v->val.v->base_type=$1;  
-        list_for_end
       }
     |
-    TYPENAME error ';' {$$=NULL;}
+    type_decl error ';' {$$=NULL;}
     ;
 
 variable_declarator_list: 
@@ -227,7 +225,7 @@ variable_declarator_list:
     variable_declarator_list ',' variable_init_declarator 
       {
         $$=$1;
-        append(ast_node_t,&$$,$3); 
+        ignore($3);
       }
     | 
     error ','  variable_init_declarator {$$=$3;}
@@ -261,15 +259,12 @@ variable_declarator:
 
   */
 input_variable_declaration: 
-    TYPENAME input_variable_declarator_list ';' 
+    type_decl input_variable_declarator_list ';' 
       {
         $$=$2;
-        list_for(v,ast_node_t,$$) 
-          v->val.v->base_type=$1;  
-        list_for_end
       }
     |
-    TYPENAME error ';' {$$=NULL;}
+    type_decl error ';' {$$=NULL;}
     ;
 
 input_variable_declarator_list: 
@@ -278,7 +273,7 @@ input_variable_declarator_list:
     input_variable_declarator_list ',' input_variable_declarator 
       {
         $$=$1;
-        append(ast_node_t,&$$,$3); 
+        ignore($3);
       }
     | 
     error ',' input_variable_declarator {$$=$3;}
@@ -311,6 +306,8 @@ static_variable_declarator: IDENT
                             {
                                 $$=init_variable(ast,&@1,$1); 
                                 if (!$$) YYERROR;
+                                if (!append_variables(ast,$$)) YYERROR;
+                                $$->val.v->base_type=ast->current_type;
                             }
 
 
@@ -344,12 +341,12 @@ function_declaration
       maybe_scope_item_list '}'
          {
            ast->current_scope=$<ast_node_val>3->val.sc->parent;
-           // TODO free
+           free($<ast_node_val>3);
          }
 
 
 open_function:
-    TYPENAME IDENT '(' parameter_declarator_list ')'
+    type_decl IDENT '(' parameter_declarator_list ')'
       {
         $$=define_function(ast,&@$,$1,$2,&@2,$4);
         if (!$$)
@@ -372,7 +369,7 @@ parameter_declarator_list:
     {
       $$=$2;
       ast->current_scope=$<ast_node_val>1->val.sc->parent;
-      // TODO free
+      ast_node_t_delete($<ast_node_val>1);
     }
     ;
 
@@ -396,7 +393,11 @@ parameter_declarator
 
  
 array_dim_spec: %empty {$$=0;} | '[' placeholder_list ']' {$$=$2;};                                  
-  
+type_decl: TYPENAME 
+      {
+        ast->current_type=$1;
+        $$=$1;
+      }
   
   /* ************************* EXPRESSIONS  ***************************** */
 
@@ -809,7 +810,7 @@ stmt_scope
 
 scope_item_list:  scope_item | scope_item_list scope_item ;
 scope_item 
-          : variable_declaration  { if (!append_variables(ast,$1)) YYERROR; }
+          : variable_declaration  
           | stmt;
 
 stmt_expr 
@@ -904,9 +905,6 @@ for_specifier
 first_for_item 
               : stmt_expr 
               | variable_declaration  
-                { 
-                  if (!append_variables(ast,$1)) YYERROR; 
-                }
               | ';' 
                 {
                   append(ast_node_t,&ast->current_scope->items,

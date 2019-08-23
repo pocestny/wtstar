@@ -642,6 +642,19 @@ static void write_io_variables(writer_t *out, int flag) {
 void emit_code(ast_t *_ast, writer_t *out, writer_t *log) {
   writer_log = log;
   ast = _ast;
+  
+  DEBUG("types\n");
+  for (ast_node_t *t=ast->types;t;t=t->next) {
+    static_type_t *type = t->val.t;
+    DEBUG("%s (size %d) = [ ",type->name,type->size);
+    for (static_type_member_t *m=type->members;m;m=m->next){
+      DEBUG("%s %s",m->type->name,m->name);
+      if (m->next) DEBUG(", ");
+    }
+    DEBUG(" ]\n");
+  }
+
+
 
   {
     int n = 0;
@@ -649,7 +662,7 @@ void emit_code(ast_t *_ast, writer_t *out, writer_t *log) {
       assert(fn->node_type == AST_NODE_FUNCTION);
       fn->val.f->n = n++;
       uint32_t base = 0;
-      DEBUG("function #%d: %s\n",fn->val.f->n,fn->val.f->name);
+      DEBUG("\nfunction #%d: %s\n",fn->val.f->n,fn->val.f->name);
       for (ast_node_t *p = fn->val.f->params; p; p = p->next)
         base = assign_single_variable_address(base, p->val.v);
       DEBUG("items:\n");

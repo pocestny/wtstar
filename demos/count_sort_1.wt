@@ -1,0 +1,23 @@
+/*
+   input: k, and an array of integers a_1,...,a_n from 1...k 
+   output: sorted array
+
+   T = O(log n)
+   W = O(k n)
+*/
+
+#include "utils.wt"
+
+input int k, A[_];
+int n = A.size;
+
+output int B[n];
+int Cnt[k], ps[k], pos[k+1];
+
+pardo(i : k) Cnt[i] = count(i, A);
+prefix_sums(Cnt, ps);
+
+pos[0]=0;
+pardo(i:k) pos[i+1]=ps[i];
+
+pardo(i : k) pardo(j : Cnt[i]) B[pos[i] + j] = i;

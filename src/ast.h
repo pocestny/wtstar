@@ -344,6 +344,7 @@ typedef struct {
   ast_node_t *types;      // list of AST_NODE_STATIC_TYPE
   ast_node_t *functions;  // list of AST_NODE_FUNCTION
   scope_t *root_scope, *current_scope;
+  static_type_t *current_type;
   int error_occured;
 } ast_t;
 
