@@ -1,17 +1,22 @@
-#include "driver.h"
-#include "parser.h"
-#include "scanner.h"
-
 #include <string.h>
 
+#include <driver.h>
+#include <parser.h>
+#include <scanner.h>
+#include <errors.h>
+
+extern int yycolumn;
 
 static void driver_error_handler(const char *s,...) {
+  error_t *err = error_t_new();
+  append_error_msg(err,"driver error: ");
   va_list args;
+  int n;
+  get_printed_length(s,n);
   va_start(args,s);
-  fprintf(stderr, "driver error, ");
-  vfprintf(stderr,s,args);
-  fprintf(stderr,"\n");
+  append_error_vmsg(err,n,s,args);
   va_end(args);
+  emit_error(err);
 }
 
 typedef struct _include_file_t{
@@ -47,13 +52,13 @@ static DESTRUCTOR(include_file_t) {
 }
 
 
-include_file_t *files,*current;
+static include_file_t *files,*current;
 
+writer_t *driver_error_writer=NULL;
 
-
-/* insert a new empty file into hashtable */
+/* insert a new empty file  */
 static include_file_t *insert_file(const char *filename) {
-  ALLOC_VAR(file,include_file_t)
+  include_file_t *file = include_file_t_new();
   if (files) file->next=files;
   files=file;
   file->name = strdup(filename);
@@ -68,14 +73,16 @@ void driver_init() {
 
 /* preload / unload the given file */
 void driver_set_file(const char *filename, const char *content) {
-  
+ 
   include_file_t *file;
-  for(file=files;strcmp(file->name,filename);file=file->next);
+
+  for(file=files;file&&strcmp(file->name,filename);file=file->next);
 
   if (file && (file->f || file->buf)) {
     driver_error_handler("declined to preload current file, skipping");
     return;
   }
+
 
   if (file == NULL)
     file = insert_file(filename);
@@ -92,6 +99,7 @@ ast_t *driver_parse(const char *filename) {
   ast_t * ast = ast_t_new();
 
   driver_push_file(filename);
+  yylineno=1; yycolumn=1;
   if (driver_current_file()) yyparse(ast);
   return ast;
 }

@@ -3,8 +3,8 @@
 
 #include <inttypes.h>
 
-#include "utils.h"
-#include "code.h"
+#include <utils.h>
+#include <code.h>
 
 typedef struct {
   uint32_t addr;

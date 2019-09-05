@@ -1,0 +1,7 @@
+type a1 {
+  int x1,x2,a1;
+}
+
+type a2{
+  a1 a2;
+  }

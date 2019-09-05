@@ -1,9 +1,10 @@
 #ifndef __WRITER_H__
 #define __WRITER_H__
 
-#include "utils.h"
 #include <stdarg.h>
 #include <stdio.h>
+
+#include <utils.h>
 
 #define WRITER_STRING 0
 #define WRITER_FILE 1
@@ -22,7 +23,9 @@ typedef struct {
 
 CONSTRUCTOR(writer_t,int type);
 DESTRUCTOR(writer_t);
-void out_text(writer_t *w, char *format, ...);
+
+void out_text(writer_t *w, const char *format, ...);
+void out_vtext(writer_t* w,  int len, const char *format, va_list args);
 void out_raw(writer_t *w, void *base, int n);
 
 #endif

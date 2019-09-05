@@ -1,7 +1,7 @@
 #ifndef __DRIVER_H__
 #define __DRIVER_H__
 
-#include "ast.h"
+#include <ast.h>
 
 /* driver constructor */
 void driver_init();

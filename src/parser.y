@@ -7,7 +7,8 @@
   #include <string.h>
   #include <stdarg.h>
   #include <stdlib.h>
-  #include "ast.h"
+
+  #include <ast.h>
 }
 
 %debug
@@ -81,7 +82,9 @@
 %destructor { if ($$) ast_node_t_delete($$); $$=NULL;} <ast_node_val>
 %destructor { if ($$) static_type_member_t_delete($$); $$=NULL;} <static_type_member_val>
 
-
+%destructor {$$=NULL;} input_variable_declaration variable_declaration variable_declarator_list
+    variable_init_declarator variable_declarator input_variable_declarator
+    static_variable_declarator input_variable_declarator_list
 
 %type <int_val> 
     placeholder_list 
@@ -134,45 +137,54 @@ program_item
         <type_1> <name_1_1>, ... ,<name_1_n1>;
         <type_2> <name_2_1>, ... ,<name_2_n2>;
         ...
-      }
+      };
 
    */
 
 typedef 
-       : TYPE IDENT '{' typedef_list '}' {if (!make_typedef(ast,&@$,$2,&@2,$4)) YYERROR;}
-       | TYPE error '}'
+       : TYPE IDENT '{' typedef_list '}' {make_typedef(ast,&@$,$2,&@2,$4);}
+       | TYPE error '}' 
        ;
 
 typedef_list
             : typedef_item {$$=$1;} 
-            | typedef_list typedef_item {$$=$1; append(static_type_member_t,&$$,$2);}
+            | typedef_list typedef_item {
+              if ($2==NULL) $$=$1;
+              else if ($1==NULL) $$=$2;
+              else {
+                $$=$1; 
+                append(static_type_member_t,&$$,$2);
+              }
+            }
 
 typedef_item
             : TYPENAME typedef_ident_list ';' 
                 {
                   $$=$2;
-                  list_for(tt,static_type_member_t,$$) 
-                    tt->type=$1;
-                  list_for_end
+                  if ($$) {
+                    list_for(tt,static_type_member_t,$$) 
+                      tt->type=$1;
+                    list_for_end
+                  }
                 }
             | TYPENAME error ';' {$$=NULL;}
             ;
 
 
 typedef_ident_list: 
+    error ',' IDENT  { $$=static_type_member_t_new($3,NULL); free($3); }
+    |
     IDENT { $$=static_type_member_t_new($1,NULL); free($1); }
     | 
     typedef_ident_list ',' IDENT 
         {
-          if (static_type_member_find($1,$3)) {
-            yyerror(&@3,ast,"duplicate type member %s",$3);
-            free($3);
-            static_type_member_t_delete($1);            
-            $$=NULL;
-            YYERROR;
-          }
           $$=$1;
-          append(static_type_member_t,&$$,static_type_member_t_new($3,NULL));
+          if (static_type_member_find($1,$3)) {
+            yyerror(&@3,ast,"duplicate type member '%s' in type definition",$3);
+          } else {
+            static_type_member_t *nt = static_type_member_t_new($3,NULL);
+            append(static_type_member_t,&$$,nt);
+          }
           free($3);
         }
     ;
@@ -195,7 +207,7 @@ typedef_ident_list:
 input_declaration 
                  : INPUT  input_variable_declaration 
                     {
-                      add_variable_flag(IO_FLAG_IN,$2);
+                      if ($2) add_variable_flag(IO_FLAG_IN,$2);
                     }
                  | INPUT error ';' 
                  ;
@@ -203,7 +215,7 @@ input_declaration
 output_declaration
                   : OUTPUT variable_declaration 
                     {
-                      add_variable_flag(IO_FLAG_OUT,$2);
+                      if($2) add_variable_flag(IO_FLAG_OUT,$2);
                     }
                   | OUTPUT error ';'
                   ;
@@ -225,7 +237,7 @@ variable_declarator_list:
     variable_declarator_list ',' variable_init_declarator 
       {
         $$=$1;
-        ignore($3);
+        if (!$$) $$=$3;
       }
     | 
     error ','  variable_init_declarator {$$=$3;}
@@ -236,12 +248,29 @@ variable_declarator_list:
 variable_init_declarator: 
     variable_declarator {$$=$1;}
     | 
-    variable_declarator '=' initializer_item 
+    variable_declarator '=' expr_assign
       { 
         $$=$1; 
-        $$->val.v->initializer = $3;
+        if ($$) {
+          if ($3) {
+            ast_node_t *nn =ast_node_t_new(&@3,AST_NODE_EXPRESSION,EXPR_INITIALIZER);
+            nn->val.e->type = inferred_type_copy($3->val.e->type);
+            nn->val.e->val.i = $3;
+            $$->val.v->initializer = nn;
+          }
+        } else 
+          ast_node_t_delete($3);
       }
+    | variable_declarator '=' '{' initializer_list '}' 
+    {
+      $$=$1;
+      if ($$) $$->val.v->initializer=$4;
+      else ast_node_t_delete($4);
+    }
+    
     ;
+
+
 
 variable_declarator: 
     static_variable_declarator {$$=$1;}
@@ -249,7 +278,8 @@ variable_declarator:
     static_variable_declarator '[' expr_list ']'
       {
         $$=$1;
-        if (!init_array(ast,$1,$3)) YYERROR;
+        if ($$) init_array(ast,$1,$3);
+        else ast_node_t_delete($3);
       }
     ;
 
@@ -273,7 +303,7 @@ input_variable_declarator_list:
     input_variable_declarator_list ',' input_variable_declarator 
       {
         $$=$1;
-        ignore($3);
+        if (!$$) $$=$3;
       }
     | 
     error ',' input_variable_declarator {$$=$3;}
@@ -285,8 +315,13 @@ input_variable_declarator:
     static_variable_declarator '[' placeholder_list ']' 
       {
         $$=$1;
-        if (!init_input_array(ast,$1,$3)) YYERROR;
+        if ($$) init_input_array(ast,$1,$3);
       }
+    | 
+    static_variable_declarator '[' error ']' {
+      yyerror(&@1,ast,"wrong list of placeholders");
+      $$=$1;
+    }
     ;
 
 
@@ -305,9 +340,10 @@ placeholder_list:
 static_variable_declarator: IDENT 
                             {
                                 $$=init_variable(ast,&@1,$1); 
-                                if (!$$) YYERROR;
-                                if (!append_variables(ast,$$)) YYERROR;
-                                $$->val.v->base_type=ast->current_type;
+                                if ($$) {
+                                 append_variables(ast,$$);
+                                 $$->val.v->base_type=ast->current_type;
+                                }
                             }
 
 
@@ -413,7 +449,7 @@ expr_assign:
     expr_unary  assign_operator expr_assign 
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     ;
@@ -424,7 +460,7 @@ expr_or:
     expr_or OR expr_and
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,TOK_OR,$3);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     ;
@@ -435,7 +471,7 @@ expr_and:
     expr_and AND expr_eq
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,TOK_AND,$3);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     ;
@@ -447,7 +483,7 @@ expr_eq:
     expr_eq  eq_operator expr_rel
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     ;
@@ -459,7 +495,7 @@ expr_rel:
     expr_rel  rel_operator  expr_add
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     ;
@@ -468,17 +504,10 @@ expr_rel:
 expr_add: 
     expr_mult {$$=$1;} 
     |
-    expr_add expr_literal
-      {
-        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,'+',$2);
-        if (!fix_expression_type($$))
-          YYERROR;
-      }
-    |
     expr_add    add_operator    expr_mult
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     ;
@@ -489,7 +518,7 @@ expr_mult:
     expr_mult   mult_operator   expr_pow
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     ;
@@ -501,7 +530,7 @@ expr_pow:
     expr_cast '^' expr_pow
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,'^',$3);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     ;
@@ -513,14 +542,14 @@ expr_cast:
     '(' TYPENAME ')'  expr_cast
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_CAST,$2,$4);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     | 
     '(' TYPENAME ')' '{' initializer_list '}'
       {
          $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_CAST,$2,$5);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
        }
     ;
@@ -531,7 +560,7 @@ expr_unary:
     unary_operator expr_postfix
       {
          $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_PREFIX,$1,$2);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     ;
@@ -542,21 +571,22 @@ expr_postfix:
     | 
     expr_postfix '.' IDENT
       {
-        $$ = create_specifier_expr(&@$,ast,$1,$3,&@3);
+        $$=NULL;
+        if($1) $$ = create_specifier_expr(&@$,ast,$1,$3,&@3);
         if (!$$) YYERROR;
       }
     |
     expr_postfix INC 
       {
          $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_POSTFIX,$1,TOK_INC);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     | 
     expr_postfix DEC
       {
          $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_POSTFIX,$1,TOK_DEC);
-        if (!fix_expression_type($$))
+        if (!fix_expression_type(ast,&@$,$$))
           YYERROR;
       }
     ;
@@ -695,7 +725,7 @@ expr_literal:
 
   /* bracketed comma separated initializer list - returns expression */
 initializer_list 
-                : initializer_item {$$=$1;} 
+                : initializer_item {$$=$1;}
                 | STRING_LITERAL 
                   {
                     $$=ast_node_t_new(&@1,AST_NODE_EXPRESSION,EXPR_INITIALIZER);
@@ -730,7 +760,7 @@ initializer_list
                 ;
 
 initializer_item 
-                : expr_assign 
+      : expr_assign 
       {
         if (!$1) $$=NULL;
         else {
@@ -740,7 +770,7 @@ initializer_item
         }
       }
       | '{' initializer_list '}' 
-      {
+      { 
         inferred_type_item_t *t =inferred_type_item_t_new($2->val.e->type);
         
         ALLOC_VAR(nt,inferred_type_t);

@@ -1,0 +1,11 @@
+<div class="w2ui-page page-0">
+    <div class="w2ui-field">
+        <label>####</label>
+        <div>
+           <input name="data" type="text" maxlength="100" style="width: 250px"/>
+        </div>
+    </div>
+</div>
+<div class="w2ui-buttons">
+    <button class="w2ui-btn" name="save">Ok</button>
+</div>

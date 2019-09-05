@@ -1,8 +1,8 @@
 #ifndef __CODE_GENERATION_H__
 #define __CODE_GENERATION_H__
 
-#include "writer.h"
-#include "ast.h"
+#include <writer.h>
+#include <ast.h>
 
 /* ----------------------------------------------------------------------------
  * resizable page of code
@@ -28,6 +28,6 @@ void add_code_block(code_block_t *dst, code_block_t *src);
 void add_instr(code_block_t *out, int code, ...);
 
 // this is the main interface
-void emit_code(ast_t *_ast, writer_t *out, writer_t *log) ;
+void emit_code(ast_t *_ast, writer_t *out) ;
 
 #endif

@@ -1,7 +1,8 @@
-#include "ast_debug_print.h"
-#include "parser.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <ast_debug_print.h>
+#include <parser.h>
 
 static writer_t *writer;
 
@@ -20,10 +21,10 @@ static const char *const stmt_names[] = {
 
 #define EXPR_BASE 18
 static const char *const expr_names[] = {
-    "EXPR_EMPTY",         "EXPR_LITERAL",  "EXPR_INITIALIZER",    "EXPR_CALL",
-    "EXPR_ARRAY_ELEMENT", "EXPR_VAR_NAME", "EXPR_SIZEOF",
-    "EXPR_POSTFIX",       "EXPR_PREFIX",   "EXPR_BINARY",         "EXPR_CAST",
-    "EXPR_SPECIFIER"};
+    "EXPR_EMPTY",  "EXPR_LITERAL",       "EXPR_INITIALIZER",
+    "EXPR_CALL",   "EXPR_ARRAY_ELEMENT", "EXPR_VAR_NAME",
+    "EXPR_SIZEOF", "EXPR_POSTFIX",       "EXPR_PREFIX",
+    "EXPR_BINARY", "EXPR_CAST",          "EXPR_SPECIFIER"};
 
 static const char *const ioflag_names[] = {"IO_FLAG_NONE", "IO_FLAG_IN",
                                            "IO_FLAG_OUT"};
@@ -204,14 +205,20 @@ static void print_node(int ofs, ast_node_t *node) {
   if (node->node_type == AST_NODE_EXPRESSION &&
       (node->val.e->variant == EXPR_ARRAY_ELEMENT ||
        node->val.e->variant == EXPR_SIZEOF ||
-       node->val.e->variant == EXPR_CALL )) {
+       node->val.e->variant == EXPR_CALL)) {
     for (ast_node_t *t = node->val.e->val.v->params; t; t = t->next)
       print_node(ofs + 5, t);
   }
 
   if (node->node_type == AST_NODE_EXPRESSION &&
-      node->val.e->variant == EXPR_INITIALIZER) {
-    print_node(ofs + 5, node->val.e->val.i);
+      node->val.e->variant == EXPR_INITIALIZER)
+    for (ast_node_t *nd = node->val.e->val.i; nd; nd = nd->next) {
+      print_node(ofs + 5, nd);
+    }
+
+  if (node->node_type == AST_NODE_EXPRESSION &&
+      node->val.e->variant == EXPR_CAST) {
+    print_node(ofs + 5, node->val.e->val.c->ex);
   }
 }
 

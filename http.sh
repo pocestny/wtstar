@@ -1,3 +1,3 @@
 #!/bin/bash
 
-python -m SimpleHTTPServer 4247
+cd ./_build/frontend; python -m SimpleHTTPServer 4247

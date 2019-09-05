@@ -1,6 +1,5 @@
 #ifdef __PARSER_UTILS__
 
-
 void ignore(void *i) {}  // don't fret about unused values
 
 // add basic  types
@@ -10,7 +9,8 @@ void ignore(void *i) {}  // don't fret about unused values
   __type__##typename->val.t->size = nbytes;                          \
   append(ast_node_t, &ast->types, __type__##typename);
 
-ast_node_t *__type__int, *__type__float, *__type__void, *__type__char;
+ast_node_t *__type__int = NULL, *__type__float = NULL, *__type__void = NULL,
+           *__type__char = NULL;
 
 void add_basic_types(ast_t *ast) {
   ADD_STATIC_TYPEDEF(int, 4)
@@ -19,35 +19,47 @@ void add_basic_types(ast_t *ast) {
   ADD_STATIC_TYPEDEF(char, 1)
 }
 
-int make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
-                 static_type_member_t *members) {
-  if (!members || !ident || ast->error_occured) {
+void make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
+                  static_type_member_t *members) {
+  if (!members || !ident) {
     static_type_member_t_delete(members);
     free(ident);
-    return 1;
+    return;
   }
 
   int role = ident_role(ast, ident, NULL);
 
   if (role != IDENT_FREE) {
-    yyerror(rloc, ast, "type name (%s) must be unique", ident);
+    yyerror(rloc, ast,
+            "name of the newly defined type '%s' already belongs to a %s",
+            ident, role_name(role));
     static_type_member_t_delete(members);
     free(ident);
-    return 0;
+    return;
   }
 
   ast_node_t *nt = ast_node_t_new(rloc, AST_NODE_STATIC_TYPE, ident);
   nt->val.t->members = members;
+  int err = 0;
   list_for(m, static_type_member_t, members) {
     m->offset = nt->val.t->size;
     m->parent = nt->val.t;
     nt->val.t->size += m->type->size;
+    if (!strcmp(m->name, ident)) err = 1;
   }
   list_for_end;
 
+  if (err) {
+    yyerror(rloc, ast,
+            "name of a member is the same as the newly defined type '%s'",
+            ident);
+    ast_node_t_delete(nt);
+    free(ident);
+    return;
+  }
+
   append(ast_node_t, &ast->types, nt);
   free(ident);
-  return 1;
 }
 
 void add_variable_flag(int flag, ast_node_t *list) {
@@ -56,21 +68,19 @@ void add_variable_flag(int flag, ast_node_t *list) {
 }
 
 // append list of variables to current scope
-int append_variables(ast_t *ast, ast_node_t *list) {
+void append_variables(ast_t *ast, ast_node_t *list) {
   list_for(v, ast_node_t, list) {
     v->next = NULL;
     if (ident_role(ast, v->val.v->name, NULL) & IDENT_LOCAL_VAR) {
       yyerror(&v->loc, ast, "redefinition of local variable %s",
               v->val.v->name);
-      ast_node_t_delete(list);
       ast_node_t_delete(v);
-      return 0;
+    } else {
+      append(ast_node_t, &ast->current_scope->items, v);
+      v->val.v->scope = ast->current_scope;
     }
-    append(ast_node_t, &ast->current_scope->items, v);
-    v->val.v->scope = ast->current_scope;
   }
   list_for_end;
-  return 1;
 }
 
 ast_node_t *expression_int_val(int val) {
@@ -82,47 +92,49 @@ ast_node_t *expression_int_val(int val) {
 }
 
 // update var so that it represents array with dimensions in exprlist
-int init_array(ast_t *ast, ast_node_t *var, ast_node_t *exprlist) {
+// on error, keep the variable as scalar
+void init_array(ast_t *ast, ast_node_t *var, ast_node_t *exprlist) {
   if (!var) {
     ast_node_t_delete(exprlist);
-    return 1;
+    return;
   }
 
   if (!exprlist) {
-    yyerror(&(var->loc), ast, "array must have at least one dimension");
-    return 0;
+    yyerror(&(var->loc), ast, "array '%s' must have at least one dimension",
+            var->val.v->name);
+    return;
   }
 
-  for (ast_node_t *e = exprlist; e; e = e->next)
+  int current_dim = 1;
+  for (ast_node_t *e = exprlist; e; e = e->next, current_dim++)
     if (!expr_int(e->val.e)) {
       char *tname = inferred_type_name(e->val.e->type);
-      yyerror(&(e->loc), ast, "array dimesion must be integral, has type %s",
-              tname);
+      yyerror(&(e->loc), ast,
+              "%d-th array dimesion must be integral expression, has type %s",
+              current_dim, tname);
       free(tname);
       ast_node_t_delete(exprlist);
-      return 0;
+      return;
     }
 
   variable_t *v = var->val.v;
   v->num_dim = length(exprlist);
   v->ranges = exprlist;
-
-  return 1;
 }
 
-int init_input_array(ast_t *ast, ast_node_t *var, int num_dim) {
-  if (!var) return 1;
+void init_input_array(ast_t *ast, ast_node_t *var, int num_dim) {
+  if (!var) return;
 
   if (num_dim < 1) {
-    yyerror(&(var->loc), ast, "array must have at least one dimension");
-    return 0;
+    yyerror(&(var->loc), ast,
+            "input array '%s' must have at least one dimension",
+            var->val.v->name);
+    return;
   }
 
   variable_t *v = var->val.v;
   v->num_dim = num_dim;
   v->ranges = NULL;
-
-  return 1;
 }
 
 ast_node_t *init_variable(ast_t *ast, YYLTYPE *loc, char *vname) {
@@ -213,7 +225,7 @@ ast_node_t *create_specifier_expr(YYLTYPE *loc, ast_t *ast, ast_node_t *expr,
       static_type_member_find(expr->val.e->type->type->members, ident);
 
   if (!t) {
-    yyerror(loc, ast, "type %d dose not have a member %s",
+    yyerror(loc, ast, "type %s does not have a member %s",
             expr->val.e->type->type->name, ident);
     free(ident);
     ast_node_t_delete(expr);
@@ -245,7 +257,7 @@ ast_node_t *expression_variable(ast_t *ast, YYLTYPE *loc, char *name) {
 }
 
 int add_expression_array_parameters(ast_node_t *ve, ast_node_t *p) {
-  ve->val.e->variant =  EXPR_ARRAY_ELEMENT;
+  ve->val.e->variant = EXPR_ARRAY_ELEMENT;
   // TODO: check type, number of dimensions, etc.
   ve->val.e->val.v->params = p;
   return 1;
@@ -274,8 +286,49 @@ ast_node_t *expression_call(ast_t *ast, YYLTYPE *loc, char *name,
 // AST_NODE_EXPRESSION initialized with variant and parameters
 // check types, and set the resulting type
 // on error, return 0 and deallocate node
-int fix_expression_type(ast_node_t *node) {
-  node->val.e->type->type = __type__int->val.t;
+// node is EXPR_BINARY, EXPR_CAST, EXPR_PREFIX or EXPR_POSTFIX
+int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node) {
+  expression_t *e = node->val.e;
+
+  if (e->variant == EXPR_BINARY) {
+    if (inferred_type_equal(e->val.o->first->val.e->type,
+                            e->val.o->second->val.e->type)) {
+      inferred_type_t_delete(e->type);
+      e->type = inferred_type_copy(e->val.o->first->val.e->type);
+    } else {
+      // only implicit type conversion is int->float
+      int fi = 1, ff = 1, si = 1, sf = 1;
+
+      if (e->val.o->first->val.e->type->compound)
+        fi = ff = 0;
+      else {
+        if (e->val.o->first->val.e->type->type != __type__int->val.t) fi = 0;
+        if (e->val.o->first->val.e->type->type != __type__float->val.t) ff = 0;
+      }
+
+      if (e->val.o->second->val.e->type->compound)
+        si = sf = 0;
+      else {
+        if (e->val.o->second->val.e->type->type != __type__int->val.t) si = 0;
+        if (e->val.o->second->val.e->type->type != __type__float->val.t) sf = 0;
+      }
+
+      if (fi && si)
+        e->type->type = __type__int->val.t;
+      else if ((fi || ff) && (si || sf))
+        e->type->type = __type__float->val.t;
+      else {
+        yyerror(loc, ast, "type check error");
+        return 0;
+      }
+    }
+  } else if (e->variant == EXPR_CAST) {
+    e->type->type = e->val.c->type;
+  } else {
+    // unary expression
+    inferred_type_t_delete(e->type);
+    e->type = inferred_type_copy(e->val.o->first->val.e->type);
+  }
   return 1;
 }
 #endif

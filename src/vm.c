@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "vm.h"
+#include <vm.h>
 
 extern int EXEC_DEBUG;
 #include <stdio.h>  // for debug
@@ -555,6 +555,13 @@ void execute(runtime_t *env, int *W, int *T) {
             } break;
             case SUB_INT: {
               int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a -= b;
+              _PUSH(a, 4);
+            } break;
+            case SUB_FLOAT: {
+              float a, b;
               _POP(a, 4);
               _POP(b, 4);
               a -= b;

@@ -4,8 +4,8 @@
 #include <inttypes.h>
 #include <stdarg.h>
 
-#include "utils.h"
-#include "writer.h"
+#include <utils.h>
+#include <writer.h>
 
 /* ----------------------------------------------------------------------------
  * ast_node_t
@@ -46,6 +46,10 @@ typedef struct {
 
 CONSTRUCTOR(static_type_t, char *name);
 DESTRUCTOR(static_type_t);
+
+// return the TYPE_* descriptor (see code.h) of a basic type
+// (for non-basic type assert fails)
+int static_type_basic(static_type_t *t);
 
 /*
  * (list of) members of a static type
@@ -147,7 +151,8 @@ DESTRUCTOR(function_t);
  *
  * empty: just a placeholder
  * literal: (void*) value according to  type
- * initializer: (ast_node_t*) flattened list of members
+ * initializer: (ast_node_t*)  flattened list of members (tree structure is 
+ *                in the inferred type)
  * function call: (expr_function_t*) function_t* and parameters (ast_node_t*)
  * variable name: (expr_variable_t*) variable_t* (parameters are NULL)
  * array element: (expr_variable_t*) variable_t* and parameters (ast_node_t*)
@@ -206,6 +211,34 @@ inferred_type_t *inferred_type_copy(inferred_type_t *t);
 // returns new dst
 inferred_type_t *inferred_type_append(inferred_type_t *dst,
                                       inferred_type_t *src);
+
+int inferred_type_equal(inferred_type_t *a, inferred_type_t *b);
+
+// can this inferred type be assigned to the static type?
+#define CONVERT_FROM_INT 1U
+#define CONVERT_FROM_FLOAT 2U
+#define CONVERT_FROM 3U
+#define CONVERT_TO_INT 4U
+#define CONVERT_TO_FLOAT 8U
+#define CONVERT_TO_CHAR 16U
+#define CONVERT_TO 28U
+// casts = if not null and the result is true, 
+//    its allocated to layout size, and populated with conversion flags, and n is set
+int inferred_type_compatible(static_type_t *st, inferred_type_t *it,int **casts,int *n);
+
+/* ----------------------------------------------------------------------------
+ * static/inferred type layout
+ *
+ * returns the number of elements of a static/inferred type
+ *
+ * if layout is not NULL, allocate and populate an array describing the
+ * components
+ *
+ */
+
+int static_type_layout(static_type_t *t, uint8_t **layout);
+int inferred_type_layout(inferred_type_t *t, uint8_t **layout);
+
 
 /*
  * data storage for variants
@@ -371,5 +404,6 @@ DESTRUCTOR(ast_t);
 // returns combination of values in current scope, and (if not NULL) stores
 // the node (of the closest variable)
 int ident_role(ast_t *ast, char *ident, ast_node_t **result);
+const char* role_name(int role);
 
 #endif

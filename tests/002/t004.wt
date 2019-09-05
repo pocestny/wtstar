@@ -1,0 +1,8 @@
+int a() {}
+
+type a {
+  int b;
+}
+
+a x;
+int int;

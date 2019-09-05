@@ -1,9 +1,13 @@
 %{
-#include "parser.h"
-#include "driver.h"
 #include <stdarg.h>
 
+#include <parser.h>
+#include <driver.h>
+#include <errors.h>
+
 int yycolumn = 1;
+
+extern writer_t *driver_error_writer;
 
 const char* const symbols[]={
   "(",")","{","}","[","]",
@@ -70,12 +74,12 @@ SYMBOL2  [^a-zA-Z0-9 \t_'";]
   /* single line comment */
 "//".*\n             yylineno++;yycolumn=1;
 
--?{DIGIT}+/[^{IDSYM}{DIGIT}] { 
+{DIGIT}+ { 
     yylval->int_val = atoi(yytext); 
     return TOK_INT_LITERAL; 
   }
 
--?({DIGIT}*\.{DIGIT}+)|({DIGIT}*\.{DIGIT}+)/[^{IDSYM}{DIGIT}]  {
+{DIGIT}*\.{DIGIT}+  {
     yylval->float_val = atof(yytext); 
     return TOK_FLOAT_LITERAL; 
 }
@@ -94,18 +98,18 @@ SYMBOL2  [^a-zA-Z0-9 \t_'";]
 
   /* keywords */
 
-type/[^{IDSYM}{DIGIT}]      { return TOK_TYPE; }
-input/[^{IDSYM}{DIGIT}]     { return TOK_INPUT; }
-output/[^{IDSYM}{DIGIT}]    { return TOK_OUTPUT; }
-if/[^{IDSYM}{DIGIT}]        { return TOK_IF; }
-else/[^{IDSYM}{DIGIT}]      { return TOK_ELSE; }
-for/[^{IDSYM}{DIGIT}]       { return TOK_FOR; }
-while/[^{IDSYM}{DIGIT}]     { return TOK_WHILE; }
-pardo/[^{IDSYM}{DIGIT}]       { return TOK_PARDO; }
-do/[^{IDSYM}{DIGIT}]        { return TOK_DO; }
-return/[^{IDSYM}{DIGIT}]    { return TOK_RETURN; }
-.{SPACE}*size/[^{IDSYM}{DIGIT}]      { return TOK_SIZE; }
-dim/[^{IDSYM}{DIGIT}]       { return TOK_DIM; }
+type/[^a-zA-Z0-9]      { return TOK_TYPE; }
+input/[^a-zA-Z0-9]     { return TOK_INPUT; }
+output/[^a-zA-Z0-9]    { return TOK_OUTPUT; }
+if/[^a-zA-Z0-9]        { return TOK_IF; }
+else/[^a-zA-Z0-9]      { return TOK_ELSE; }
+for/[^a-zA-Z0-9]       { return TOK_FOR; }
+while/[^a-zA-Z0-9]     { return TOK_WHILE; }
+pardo/[^a-zA-Z0-9]       { return TOK_PARDO; }
+do/[^a-zA-Z0-9]        { return TOK_DO; }
+return/[^a-zA-Z0-9]    { return TOK_RETURN; }
+\.{SPACE}*size/[^a-zA-Z0-9]      { return TOK_SIZE; }
+dim/[^a-zA-Z0-9]       { return TOK_DIM; }
 
   /* not a keyword  */
 [a-zA-Z_]{IDSYM}* {
@@ -163,14 +167,16 @@ dim/[^{IDSYM}{DIGIT}]       { return TOK_DIM; }
 %%
 
 
-void yyerror(YYLTYPE *yylloc, ast_t *r,  char const *s, ...) { 
+void yyerror(YYLTYPE *yylloc, ast_t *r,  const char  *s, ...) { 
+  error_t *err = error_t_new();
+  append_error_msg(err,"%s:%d:%d: ", yylloc->fn, yylloc->fl,  yylloc->fc);
   va_list args;
+  int n;
+  get_printed_length(s,n);
   va_start(args,s);
-
-  r->error_occured=1;
-  fprintf(stderr,"%s:%d:%d: ", yylloc->fn, yylloc->fl,  yylloc->fc);
-  vfprintf(stderr, s, args);
-  fprintf(stderr,"\n");
+  append_error_vmsg(err,n,s,args);
   va_end(args);
+  emit_error(err);
+  r->error_occured=1;
 }
 
