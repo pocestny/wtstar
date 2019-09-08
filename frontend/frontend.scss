@@ -1,0 +1,140 @@
+body{
+  padding:0px;
+  margin:0px;
+  font-family:'Montserrat';
+}
+
+.w2ui-reset table {
+  font-family:'Montserrat';
+}
+.w2ui-reset  {
+  font-family:'Montserrat';
+}
+
+.w2ui-panel-toolbar {
+background: rgb(225,244,252)!important;
+background: linear-gradient(0deg, rgba(225,244,252,1) 0%, rgba(240,251,255,1) 50%, rgba(225,244,252,1) 100%)!important;
+}
+
+
+$background-color: #F5F6F7; 
+$border: 1px solid #d3d3d3; 
+
+#app-layout{
+  width:100%;
+  height:100vh;
+  padding:0;
+  margin:0;
+}
+
+textarea{
+  font-family:'Roboto';
+}
+
+
+/* statusbar */
+.statusbar-container {
+  position: relative;
+  height: calc( 100% - 4px );
+  width:100%;
+  font-family:'Montserrat';
+  font-weight:300;
+  margin:0px;
+  padding:0px;
+  border: $border;
+  background-color: $background-color;
+}
+
+.statusbar-panel {
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  -ms-transform: translateY(-50%);
+  transform: translateY(-50%);
+}
+
+#statusbar-left{
+  left:10px;
+}
+
+.statusbar-strong{
+  color: green;
+  font-weight:400;
+}
+
+/* IO panel */
+
+.container {
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  padding:0;
+  margin:0;
+}
+
+.iopanel-div {
+  width:100%;
+  height:50%;
+  position:absolute;
+  left:0;
+  padding:10px;
+}
+
+.iopanel-top {
+  top:0;
+}
+
+.iopanel-bottom {
+  top:50%;
+}
+
+.iopanel-textarea{
+  background-color:$background-color;
+  resize:none; 
+  width:100%;
+  height:100%;
+  left:0;
+}
+
+.iopanel-textarea:read-only,
+.iopanel-textarea:-moz-read-only {
+  background-color:$background-color;
+  resize:none; 
+  width:100%;
+  height:100%;
+  left:0;
+}
+
+/* logger */
+
+#layout_inner_layout_panel_bottom > .w2ui-panel-content{
+  padding-bottom:10px;
+}
+
+.logger-container {
+  border:$border;
+  overflow-y:auto;
+  padding:10px;
+}
+
+.logger-panel {
+  border:none;
+  background-color:$background-color;
+  width:100%;
+  color:#555;
+  font-size:80% !important;
+}
+
+.logger-strong{
+  color: green;
+  font-weight:400;
+}
+
+.logger-error{
+  color: red;
+  font-weight:400;
+}
+
+.logger-hr {
+  border: 1px dashed #ddd;
+}
