@@ -2,10 +2,9 @@ program ::= ( type_definition | ( "output" | ) variable_declaration | "input" in
 
 type_definition ::= "type" identifier "{" ( typename identifier ( "," identifier ) * ";" ) + "}"
 
-
 variable_declaration ::= typename variable_declarator ( "," variable_declarator )*  ";"
 
-variable_declarator ::= identifier ( "[" expression ("," expression) * "]" | ) (| "=" initializer )
+variable_declarator ::= identifier ( "[" expression ("," expression) * "]" |  ( | "=" initializer ))
 
 input_variable_declaration ::= "input" typename input_variable_declarator ( "," input_variable_declarator )*  ";"
 

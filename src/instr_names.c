@@ -3,7 +3,7 @@ const char* const instr_names[]={
 "PUSHC",
 "PUSHB",
 "FBASE",
-"----",
+"SIZE",
 "LDC",
 "LDB",
 "STC",

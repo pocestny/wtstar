@@ -109,7 +109,7 @@ pardo/[^a-zA-Z0-9]       { return TOK_PARDO; }
 do/[^a-zA-Z0-9]        { return TOK_DO; }
 return/[^a-zA-Z0-9]    { return TOK_RETURN; }
 \.{SPACE}*size/[^a-zA-Z0-9]      { return TOK_SIZE; }
-dim/[^a-zA-Z0-9]       { return TOK_DIM; }
+\.{SPACE}*dim/[^a-zA-Z0-9]       { return TOK_DIM; }
 
   /* not a keyword  */
 [a-zA-Z_]{IDSYM}* {

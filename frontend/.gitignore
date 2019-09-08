@@ -1,6 +1,8 @@
 node_modules
 backend.js
 index.js
+frontend.css
+lock.*
 *.wasm
 *.wasm.map
 *.wast

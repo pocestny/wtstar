@@ -65,6 +65,14 @@ typedef struct {
 
   stack_t *threads;        // stack of stack of thread_t* 
   stack_t *frames;         // stack of frame_t *
+
+  int W,T;
+  int pc,virtual_grps,n_thr;
+
+  uint32_t arr_sizes[257], arr_offs[257];
+
+   thread_t **thr;
+   frame_t *frame ;
 } runtime_t;
 
 
@@ -72,5 +80,5 @@ typedef struct {
 CONSTRUCTOR(runtime_t, uint8_t *in, int len);
 DESTRUCTOR(runtime_t);
 
-void execute(runtime_t *env, int *W, int *T);
+int execute(runtime_t *env, int limit);
 #endif

@@ -4,11 +4,11 @@ import { string } from "rollup-plugin-string";
 module.exports = {
   input: './main.js',
   output: {
-    file: './index.js',
+    file: './frontend.js',
     format: 'iife'
   },
   plugins:[
-    scss({output:'./index.css'}),
+    scss({output:'./frontend.css'}),
     string({include:'**/*.txt'})
   ]
 };

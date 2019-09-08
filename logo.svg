@@ -48,7 +48,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -62,9 +62,12 @@
        width="180"
        height="180"
        x="12.302348"
-       y="53.231247" />
+       y="53.231247"
+       inkscape:export-filename="/home/kralovic/SW/pram/frontend/static/img/icon.png"
+       inkscape:export-xdpi="9.0299997"
+       inkscape:export-ydpi="9.0299997" />
     <path
-       style="opacity:1;fill:#d5f1c8;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998000000002;stroke-dashoffset:0;stroke-opacity:1"
+       style="opacity:1;fill:#ace091;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998000000002;stroke-dashoffset:0;stroke-opacity:1"
        id="path815"
        sodipodi:type="arc"
        sodipodi:cx="101.38046"
@@ -75,7 +78,7 @@
        sodipodi:end="3.1415927"
        d="m 181.38046,143.67628 a 80,80 0 0 1 -40,69.28204 80,80 0 0 1 -79.999999,0 80,80 0 0 1 -39.999998,-69.28204 l 79.999997,0 z" />
     <path
-       style="opacity:1;fill:#50bad8;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998000000002;stroke-dashoffset:0;stroke-opacity:1"
+       style="opacity:1;fill:#4abdde;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998000000002;stroke-dashoffset:0;stroke-opacity:1"
        id="path817"
        sodipodi:type="arc"
        sodipodi:cx="101.38046"
@@ -86,7 +89,7 @@
        sodipodi:end="4.712389"
        d="M 21.380463,140.48539 A 80,80 0 0 1 101.38046,60.486786 l 0,80.000004 z" />
     <path
-       style="opacity:1;fill:#d5f1c8;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998000000002;stroke-dashoffset:0;stroke-opacity:1"
+       style="opacity:1;fill:#ace091;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998000000002;stroke-dashoffset:0;stroke-opacity:1"
        id="path819"
        sodipodi:type="arc"
        sodipodi:cx="101.38046"
@@ -97,7 +100,7 @@
        sodipodi:end="4.712389"
        d="m 61.380463,140.48609 a 40,40 0 0 1 39.999997,-39.9993 l 0,40 z" />
     <path
-       style="opacity:1;fill:#50bad8;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998000000002;stroke-dashoffset:0;stroke-opacity:1"
+       style="opacity:1;fill:#4abdde;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998000000002;stroke-dashoffset:0;stroke-opacity:1"
        id="path821"
        sodipodi:type="arc"
        sodipodi:cx="101.38046"
@@ -108,7 +111,7 @@
        sodipodi:end="3.1415927"
        d="m 141.38046,143.67628 a 40,40 0 0 1 -20,34.64102 40,40 0 0 1 -39.999998,0 40,40 0 0 1 -19.999999,-34.64102 l 39.999997,0 z" />
     <path
-       style="opacity:1;fill:#d5f1c8;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998;stroke-dashoffset:0;stroke-opacity:1"
+       style="opacity:1;fill:#ace091;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998000000002;stroke-dashoffset:0;stroke-opacity:1"
        id="path835"
        sodipodi:type="arc"
        sodipodi:cx="161.41945"
@@ -118,17 +121,5 @@
        sodipodi:start="3.1415927"
        sodipodi:end="0"
        d="m 141.41945,140.48678 a 20,20 0 0 1 20,-19.99999 20,20 0 0 1 20,20 h -20 z" />
-    <circle
-       style="opacity:1;fill:#50bad8;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998;stroke-dashoffset:0;stroke-opacity:1"
-       id="path847"
-       cx="36.679226"
-       cy="212.70613"
-       r="12" />
-    <circle
-       cy="212.70613"
-       cx="165.62607"
-       id="circle849"
-       style="opacity:1;fill:#50bad8;fill-opacity:1;stroke:none;stroke-width:0.26499999;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:1.05999994, 0.26499998;stroke-dashoffset:0;stroke-opacity:1"
-       r="12" />
   </g>
 </svg>

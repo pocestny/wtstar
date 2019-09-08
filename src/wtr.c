@@ -92,10 +92,9 @@ int main(int argc, char **argv) {
     reader_t *r = reader_t_new(READER_FILE,stdin);
     read_input(r,env);
     reader_t_delete(r);
-    int W, T;
-    execute(env, &W, &T);
+    execute(env, -1);
     write_output(w,env);
-    out_text(w,"W/T: %d %d\n", W, T);
+    out_text(w,"W/T: %d %d\n", env->W, env->T);
     if (dump_heap) dump_memory(w,env); 
   }
 }

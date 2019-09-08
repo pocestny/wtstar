@@ -1,8 +1,9 @@
 export default (function (){
-  var elem = $("<div style='width:100%;height:100%'></div>");
+  var elem = $("<div style='width:100%;height:calc( 100% - 10px );'></div>");
   var editor = ace.edit(elem[0], {
     theme: "ace/theme/chrome",
     selectionStyle: "text",
+    showPrintMargin: false,
     fontFamily: 'Roboto Mono',
     fontSize:'16'
   });

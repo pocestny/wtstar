@@ -79,12 +79,19 @@
 
 
 %destructor { if ($$) free($$); $$=NULL;} <string_val>
-%destructor { if ($$) ast_node_t_delete($$); $$=NULL;} <ast_node_val>
+%destructor { 
+  if ($$) {
+    if ($$->node_type == AST_NODE_SCOPE && ast->current_scope == $$->val.sc)
+        ast->current_scope=ast->current_scope->parent;
+    ast_node_t_delete($$); 
+  }
+  $$=NULL;
+} <ast_node_val>
 %destructor { if ($$) static_type_member_t_delete($$); $$=NULL;} <static_type_member_val>
 
 %destructor {$$=NULL;} input_variable_declaration variable_declaration variable_declarator_list
     variable_init_declarator variable_declarator input_variable_declarator
-    static_variable_declarator input_variable_declarator_list
+    static_variable_declarator input_variable_declarator_list open_function
 
 %type <int_val> 
     placeholder_list 
@@ -365,13 +372,13 @@ function_declaration
     : open_function ';'
     | open_function '{'
         {
+            $<ast_node_val>$ = ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
+            ast->current_scope=$<ast_node_val>$->val.sc;
             if ($1) {
-               $<ast_node_val>$ = ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
                $1->val.f->root_scope = $<ast_node_val>$->val.sc;
                $<ast_node_val>$->val.sc->fn = $1->val.f;
                for (ast_node_t *p=$1->val.f->params;p;p=p->next)
                   p->val.v->scope = $<ast_node_val>$->val.sc;
-               ast->current_scope=$<ast_node_val>$->val.sc;
             }
          } 
       maybe_scope_item_list '}'
@@ -385,19 +392,18 @@ open_function:
     type_decl IDENT '(' parameter_declarator_list ')'
       {
         $$=define_function(ast,&@$,$1,$2,&@2,$4);
-        if (!$$)
-          YYERROR;
       }
     |
     error ')' {$$=NULL;}
     ;
 
-maybe_scope_item_list: %empty | scope_item_list; 
+maybe_scope_item_list: %empty | scope_item_list | error; 
 
 parameter_declarator_list: 
     %empty {$$=NULL;}
     |  
     { 
+      // make new scope so there is no variable redefinition
       $<ast_node_val>$ = ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
       ast->current_scope=$<ast_node_val>$->val.sc;
     }
@@ -415,7 +421,12 @@ nonempty_parameter_declarator_list:
     nonempty_parameter_declarator_list ',' parameter_declarator
       {
         $$=$1;
-        if ($3) append(ast_node_t,&$$,$3);
+        if ($3) {
+          if (ast_node_find($$,$3->val.v->name))
+            yyerror(&@3,ast,"redefinition of parameter");
+          else
+            append(ast_node_t,&$$,$3);
+        }
       }
     ;
 
@@ -637,32 +648,19 @@ expr_primary:
         $$=expression_variable(ast,&@1,$1);
       }
     |
-    IDENT SIZE 
+    IDENT DIM 
       {
-        $$=expression_variable(ast,&@1,$1);
-        $$->val.e->variant=EXPR_SIZEOF;
-        $$->val.e->val.v->params=expression_int_val(0);
-        if ($$->val.e->val.v->var->num_dim==0) {
-          yyerror(&@1,ast,"sizeof appied to non-array");
-          ast_node_t_delete($$);
-          YYERROR;
-        }
+        $$ = array_dimensions(ast,&@1,$1);
       }
     |
-    IDENT SIZE "(" expr_assign ")" 
+    IDENT SIZE 
       {
-        $$=expression_variable(ast,&@1,$1);
-        $$->val.e->variant=EXPR_SIZEOF;
-        $$->val.e->val.v->params=$4;
-        if ($$->val.e->val.v->var->num_dim==0) {
-          yyerror(&@1,ast,"sizeof appied to non-array");
-          ast_node_t_delete($$);
-          YYERROR;
-        } else if (!expr_int($4->val.e)) {
-          yyerror(&@1,ast,"non integral array dimension");
-          ast_node_t_delete($$);
-          YYERROR;
-        }
+        $$=expression_sizeof(ast,&@1,$1,NULL);
+      }
+    |
+    IDENT SIZE '(' expr_assign ')' 
+      {
+        $$=expression_sizeof(ast,&@1,$1,$4);
       }
     |
     IDENT '[' expr_list ']' 
@@ -702,7 +700,7 @@ expr_literal:
         $$=ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
         $$->val.e->type->type = __type__int->val.t;
         $$->val.e->val.l = malloc(sizeof(int));
-        *(int *)($$->val.e->val.l) = $1;
+        *((int *)($$->val.e->val.l)) = $1;
       }
     |
     FLOAT_LITERAL 
@@ -710,7 +708,7 @@ expr_literal:
         $$=ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
         $$->val.e->type->type = __type__float->val.t;
         $$->val.e->val.l = malloc(sizeof(float));
-        *(float *)($$->val.e->val.l) = $1;
+        *((float *)($$->val.e->val.l)) = $1;
       }
     | 
     CHAR_LITERAL 
@@ -718,7 +716,7 @@ expr_literal:
         $$=ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
         $$->val.e->type->type = __type__char->val.t;
         $$->val.e->val.l = malloc(1);
-        *(char *)($$->val.e->val.l) = $1;
+        *((char *)($$->val.e->val.l)) = $1;
       }
     ;
 
@@ -820,7 +818,7 @@ expr_list:
 
   */
 
-stmt: stmt_scope {ignore($1);}| stmt_expr  | stmt_cond | stmt_iter | stmt_jump ';' | error ';';
+stmt: stmt_scope {ignore($1);}| stmt_expr  | stmt_cond | stmt_iter | stmt_jump ';' | error ';' ;
 
 stmt_scope
             : '{' 

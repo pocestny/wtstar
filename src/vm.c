@@ -118,6 +118,9 @@ CONSTRUCTOR(runtime_t, uint8_t *in, int len) {
   r->threads = stack_t_new();
   r->frames = stack_t_new();
 
+  r->W = r->T = r->pc = r->virtual_grps = 0;
+  r->n_thr = 1;
+
   frame_t *tf = frame_t_new(0);
   stack_t_push(r->frames, (void *)(&tf), sizeof(frame_t *));
 
@@ -127,6 +130,9 @@ CONSTRUCTOR(runtime_t, uint8_t *in, int len) {
   stack_t *grp = stack_t_new();
   stack_t_push(grp, (void *)(&main_thread), sizeof(thread_t *));
   stack_t_push(r->threads, (void *)(&grp), sizeof(stack_t *));
+  
+  r->thr = STACK(STACK(r->threads, stack_t *)[0], thread_t *);
+  r->frame = STACK(r->frames, frame_t *)[0];
 
   // parse input file
   uint8_t section;
@@ -216,8 +222,8 @@ DESTRUCTOR(runtime_t) {
   free(r);
 }
 
-#define _PUSH(var, len) stack_t_push(thr[t]->op_stack, (void *)(&(var)), len)
-#define _POP(var, len) stack_t_pop(thr[t]->op_stack, (void *)(&(var)), len)
+#define _PUSH(var, len) stack_t_push(env->thr[t]->op_stack, (void *)(&(var)), len)
+#define _POP(var, len) stack_t_pop(env->thr[t]->op_stack, (void *)(&(var)), len)
 
 void *get_addr(thread_t *thr, uint32_t addr, uint32_t len) {
   if (thr->mem_base + thr->mem->top <= len ||
@@ -242,173 +248,181 @@ static void mem_free(frame_t *frame, runtime_t *env, int n_thr,
   for (int t = 0; t < n_thr; t++) thr[t]->mem->top = memtop;
 }
 
-void execute(runtime_t *env, int *W, int *T) {
-  int n_thr = 1;
-  uint32_t arr_sizes[257], arr_offs[257];
-  thread_t **thr = STACK(STACK(env->threads, stack_t *)[0], thread_t *);
-  frame_t *frame = STACK(env->frames, frame_t *)[0];
-
-  int virtual_grps = 0;
-  *W = *T = 0;
+int execute(runtime_t *env, int limit) {
 
   if (EXEC_DEBUG) printf("code size: %d\n", env->code_size);
 
-  for (uint32_t pc = 0; 1;) {
-    uint8_t opcode = lval(env->code + pc, uint8_t);
+  while (1) {
+    if (limit>0) limit--;
+    if (limit == 0) return 1;
+    uint8_t opcode = lval(env->code + env->pc, uint8_t);
     if (opcode == ENDVM) break;
-    pc++;
+    env->pc++;
 
     if (EXEC_DEBUG) {
-      printf("\n%3d: %s", pc - 1, instr_names[opcode]);
+      printf("\n%3d: %s", env->pc - 1, instr_names[opcode]);
       switch (opcode) {
         case PUSHC:
         case JMP:
-          printf(" %d", lval(&env->code[pc], int32_t));
+          printf(" %d", lval(&env->code[env->pc], int32_t));
           break;
         case CALL:
-          printf(" %d", lval(&env->code[pc], uint32_t));
+          printf(" %d", lval(&env->code[env->pc], uint32_t));
           break;
         case PUSHB:
         case IDX:
-          printf(" %d", lval(&env->code[pc], uint8_t));
+          printf(" %d", lval(&env->code[env->pc], uint8_t));
           break;
       }
     }
 
     switch (opcode) {
       case MEM_MARK:
-        if (n_thr > 0) mem_mark(frame, env, n_thr, thr);
+        if (env->n_thr > 0) mem_mark(env->frame, env, env->n_thr, env->thr);
         break;
       case MEM_FREE:
-        if (n_thr > 0) mem_free(frame, env, n_thr, thr);
+        if (env->n_thr > 0) mem_free(env->frame, env, env->n_thr, env->thr);
         break;
       case FORK:
-        if (n_thr > 0) {
-          (*W)++;
-          (*T)++;
+        if (env->n_thr > 0) {
+          env->W++;
+          env->T++;
 
           stack_t *grp = stack_t_new();
 
-          for (int t = 0; t < n_thr; t++) {
+          for (int t = 0; t < env->n_thr; t++) {
             uint32_t a, n;
             _POP(a, 4);
             _POP(n, 4);
             for (int j = 0; j < n; j++) {
-              thread_t *nt = clone_thread(thr[t]);
+              thread_t *nt = clone_thread(env->thr[t]);
               lval(get_addr(nt, a, 4), int32_t) = j;
               stack_t_push(grp, (void *)(&nt), sizeof(thread_t *));
             }
           }
           stack_t_push(env->threads, (void *)(&grp), sizeof(stack_t *));
-          thr = STACK(grp, thread_t *);
-          n_thr = STACK_SIZE(grp, thread_t *);
+          env->thr = STACK(grp, thread_t *);
+          env->n_thr = STACK_SIZE(grp, thread_t *);
         } else
-          virtual_grps++;
+          env->virtual_grps++;
         break;
       case SPLIT: {
-        if (n_thr > 0) {
-          (*W)++;
-          (*T)++;
+        if (env->n_thr > 0) {
+          env->W++;
+          env->T++;
         }
-        if (n_thr > 0) {
+        if (env->n_thr > 0) {
           stack_t *nonzero = stack_t_new();
           stack_t *zero = stack_t_new();
-          for (int t = 0; t < n_thr; t++) {
+          for (int t = 0; t < env->n_thr; t++) {
             int32_t a;
             _POP(a, 4);
-            thr[t]->refcnt++;
+            env->thr[t]->refcnt++;
             if (a == 0)
-              stack_t_push(zero, (void *)(&thr[t]), sizeof(thread_t *));
+              stack_t_push(zero, (void *)(&(env->thr[t])), sizeof(thread_t *));
             else
-              stack_t_push(nonzero, (void *)(&thr[t]), sizeof(thread_t *));
+              stack_t_push(nonzero, (void *)(&(env->thr[t])), sizeof(thread_t *));
           }
           stack_t_push(env->threads, (void *)(&nonzero), sizeof(stack_t *));
           stack_t_push(env->threads, (void *)(&zero), sizeof(stack_t *));
-          thr = STACK(zero, thread_t *);
-          n_thr = STACK_SIZE(zero, thread_t *);
+          env->thr = STACK(zero, thread_t *);
+          env->n_thr = STACK_SIZE(zero, thread_t *);
         } else
-          virtual_grps += 2;
+          env->virtual_grps += 2;
       } break;
       case JOIN: {
-        if (n_thr > 0) {
-          (*W)++;
-          (*T)++;
+        if (env->n_thr > 0) {
+          env->W++;
+          env->T++;
         }
-        if (virtual_grps > 0)
-          virtual_grps--;
+        if (env->virtual_grps > 0)
+          env->virtual_grps--;
         else {
-          for (int t = 0; t < n_thr; t++) thread_t_delete(thr[t]);
+          for (int t = 0; t < env->n_thr; t++) thread_t_delete(env->thr[t]);
           int n_grps = STACK_SIZE(env->threads, stack_t *) - 1;
           stack_t_delete(STACK(env->threads, stack_t *)[n_grps]);
           stack_t *tmp;
           stack_t_pop(env->threads, &tmp, sizeof(stack_t *));
-          thr = STACK(STACK(env->threads, stack_t *)[n_grps - 1], thread_t *);
-          n_thr = STACK_SIZE(STACK(env->threads, stack_t *)[n_grps - 1],
-                             thread_t *);
+          env->thr = STACK(STACK(env->threads, stack_t *)[n_grps - 1], thread_t *);
+          env->n_thr = STACK_SIZE(STACK(env->threads, stack_t *)[n_grps - 1],
+                                  thread_t *);
         }
       } break;
 
       case JMP:  // jump if nonempty group
-        if (n_thr > 0) {
-          (*W)++;
-          (*T)++;
+        if (env->n_thr > 0) {
+          env->W++;
+          env->T++;
         }
-        if (n_thr > 0) {
-          pc += lval(env->code + pc, int32_t);
+        if (env->n_thr > 0) {
+          env->pc += lval(env->code + env->pc, int32_t);
         } else
-          pc += 4;
+          env->pc += 4;
         break;
 
       case CALL:
-        if (n_thr > 0) {
-          (*W)++;
-          (*T)++;
-          uint32_t ra = pc + 4;
+        if (env->n_thr > 0) {
+          env->W++;
+          env->T++;
+          uint32_t ra = env->pc + 4;
 
-          frame_t *nf = frame_t_new(thr[0]->mem->top + thr[0]->mem_base);
+          frame_t *nf = frame_t_new(env->thr[0]->mem->top + env->thr[0]->mem_base);
           nf->ret_addr = ra;
-          mem_mark(frame, env, n_thr, thr);
+          mem_mark(env->frame, env, env->n_thr, env->thr);
 
           stack_t_push(env->frames, (void *)&nf, sizeof(frame_t *));
-          frame = nf;
+          env->frame = nf;
 
-          pc = env->fnmap[lval(env->code + pc, uint32_t)];
+          env->pc = env->fnmap[lval(env->code + env->pc, uint32_t)];
         }
         break;
 
       case RETURN:
-        if (n_thr > 0) {
-          (*W)++;
-          (*T)++;
+        if (env->n_thr > 0) {
+          env->W++;
+          env->T++;
 
-          pc = frame->ret_addr;
+          env->pc = env->frame->ret_addr;
 
           frame_t *of;
           stack_t_pop(env->frames, (void *)&of, sizeof(frame_t *));
           frame_t_delete(of);
 
-          frame = STACK_TOP(env->frames, frame_t *);
-          mem_free(frame, env, n_thr, thr);
+          env->frame = STACK_TOP(env->frames, frame_t *);
+          mem_free(env->frame, env, env->n_thr, env->thr);
         }
         break;
 
       default:
-        if (n_thr > 0) {
-          (*W) += n_thr;
-          (*T)++;
+        if (env->n_thr > 0) {
+          env->W += env->n_thr;
+          env->T++;
         }
-        for (int t = 0; t < n_thr; t++, (*W)++) switch (opcode) {
+        for (int t = 0; t < env->n_thr; t++, env->W++) switch (opcode) {
+            case SIZE: {
+              uint32_t a, d;
+              _POP(a, 4);
+              _POP(d, 4);
+              uint32_t max = lval(get_addr(env->thr[t], a + 4, 4), uint32_t);
+              if (d >= max) {
+                fprintf(stderr, "bad array dimension\n");
+                exit(1);
+              }
+              uint32_t size =
+                  lval(get_addr(env->thr[t], a + 4 * (d + 2), 4), uint32_t);
+              _PUSH(size, 4);
+            } break;
             case PUSHC:
-              _PUSH(env->code[pc], 4);
+              _PUSH(env->code[env->pc], 4);
               break;
 
             case PUSHB: {
-              uint32_t v = lval(env->code + pc, uint8_t);
+              uint32_t v = lval(env->code + env->pc, uint8_t);
               _PUSH(v, 4);
             } break;
 
             case FBASE:
-              _PUSH(frame->base, 4);
+              _PUSH(env->frame->base, 4);
               break;
 
             case ALLOC: {
@@ -421,13 +435,13 @@ void execute(runtime_t *env, int *W, int *T) {
             case LDC: {
               uint32_t a;
               _POP(a, 4);
-              stack_t_push(thr[t]->op_stack, get_addr(thr[t], a, 4), 4);
+              stack_t_push(env->thr[t]->op_stack, get_addr(env->thr[t], a, 4), 4);
             } break;
 
             case LDB: {
               uint32_t a;
               _POP(a, 4);
-              int32_t w = lval(get_addr(thr[t], a, 1), uint8_t);
+              int32_t w = lval(get_addr(env->thr[t], a, 1), uint8_t);
               _PUSH(w, 4);
             } break;
 
@@ -436,7 +450,7 @@ void execute(runtime_t *env, int *W, int *T) {
               int32_t v;
               _POP(a, 4);
               _POP(v, 4);
-              lval(get_addr(thr[t], a, 4), int32_t) = v;
+              lval(get_addr(env->thr[t], a, 4), int32_t) = v;
             } break;
 
             case STB: {
@@ -444,13 +458,13 @@ void execute(runtime_t *env, int *W, int *T) {
               int32_t v;
               _POP(a, 4);
               _POP(v, 4);
-              lval(get_addr(thr[t], a, 1), uint8_t) = (uint8_t)v;
+              lval(get_addr(env->thr[t], a, 1), uint8_t) = (uint8_t)v;
             } break;
 
             case LDCH: {
               uint32_t a;
               _POP(a, 4);
-              stack_t_push(thr[t]->op_stack, (env->heap->data + a), 4);
+              stack_t_push(env->thr[t]->op_stack, (env->heap->data + a), 4);
             } break;
 
             case LDBH: {
@@ -478,18 +492,34 @@ void execute(runtime_t *env, int *W, int *T) {
               lval(env->heap->data + a, int32_t) = w;
             } break;
 
+            case INT2FLOAT: {
+              int32_t a;
+              float b;
+              _POP(a, 4);
+              b = a;
+              _PUSH(b, 4);
+            } break;
+
+            case FLOAT2INT: {
+              int32_t a;
+              float b;
+              _POP(b, 4);
+              a = b;
+              _PUSH(a, 4);
+            } break;
+
             case IDX: {
-              uint8_t nd = lval(&env->code[pc], uint8_t);
+              uint8_t nd = lval(&env->code[env->pc], uint8_t);
               uint32_t addr;
               _POP(addr, 4);
 
               for (int i = 0; i < nd; i++) {
-                arr_sizes[i] =
-                    lval(get_addr(thr[t], addr + 4 * (i + 1), 4), uint32_t);
+                env->arr_sizes[i] =
+                    lval(get_addr(env->thr[t], addr + 4 * (i + 2), 4), uint32_t);
                 uint32_t v;
                 _POP(v, 4);
-                arr_offs[i] = v;
-                if (v >= arr_sizes[i]) {
+                env->arr_offs[i] = v;
+                if (v >= env->arr_sizes[i]) {
                   fprintf(stderr, "range check error\n");
                   // dump_memory(env);
                   exit(1);
@@ -497,7 +527,7 @@ void execute(runtime_t *env, int *W, int *T) {
               }
               uint32_t res = 0;
               for (int i = 0; i < nd; i++)
-                res = res * arr_sizes[i] + arr_offs[i];
+                res = res * env->arr_sizes[i] + env->arr_offs[i];
               _PUSH(res, 4);
             } break;
 
@@ -515,35 +545,35 @@ void execute(runtime_t *env, int *W, int *T) {
             } break;
 
             case A2S: {
-              _PUSH(STACK_TOP(thr[t]->acc_stack, int32_t), 4);
+              _PUSH(STACK_TOP(env->thr[t]->acc_stack, int32_t), 4);
             } break;
 
             case POPA: {
               int32_t val;
-              stack_t_pop(thr[t]->acc_stack, &val, 4);
+              stack_t_pop(env->thr[t]->acc_stack, &val, 4);
             } break;
 
             case S2A:
-              stack_t_push(thr[t]->acc_stack,
-                           (void *)(&STACK_TOP(thr[t]->op_stack, int32_t)), 4);
+              stack_t_push(env->thr[t]->acc_stack,
+                           (void *)(&STACK_TOP(env->thr[t]->op_stack, int32_t)), 4);
               break;
 
             case RVA: {
-              int n = thr[t]->acc_stack->top / 4;
+              int n = env->thr[t]->acc_stack->top / 4;
               for (int i = 0; i < (int)(n / 2); i++) {
-                int32_t a = lval(thr[t]->acc_stack->data + 4 * i, int32_t);
-                lval(thr[t]->acc_stack->data + 4 * i, int32_t) =
-                    lval(thr[t]->acc_stack->data + 4 * (n - i - 1), int32_t);
-                lval(thr[t]->acc_stack->data + 4 * (n - i - 1), int32_t) = a;
+                int32_t a = lval(env->thr[t]->acc_stack->data + 4 * i, int32_t);
+                lval(env->thr[t]->acc_stack->data + 4 * i, int32_t) =
+                    lval(env->thr[t]->acc_stack->data + 4 * (n - i - 1), int32_t);
+                lval(env->thr[t]->acc_stack->data + 4 * (n - i - 1), int32_t) = a;
               }
             } break;
 
             case SWA: {
-              int n = thr[t]->acc_stack->top / 4;
-              int32_t a = lval(thr[t]->acc_stack->data + 4 * (n - 2), int32_t);
-              lval(thr[t]->acc_stack->data + 4 * (n - 2), int32_t) =
-                  lval(thr[t]->acc_stack->data + 4 * (n - 1), int32_t);
-              lval(thr[t]->acc_stack->data + 4 * (n - 1), int32_t) = a;
+              int n = env->thr[t]->acc_stack->top / 4;
+              int32_t a = lval(env->thr[t]->acc_stack->data + 4 * (n - 2), int32_t);
+              lval(env->thr[t]->acc_stack->data + 4 * (n - 2), int32_t) =
+                  lval(env->thr[t]->acc_stack->data + 4 * (n - 1), int32_t);
+              lval(env->thr[t]->acc_stack->data + 4 * (n - 1), int32_t) = a;
             } break;
 
             case ADD_INT: {
@@ -657,38 +687,40 @@ void execute(runtime_t *env, int *W, int *T) {
               fprintf(
                   stderr,
                   "fatal error, unknown instruction %s (opcode %0x) at %u\n",
-                  instr_names[opcode], opcode, pc - 1);
+                  instr_names[opcode], opcode, env->pc - 1);
               exit(1);
           }
         switch (opcode) {
           case PUSHC:
-            pc += 4;
+            env->pc += 4;
             break;
           case PUSHB:
           case IDX:
-            pc++;
+            env->pc++;
             break;
         }
     }
 
     if (EXEC_DEBUG) {
       printf("\nthread groups: ");
-      for (int i=0;i<STACK_SIZE(env->threads,stack_t*);i++)
-        printf(" %lu ",STACK_SIZE(STACK(env->threads,stack_t*)[i],thread_t*));
-      printf("\n     n_thr=%2d\n", n_thr);
-      if (n_thr > 0) {
-        printf("fbase=%d\n", frame->base);
-        for (int t = 0; t < n_thr; t++) {
-          printf("mem_base=%d size=%d", thr[t]->mem_base, thr[t]->mem->top);
+      for (int i = 0; i < STACK_SIZE(env->threads, stack_t *); i++)
+        printf(" %lu ",
+               STACK_SIZE(STACK(env->threads, stack_t *)[i], thread_t *));
+      printf("\n     env->n_thr=%2d\n", env->n_thr);
+      if (env->n_thr > 0) {
+        printf("fbase=%d\n", env->frame->base);
+        for (int t = 0; t < env->n_thr; t++) {
+          printf("mem_base=%d size=%d", env->thr[t]->mem_base, env->thr[t]->mem->top);
           printf("     [");
-          for (int i = 0; i < thr[t]->op_stack->top; i++)
-            printf("%d ", thr[t]->op_stack->data[i]);
+          for (int i = 0; i < env->thr[t]->op_stack->top; i++)
+            printf("%d ", env->thr[t]->op_stack->data[i]);
           printf("]\n");
         }
       } else
         printf("\n");
     }
   }
+  return 0;
 }
 #undef _PUSH
 #undef _POP

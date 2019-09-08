@@ -15,6 +15,9 @@
 #define PUSHB       0x2U  //  PUSHB(b)  : ...   -> c,...  b: 1B, c:4B
 #define FBASE       0x3U  //  FBASE     : ...   -> frame_base,... (uint32_t)
 
+#define SIZE        0x04  //  SIZE      : a , d  ... -> s,...
+                          //            a = array address, d = dim number
+
 #define LDC         0x5U  //  LDC       : a,... -> val(a),... (a, val(a)=4 B)
 #define LDB         0x6U  //  same as LDC, val(a) : 1 B converted to 4 B
 #define STC         0x7U  //  STC       : a,val,.. -> ... 4 B
@@ -144,6 +147,7 @@ addr_1 ... addr_n   - addresses in the code segment of respective functions
 
   array:
     uint32:  base address (relative to heap)
+    uint32:  nd
     dim_1 ... dim_nd  uint32 range n (0..n-1) of dimensions 1..nd
 */
 #endif

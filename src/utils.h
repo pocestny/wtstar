@@ -53,13 +53,13 @@ typedef struct YYLTYPE {
   while (0)
 #endif
 
-#define get_printed_length(format, len)    \
-  {                                        \
-    va_list _args;                         \
-    va_start(_args, format);               \
-    char *buf;                             \
-    len = snprintf(buf, 0, format, _args); \
-    va_end(_args);                         \
+#define get_printed_length(format, len)     \
+  {                                         \
+    va_list _args;                          \
+    va_start(_args, format);                \
+    char *buf;                              \
+    len = vsnprintf(buf, 0, format, _args); \
+    va_end(_args);                          \
   }
 
 #endif

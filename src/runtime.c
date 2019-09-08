@@ -151,7 +151,7 @@ void read_input(reader_t *r, runtime_t *env) {
       stack_t_alloc(env->heap, n_elem * elem_size);
 
       lval(get_addr(tt, env->in_vars[i].addr, 4), uint32_t) = base;
-      lval(get_addr(tt, env->in_vars[i].addr + 4, 4), uint32_t) = n_elem;
+      lval(get_addr(tt, env->in_vars[i].addr + 8, 4), uint32_t) = n_elem;
 
       for (int j = 0; j < n_elem; j++) {
         int x;
@@ -175,7 +175,7 @@ void write_output(writer_t *w, runtime_t *env) {
       uint8_t nd = env->out_vars[i].num_dim;
       int *sizes = (int *)malloc(nd * sizeof(int));
       for (int j = 0; j < nd; j++)
-        sizes[j] = lval(global_mem +  env->out_vars[i].addr + 4*(j+1), uint32_t) ;
+        sizes[j] = lval(global_mem +  env->out_vars[i].addr + 4*(j+2), uint32_t) ;
       print_array(w,env, &(env->out_vars[i]), nd, sizes, base, 0, 0);
       free(sizes);
     } else

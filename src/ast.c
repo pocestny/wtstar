@@ -327,8 +327,8 @@ int static_type_compatible(static_type_t *st, static_type_t *t,
     // basic static type
     if (t->members) return 0;
 
-    int from = static_type_basic(st);
-    int to = static_type_basic(t);
+    int to = static_type_basic(st);
+    int from = static_type_basic(t);
    
     if (from==TYPE_FLOAT && to==TYPE_CHAR) return 0;
 

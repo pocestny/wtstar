@@ -224,6 +224,7 @@ int inferred_type_equal(inferred_type_t *a, inferred_type_t *b);
 #define CONVERT_TO 28U
 // casts = if not null and the result is true, 
 //    its allocated to layout size, and populated with conversion flags, and n is set
+int static_type_compatible(static_type_t *st, static_type_t *t, int **casts, int *n_casts);
 int inferred_type_compatible(static_type_t *st, inferred_type_t *it,int **casts,int *n);
 
 /* ----------------------------------------------------------------------------

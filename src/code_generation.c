@@ -123,7 +123,7 @@ void add_instr(code_block_t *out, int code, ...) {
 static int assign_single_variable_address(uint32_t base, variable_t *var) {
   var->addr = base;
   if (var->num_dim > 0)
-    base += 4 * (var->num_dim + 1);
+    base += 4 * (var->num_dim + 2);
   else
     base += var->base_type->size;
   DEBUG("'%s' %lx %u\n", var->name, (unsigned long)var, var->addr);
@@ -172,12 +172,14 @@ static int inferred_type_size(inferred_type_t *t) {
 }
 
 /* ----------------------------------------------------------------------------
- * this expression can be used to obtain address
+ * this expression can be used to assign to
  */
 static int is_lval_expression(expression_t *ex) {
   switch (ex->variant) {
     case EXPR_ARRAY_ELEMENT:
+      return 1;
     case EXPR_VAR_NAME:
+      if (ex->val.v->var->num_dim > 0) return 0;
       return 1;
     case EXPR_CAST:
       return is_lval_expression(ex->val.c->ex->val.e);
@@ -289,6 +291,44 @@ static void emit_code_store_value(code_block_t *code, int on_heap, int *casts,
 }
 
 /* ----------------------------------------------------------------------------
+ * the stack contains the value; emit code to convert the variable
+ *
+ */
+static void emit_code_cast_value(code_block_t *code, int *casts, int n_casts) {
+  for (int i = 0; i < n_casts; i++) {
+    if (conversion_needed(casts[i])) {
+      int conv = (casts[i] & CONVERT_TO_FLOAT) ? INT2FLOAT : FLOAT2INT;
+      add_instr(code, conv, 0);
+    }
+    if (i < n_casts - 1) add_instr(code, S2A, POP, 0);
+  }
+  for (int i = 0; i < n_casts - 1; i++) add_instr(code, A2S, POPA, 0);
+}
+
+/* ----------------------------------------------------------------------------
+ * the stack contains value of type tm->parent, make it so
+ * that only tm->type part remains
+ *
+ */
+static void emit_code_remove_type(code_block_t *code, static_type_t *t) {
+  int n = static_type_layout(t, NULL);
+  for (int i = 0; i < n; i++) add_instr(code, POP, 0);
+}
+
+static void emit_code_select_specifier(code_block_t *code,
+                                       static_type_member_t *tm) {
+  int n = static_type_layout(tm->type, NULL);
+
+  for (static_type_member_t *x = tm->parent->members; x; x = x->next)
+    if (x != tm)
+      emit_code_remove_type(code, x->type);
+    else
+      for (int i = 0; i < n; i++) add_instr(code, S2A, POP, 0);
+
+  for (int i = 0; i < n; i++) add_instr(code, A2S, POPA, 0);
+}
+
+/* ----------------------------------------------------------------------------
  * generate code for an expression
  *
  * the code, when executed, leaves on stack a value:
@@ -320,12 +360,33 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
 
     case EXPR_CALL: {
       int np = length(ex->val.f->params);
+      if (length(ex->val.f->fn->params) != np) {
+        error(&(exn->loc), "wrong number of parameters in call to '%s'",
+              ex->val.f->fn->name);
+        break;
+      }
       for (int i = np - 1; i >= 0; --i) {
         ast_node_t *p = ex->val.f->params;
-        for (int j = 0; j < i; j++) p = p->next;
+        ast_node_t *dst = ex->val.f->fn->params;
+
+        for (int j = 0; j < i; j++) {
+          p = p->next;
+          dst = dst->next;
+        }
+
         assert(p);
         assert(p->node_type == AST_NODE_EXPRESSION);
-        emit_code_expression(code, p, 0, 0);
+
+        int *casts, n_casts;
+        if (inferred_type_compatible(dst->val.v->base_type, p->val.e->type,
+                                     &casts, &n_casts)) {
+          emit_code_expression(code, p, 0, 0);
+          emit_code_cast_value(code, casts, n_casts);
+          free(casts);
+        } else {
+          error(&(p->loc), "incompatible type in function call");
+          return;
+        }
       }
       add_instr(code, CALL, ex->val.f->fn->n, 0);
     } break;
@@ -336,16 +397,17 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
         // we want the value
         int nd = ex->val.v->var->num_dim;
         if (nd == 0) {
-          uint8_t *layout,ts = static_type_layout(ex->val.v->var->base_type,&layout);
+          uint8_t *layout,
+              ts = static_type_layout(ex->val.v->var->base_type, &layout);
           emit_code_load_value(code, 0, ts, layout);
           free(layout);
         } else {
-          // the value of an array is num_dim + 1 ints
-          // stack: base, dim1,...,dim_nd,.... bottom
+          // the value of an array is num_dim + 2 ints
+          // stack: base, nd, dim1,...,dim_nd,.... bottom
           add_instr(code, S2A, 0);
-          for (int i = 0; i <= nd; i++) {
-            if (i < nd)
-              add_instr(code, PUSHC, 4 * (nd - i), ADD_INT, LDC, A2S, 0);
+          for (int i = 0; i <= nd + 1; i++) {
+            if (i < nd + 1)
+              add_instr(code, PUSHC, 4 * (nd + 1 - i), ADD_INT, LDC, A2S, 0);
             else
               add_instr(code, LDC, 0);
           }
@@ -355,8 +417,22 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
       break;
 
     case EXPR_CAST: {
-      // TODO: typecheck
-      emit_code_expression(code, ex->val.c->ex, addr, clear);
+      ast_node_t *oexn = ex->val.c->ex;
+      static_type_t *nt = ex->val.c->type;
+
+      if (oexn->val.e->variant == EXPR_VAR_NAME &&
+          oexn->val.e->val.v->var->num_dim > 0) {
+        error(&(exn->loc), "cannot cast array");
+        break;
+      }
+      int *casts, n_casts;
+      if (!inferred_type_compatible(nt, oexn->val.e->type, &casts, &n_casts)) {
+        error(&(exn->loc), "incompatible types for cast");
+        break;
+      }
+      emit_code_expression(code, oexn, addr, clear);
+      if (!addr && !clear) emit_code_cast_value(code, casts, n_casts);
+      if (casts) free(casts);
     } break;
 
     case EXPR_INITIALIZER: {
@@ -384,7 +460,8 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
         add_instr(code, S2A, IDX, n, PUSHC, ex->val.v->var->base_type->size,
                   MULT_INT, A2S, POPA, LDC, ADD_INT, 0);
         if (!addr) {
-          uint8_t *layout,ts = static_type_layout(ex->val.v->var->base_type,&layout);
+          uint8_t *layout,
+              ts = static_type_layout(ex->val.v->var->base_type, &layout);
           emit_code_load_value(code, 1, ts, layout);
           free(layout);
         }
@@ -393,9 +470,9 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
 
     case EXPR_SIZEOF: {
       variable_t *v = ex->val.v->var;
-      emit_code_var_addr(code, v);
       emit_code_expression(code, ex->val.v->params, 0, 0);
-      add_instr(code, PUSHB, 1, ADD_INT, PUSHB, 4, MULT_INT, ADD_INT, LDC, 0);
+      emit_code_var_addr(code, v);
+      add_instr(code, SIZE, 0);
     } break;
     case EXPR_BINARY:
       // ..........
@@ -425,7 +502,7 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
           add_instr(code, S2A, load, op, A2S, POPA, store, 0);
         } else {
           // just assign
-          int *casts, n_casts;
+          int *casts = NULL, n_casts;
           ast_node_t *l = ex->val.o->first, *r = ex->val.o->second;
           if (l->val.e->type->compound) {
             error(&(l->loc),
@@ -441,6 +518,7 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
             error(&(exn->loc),
                   "assignment of incompatible types (maybe add explicit cast)");
           }
+          if (casts) free(casts);
         }
 
       } else if (binary_oper(ex->val.o->oper)) {
@@ -540,12 +618,20 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
       }
       break;
     case EXPR_SPECIFIER: {
-      emit_code_expression(code, ex->val.s->ex, 1, 0);
-      add_instr(code, PUSHC, ex->val.s->memb->offset, ADD_INT, 0);
-      if (!addr) {
-         uint8_t *layout,ts = inferred_type_layout(ex->type,&layout);
-         emit_code_load_value(code, expr_on_heap(ex), ts, layout);
-         free(layout);
+      if (is_lval_expression(ex->val.s->ex->val.e)) {
+        emit_code_expression(code, ex->val.s->ex, 1, 0);
+        add_instr(code, PUSHC, ex->val.s->memb->offset, ADD_INT, 0);
+        if (!addr) {
+          uint8_t *layout, ts = inferred_type_layout(ex->type, &layout);
+          emit_code_load_value(code, expr_on_heap(ex), ts, layout);
+          free(layout);
+        }
+      } else if (ex->val.s->ex->val.e->type->compound) {
+        error(&(exn->loc), "cannot apply specifier to compound type");
+        return;
+      } else {
+        emit_code_expression(code, ex->val.s->ex, 0, 0);
+        emit_code_select_specifier(code, ex->val.s->memb);
       }
     } break;
   }
@@ -563,6 +649,10 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
       // init array
       if (node->val.v->num_dim > 0) {
         variable_t *v = node->val.v;
+        // store number of dimensions
+        add_instr(code, PUSHC, v->num_dim, 0);
+        emit_code_var_addr(code, v);
+        add_instr(code, PUSHB, 4, ADD_INT, STC, 0);
 
         ast_node_t *rng = v->ranges;
         if (!rng) break;  // input array - will be handled during loading
@@ -572,7 +662,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           emit_code_expression(code, rng, 0, 0);
           add_instr(code, S2A, 0);
           emit_code_var_addr(code, v);
-          add_instr(code, PUSHC, 4 * (i + 1), ADD_INT, STC, 0);
+          add_instr(code, PUSHC, 4 * (i + 2), ADD_INT, STC, 0);
           rng = rng->next;
         }
 
@@ -605,9 +695,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
                 "incompatible types in initializer (maybe add explicit cast)");
 
         } else {
-            error(
-                &(node->loc),
-                "initializers are not supported for arrays");
+          error(&(node->loc), "initializers are not supported for arrays");
         }
       }
       break;
@@ -679,10 +767,20 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
   assert(fn->node_type == AST_NODE_FUNCTION);
 
   // load parameters
-  // FIXME: not only ints
-  for (ast_node_t *p = fn->val.f->params; p; p = p->next)
-    for (int i = 0; i <= p->val.v->num_dim; i++)
-      add_instr(code, PUSHC, p->val.v->addr + 4 * i, FBASE, ADD_INT, STC, 0);
+  // on the stack are values
+  for (ast_node_t *p = fn->val.f->params; p; p = p->next) {
+    if (p->val.v->num_dim == 0) {
+      add_instr(code, PUSHC, p->val.v->addr, FBASE, ADD_INT, 0);
+      int *casts, n_casts;
+      static_type_compatible(p->val.v->base_type, p->val.v->base_type, &casts,
+                             &n_casts);
+      emit_code_store_value(code, 0, casts, n_casts);
+      if (casts) free(casts);
+    } else {
+      for (int i = 0; i < p->val.v->num_dim + 2; i++)
+        add_instr(code, PUSHC, p->val.v->addr + 4 * i, FBASE, ADD_INT, STC, 0);
+    }
+  }
 
   emit_code_scope(code, fn->val.f->root_scope);
 }
@@ -764,7 +862,7 @@ void emit_code(ast_t *_ast, writer_t *out) {
       if (var->num_dim == 0)
         sz += var->base_type->size;
       else
-        sz += 4 * (1 + var->num_dim);
+        sz += 4 * (2 + var->num_dim);
       if (sz > global_size) global_size = sz;
     }
 

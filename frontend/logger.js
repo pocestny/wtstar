@@ -1,9 +1,17 @@
 export default (function (){
-  var elem = $("<div id='logger-div'>").addClass("logger-panel");
+  var elem = $("<div class='logger-container container'>")
+  var panel = $("<div class='logger-panel'>")
+
+  elem.append(panel);
 
   return {
-    log: (msg) => {
-      elem.append($("<div>").append(document.createTextNode(msg)));
+    log: (msg,_top,_bottom) => {
+      panel.append($("<div style='margin-bottom:"+_bottom+"px;"+
+        "margin-top:"+_top+"px;'>").html(msg));
+      elem.scrollTop(panel.height());
+    },
+    hr: () => {
+      panel.append($("<hr class='logger-hr'>"));
     },
     html: elem[0]
   }

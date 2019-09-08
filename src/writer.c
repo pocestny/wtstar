@@ -12,6 +12,7 @@ writer_t *writer_t_new(int type) {
   if (r->type == WRITER_STRING) {
     r->str.base = (char *)malloc(WRITER_BASE_STRING_SIZE);
     r->str.size = WRITER_BASE_STRING_SIZE;
+    *(r->str.base) = 0;
     r->str.ptr = 0;
   }
   return r;
@@ -28,8 +29,8 @@ DESTRUCTOR(writer_t) {
 
 void out_vtext(writer_t *w, int len, const char *format, va_list args) {
   if (w->type == WRITER_STRING) {
-    while (len +2 >= w->str.size - w->str.ptr ) {
-      w->str.base = (char *)realloc(w->str.base, 2 * w->str.size + 2);
+    while (len  >= w->str.size - w->str.ptr  ) {
+      w->str.base = (char *)realloc(w->str.base, 2 * w->str.size );
       w->str.size *= 2;
     }
     w->str.ptr+=vsprintf(w->str.base + w->str.ptr, format, args);

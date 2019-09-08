@@ -161,7 +161,7 @@ ast_node_t *init_variable(ast_t *ast, YYLTYPE *loc, char *vname) {
 
 ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
                             char *name, YYLTYPE *nameloc, ast_node_t *params) {
-  ast_node_t *fn;
+  ast_node_t *fn=NULL;
   int role = ident_role(ast, name, &fn);
   if (role == IDENT_FUNCTION) {
     // check parameters
@@ -183,7 +183,8 @@ ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
     }
     for (ast_node_t *x = params, *y = f->params; x; x = x->next, y = y->next) {
       if (strcmp(x->val.v->name, y->val.v->name)) {
-        yyerror(&y->loc, ast, "parameter name mismatch (%s,%s)", x->val.v->name,
+        yyerror(&x->loc, ast, "parameter name mismatch (%s was previously defined as %s)", 
+            x->val.v->name,
                 y->val.v->name);
         __define_function_abort__
       }
@@ -256,6 +257,59 @@ ast_node_t *expression_variable(ast_t *ast, YYLTYPE *loc, char *name) {
   return res;
 }
 
+ast_node_t *expression_sizeof(ast_t *ast,YYLTYPE *loc,char *name,ast_node_t *dim) {
+  ast_node_t *vn;
+  int role = ident_role(ast, name, &vn);
+  if (!(role & IDENT_VAR)) {
+    yyerror(loc, ast, "%s is not a variable", name);
+    free(name);
+    ast_node_t_delete(dim);
+    return NULL;
+  }
+  variable_t *var= vn->val.v;
+  if (var->num_dim==0) {
+    yyerror(loc, ast, "%s is not an array", name);
+    free(name);
+    ast_node_t_delete(dim);
+    return NULL;
+  }
+
+  if (dim && (!expr_int(dim->val.e))) {
+    yyerror(loc, ast, "non integral array dimension");
+    free(name);
+    ast_node_t_delete(dim);
+    return NULL;
+  }
+
+  ast_node_t *res = ast_node_t_new(loc, AST_NODE_EXPRESSION, EXPR_SIZEOF);
+  res->val.e->type->type = __type__int->val.t;
+  res->val.e->val.v->params = (dim)?dim:expression_int_val(0);
+  res->val.e->val.v->var = var; 
+  free(name);
+  return res;
+}
+
+
+ast_node_t *array_dimensions(ast_t *ast, YYLTYPE *loc, char *name) {
+  ast_node_t *vn;
+  int role = ident_role(ast, name, &vn);
+  if (!(role & IDENT_VAR)) {
+    yyerror(loc, ast, "%s is not a variable", name);
+    free(name);
+    return NULL;
+  }
+  variable_t *var= vn->val.v;
+  if (var->num_dim==0) {
+    yyerror(loc, ast, "%s is not an array", name);
+    free(name);
+    return NULL;
+  }
+
+  ast_node_t *res = expression_int_val(var->num_dim);
+  free(name);
+  return res;
+}
+
 int add_expression_array_parameters(ast_node_t *ve, ast_node_t *p) {
   ve->val.e->variant = EXPR_ARRAY_ELEMENT;
   // TODO: check type, number of dimensions, etc.
@@ -291,6 +345,7 @@ int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node) {
   expression_t *e = node->val.e;
 
   if (e->variant == EXPR_BINARY) {
+    if (e->val.o->first==NULL || e->val.o->second==NULL) return 0;
     if (inferred_type_equal(e->val.o->first->val.e->type,
                             e->val.o->second->val.e->type)) {
       inferred_type_t_delete(e->type);
