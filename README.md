@@ -19,9 +19,11 @@ a common code with a single PC (program counter) register. At each instant some 
 of threads is *active* and they perform the current operation. 
 Each thread can have its own local variables, and can also access all variables of its 
 ancestors.
-
 The complexity 
 is measured in terms of *time* (the number of consecutive steps) and *work* (the overall number of instructions performed by all active threads).
+
+The WT\* framework consists of a language and a virtual machine, with a tools to write and 
+execute SIMD programs in an emulated environment.
 
 <a name="toc"></a>
 
@@ -131,13 +133,13 @@ format, so e.g.,
       int a;
     }
 
-    goo g = { {3.14, -9.6} , 47 };
+    goo gle = { {3.14, -9.6} , 47 };
     
     type ipoint {
       int a,b;
     }
 
-    ipoint p = g.p;
+    ipoint p = gle.p;
 
 results in `p == {3, -9}`.
 
@@ -170,6 +172,12 @@ Following is a simple program that reads a 1-dimensional array, and returns its 
 ### Statements <a name="statements"></a>
 
 ### Functions <a name="functions"></a>
+
+The language supports C-like functions.
+
+![function definition](./frontend/static/img/function_definition.png)
+
+![parameter declarator](./frontend/static/img/parameter_declarator.png)
 
 [--toc--](#toc)
 

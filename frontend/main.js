@@ -30,7 +30,7 @@ var demos = {
 
 var wt = {}
 
-editor.addSession("tab1","program.wt","");
+editor.addSession("tab1","program.wt","output int x=42;");
 editor.setSession('tab1');
 
 var tabs=['tab1'];
