@@ -9,8 +9,8 @@
 WT\* is a framework to study and teach the design of SIMD parallel algorithms. It's
 based on the ideas of [Uzi Vishkin](https://dblp.uni-trier.de/pers/hd/v/Vishkin:Uzi),
 used also in the book [JáJá: Introduction to Parallel Algorithms](https://www.amazon.com/Introduction-Parallel-Algorithms-Joseph-JaJa/dp/0201548569/ref=sr_1_1).
-The aim of WT\* is to provide a hardware-independent programmer-friendly language which,
-at the same time, captures essential properties of parallel programs, yet can be relatively easily mapped to existing hardware-supported languages.
+The aim of WT\* is to provide a hardware-independent programmer-friendly language which
+captures the essential properties of parallel programs, yet can be relatively easily mapped to existing hardware-supported languages.
 
 The WT\* programming model consists of a number of threads. The program is started with
 one thread, and other threads can be dynamically created and terminated, forming a tree-like
@@ -22,7 +22,7 @@ ancestors.
 The complexity 
 is measured in terms of *time* (the number of consecutive steps) and *work* (the overall number of instructions performed by all active threads).
 
-The WT\* framework consists of a language and a virtual machine, with a tools to write and 
+The WT\* framework consists of a language, a virtual machine, and a set of tools to write and 
 execute SIMD programs in an emulated environment.
 
 <a name="toc"></a>
