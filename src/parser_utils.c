@@ -161,7 +161,7 @@ ast_node_t *init_variable(ast_t *ast, YYLTYPE *loc, char *vname) {
 
 ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
                             char *name, YYLTYPE *nameloc, ast_node_t *params) {
-  ast_node_t *fn=NULL;
+  ast_node_t *fn = NULL;
   int role = ident_role(ast, name, &fn);
   if (role == IDENT_FUNCTION) {
     // check parameters
@@ -183,9 +183,9 @@ ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
     }
     for (ast_node_t *x = params, *y = f->params; x; x = x->next, y = y->next) {
       if (strcmp(x->val.v->name, y->val.v->name)) {
-        yyerror(&x->loc, ast, "parameter name mismatch (%s was previously defined as %s)", 
-            x->val.v->name,
-                y->val.v->name);
+        yyerror(&x->loc, ast,
+                "parameter name mismatch (%s was previously defined as %s)",
+                x->val.v->name, y->val.v->name);
         __define_function_abort__
       }
       if (x->val.v->base_type != y->val.v->base_type) {
@@ -257,7 +257,8 @@ ast_node_t *expression_variable(ast_t *ast, YYLTYPE *loc, char *name) {
   return res;
 }
 
-ast_node_t *expression_sizeof(ast_t *ast,YYLTYPE *loc,char *name,ast_node_t *dim) {
+ast_node_t *expression_sizeof(ast_t *ast, YYLTYPE *loc, char *name,
+                              ast_node_t *dim) {
   ast_node_t *vn;
   int role = ident_role(ast, name, &vn);
   if (!(role & IDENT_VAR)) {
@@ -266,8 +267,8 @@ ast_node_t *expression_sizeof(ast_t *ast,YYLTYPE *loc,char *name,ast_node_t *dim
     ast_node_t_delete(dim);
     return NULL;
   }
-  variable_t *var= vn->val.v;
-  if (var->num_dim==0) {
+  variable_t *var = vn->val.v;
+  if (var->num_dim == 0) {
     yyerror(loc, ast, "%s is not an array", name);
     free(name);
     ast_node_t_delete(dim);
@@ -283,12 +284,11 @@ ast_node_t *expression_sizeof(ast_t *ast,YYLTYPE *loc,char *name,ast_node_t *dim
 
   ast_node_t *res = ast_node_t_new(loc, AST_NODE_EXPRESSION, EXPR_SIZEOF);
   res->val.e->type->type = __type__int->val.t;
-  res->val.e->val.v->params = (dim)?dim:expression_int_val(0);
-  res->val.e->val.v->var = var; 
+  res->val.e->val.v->params = (dim) ? dim : expression_int_val(0);
+  res->val.e->val.v->var = var;
   free(name);
   return res;
 }
-
 
 ast_node_t *array_dimensions(ast_t *ast, YYLTYPE *loc, char *name) {
   ast_node_t *vn;
@@ -298,8 +298,8 @@ ast_node_t *array_dimensions(ast_t *ast, YYLTYPE *loc, char *name) {
     free(name);
     return NULL;
   }
-  variable_t *var= vn->val.v;
-  if (var->num_dim==0) {
+  variable_t *var = vn->val.v;
+  if (var->num_dim == 0) {
     yyerror(loc, ast, "%s is not an array", name);
     free(name);
     return NULL;
@@ -331,8 +331,48 @@ ast_node_t *expression_call(ast_t *ast, YYLTYPE *loc, char *name,
   expression_t *e = res->val.e;
   e->type->type = fn->val.f->out_type;
   e->val.f->fn = fn->val.f;
-  // TODO: check type, number of dimensions, etc
   e->val.f->params = params;
+  free(name);
+  return res;
+}
+
+ast_node_t *expression_sort(ast_t *ast, YYLTYPE *loc, char *name,
+                            ast_node_t *params) {
+  if (!params) {
+    free(name);
+    return NULL;
+  }
+  ast_node_t *var;
+  int role = ident_role(ast, name, &var);
+  if (!(role & IDENT_VAR)) {
+    yyerror(loc, ast, "%s is not a variable", name);
+    free(name);
+    ast_node_t_delete(params);
+    return NULL;
+  }
+  if (var->val.v->num_dim != 1) {
+    yyerror(loc, ast,
+            "only 1-dimensional arrays can be sorted; %s has %d dimensions", name,
+            var->val.v->num_dim);
+    free(name);
+    ast_node_t_delete(params);
+    return NULL;
+  }
+  ast_node_t *p = params;
+
+  while (p->val.e->variant==EXPR_SPECIFIER) p=p->val.e->val.s->ex;
+  if (p->val.e->type->compound||var->val.v->base_type != p->val.e->type->type) {
+    yyerror(loc, ast, "type mismatch");
+    free(name);
+    ast_node_t_delete(params);
+    return NULL;
+  }
+  
+  ast_node_t *res = ast_node_t_new(loc, AST_NODE_EXPRESSION, EXPR_SORT);
+  expression_t *e = res->val.e;
+  e->type->type = var->val.v->base_type;
+  e->val.v->var = var->val.v;
+  e->val.v->params = params;
   free(name);
   return res;
 }
@@ -345,7 +385,7 @@ int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node) {
   expression_t *e = node->val.e;
 
   if (e->variant == EXPR_BINARY) {
-    if (e->val.o->first==NULL || e->val.o->second==NULL) return 0;
+    if (e->val.o->first == NULL || e->val.o->second == NULL) return 0;
     if (inferred_type_equal(e->val.o->first->val.e->type,
                             e->val.o->second->val.e->type)) {
       inferred_type_t_delete(e->type);
@@ -370,9 +410,15 @@ int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node) {
 
       if (fi && si)
         e->type->type = __type__int->val.t;
-      else if ((fi || ff) && (si || sf))
-        e->type->type = __type__float->val.t;
-      else {
+      else if ((fi || ff) && (si || sf)) {
+        if (assign_oper(e->val.o->oper) && fi)
+          e->type->type = __type__int->val.t;
+        else if (comparison_oper(e->val.o->oper) || e->val.o->oper == TOK_AND ||
+                 e->val.o->oper == TOK_OR) {
+          e->type->type = __type__int->val.t;
+        } else
+          e->type->type = __type__float->val.t;
+      } else {
         yyerror(loc, ast, "type check error");
         return 0;
       }

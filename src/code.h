@@ -48,8 +48,8 @@
 #define MULT_INT    0x17U
 #define DIV_INT     0x18U
 #define MOD_INT     0x19U
-#define SUB_FLOAT   0x1AU
-#define ADD_FLOAT   0x1BU
+#define ADD_FLOAT   0x1AU
+#define SUB_FLOAT   0x1BU
 #define MULT_FLOAT  0x1CU
 #define DIV_FLOAT   0x1DU
 #define LOG         0x1EU  //  LOG      : a... -> b... (a,b:float)
@@ -78,7 +78,8 @@
                            //  cretes new callframe, and jumps to the address
                            //  the function code transfers parameters from stack
                            //             p1,p2,...,pn,s... -> s,...
-#define RETURN      0x30U  //  removes the callframe (top of stack is return value)         
+#define RETURN      0x30U  //  removes the callframe (top of stack is return value)    
+                           //  and jumps
 
 #define FLOAT2INT   0x31U  //  cast top of stack
 #define INT2FLOAT   0x32U  //  cast top of stack
@@ -89,17 +90,27 @@
                            //  create two new groups (first for nonzero, second for zero)
                            //  each continues until join
                            //  empty group causes the PC to move to the next join
-#define JOIN        0x35U  // remove active group
+#define JOIN        0x35U  //  JOIN remove active group 
+#define JOIN_JMP    0x36U  //  JOIN_JMP(a) remove active group and add a to pc (default 4)
+#define SETR        0x37U  //  set the "returned" flag in current group
 
 // these instructions do not count, and are executed only by the machine
 
 // mark both static mem and heap
-#define MEM_MARK   0x36U  
-#define MEM_FREE   0x37U
+#define MEM_MARK   0x38U  
+#define MEM_FREE   0x39U
 
 // give address (relative to heap) to block of size c
-#define ALLOC       0x38U  //  ALLOC    : c,... -> addr,.... (c,addr:uint32_t)
-#define ENDVM       0x39U
+#define ALLOC       0x3aU  //  ALLOC    : c,... -> addr,.... (c,addr:uint32_t)
+#define ENDVM       0x3bU
+
+#define LAST_BIT    0x3cU  // LAST_BIT: c,... -> d,... (int32)
+                           // d : position (from right) of the last non-zero bit
+#define SORT        0x3dU  // SORT addr, size, offs, type, ... -> ...
+                           // addr is a 1-dimensional array of elements of size
+                           // sort it based on a key of type, located at offs in
+                           //    the record
+                           // type = TYPE_INT, TYPE_FLOAT, TYPE_CHAR
 
 #define SECTION_HEADER  0x77U
 #define SECTION_INPUT   0x88U
@@ -112,6 +123,7 @@
 header: 
 version     byte (1)
 global_size uint32 
+memory_mode uint8
 
 input/output section:
 
@@ -129,7 +141,10 @@ the restriction means that there are at most 256 dimensions in an array, and at 
 
 fnmap section: 
 uint32_t n
-addr_1 ... addr_n   - addresses in the code segment of respective functions
+addr_1,type_size 1, ... addr_n, type_size 2   
+      addr = ddress in the code segment 
+      type_size = how much the op_stack size should change after call 
+      (out_type size - parameters size)
 
 
 */
@@ -137,6 +152,10 @@ addr_1 ... addr_n   - addresses in the code segment of respective functions
 #define TYPE_INT   0U
 #define TYPE_FLOAT 1U
 #define TYPE_CHAR  2U
+
+#define MEM_MODE_EREW 0x75U
+#define MEM_MODE_CREW 0x76U
+#define MEM_MODE_CCRCW 0x77U
 
 
 /* storage 
@@ -150,4 +169,27 @@ addr_1 ... addr_n   - addresses in the code segment of respective functions
     uint32:  nd
     dim_1 ... dim_nd  uint32 range n (0..n-1) of dimensions 1..nd
 */
+
+/* function calls
+ 
+  call: copy non_returned from the active group to new group
+  return x:  push x, ret_join (set returned flag + join current group)
+  end_of_function: call return (clear flag, join group, set ret addr)
+
+*/
+
+#define assign_oper(oper) ( \
+      (oper) == '=' || (oper) == TOK_PLUS_ASSIGN || (oper) == TOK_MINUS_ASSIGN || \
+      (oper) == TOK_TIMES_ASSIGN || (oper) == TOK_DIV_ASSIGN ||\
+      (oper) == TOK_MOD_ASSIGN)
+
+#define numeric_oper(oper) (\
+      (oper) == '+' || (oper) == '-' || (oper) == '*' || (oper) == '^' || (oper) == '/' ||\
+      (oper) == '%')
+
+#define comparison_oper(oper) (\
+      (oper) == TOK_EQ || (oper) == TOK_NEQ || (oper) == TOK_GEQ || (oper) == TOK_LEQ || \
+      (oper) == '<' || (oper) == '>')
+
+
 #endif

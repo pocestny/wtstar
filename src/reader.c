@@ -26,15 +26,27 @@ DESTRUCTOR(reader_t) {
   free(r);
 }
 
+void in_ungetc(reader_t *r, const char c) {
+  if (r->type==READER_STRING) {
+    if (r->str.pos>r->str.base) {
+      *(--(r->str.pos))=c;
+    }
+  } else {
+    ungetc(c,r->f);
+  }
+}
 
-void _in_text_internal_(reader_t *r, const char *format, ...) {
+
+int _in_text_internal_(reader_t *r, const char *format, ...) {
  va_list args;
+ int res;
  va_start(args,format);
  if (r->type == READER_STRING) {
-   vsscanf(r->str.pos,format,args);
+   res=vsscanf(r->str.pos,format,args);
  } else {
-   vfscanf(r->f,format,args);
+   res=vfscanf(r->f,format,args);
  }
  va_end(args);
+ return res;
 }
 

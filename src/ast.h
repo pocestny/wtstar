@@ -161,6 +161,7 @@ DESTRUCTOR(function_t);
  *                 (expr_oper_t *) oper (TOK_*), expression_t *first,*second
  * typecast: (expr_cast_t *) static_type_t* new type, expression_t* orig. ex.
  * specifier: (expr_specif_t *) static_type_member_t* member, expression_t ex
+ * sort: (expr_variable_t *) var = array to be sorted, params = specifier list 
  *
  */
 #define EXPR_EMPTY 18
@@ -175,6 +176,7 @@ DESTRUCTOR(function_t);
 #define EXPR_BINARY 27
 #define EXPR_CAST 28
 #define EXPR_SPECIFIER 29
+#define EXPR_SORT 30
 
 /*
  * stuff for inferred types
@@ -312,6 +314,7 @@ int expr_int(expression_t *e);
 typedef struct _statement_t {
   int variant;
   struct _ast_node_t *par[2];  // owned
+  function_t *ret_fn; // external, only used for return
 } statement_t;
 
 CONSTRUCTOR(statement_t, int variant);
@@ -380,6 +383,7 @@ typedef struct {
   scope_t *root_scope, *current_scope;
   static_type_t *current_type;
   int error_occured;
+  int mem_mode; // last issued token for memory mode
 } ast_t;
 
 CONSTRUCTOR(ast_t);

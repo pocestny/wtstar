@@ -244,6 +244,7 @@ int static_type_layout(static_type_t *t, uint8_t **layout) {
       if (layout) *layout = NULL;
     }
   } else {
+    if (layout) *layout=NULL;
     list_for(tm, static_type_member_t, t->members) {
       uint8_t *l, **al;
       if (layout)
@@ -252,7 +253,7 @@ int static_type_layout(static_type_t *t, uint8_t **layout) {
         al = NULL;
       int nn = static_type_layout(tm->type, al);
       if (layout) {
-        if (*layout)
+        if (*layout==NULL)
           *layout = l;
         else {
           (*layout) = (uint8_t *)realloc(*layout, n + nn);
@@ -408,6 +409,7 @@ CONSTRUCTOR(expression_t, int variant) {
     } break;
     case EXPR_ARRAY_ELEMENT:
     case EXPR_VAR_NAME:
+    case EXPR_SORT:                
     case EXPR_SIZEOF: {
       ALLOC_VAR(v, expr_variable_t);
       v->var = NULL;

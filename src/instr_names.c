@@ -1,61 +1,65 @@
 const char* const instr_names[]={
-"NOOP",
-"PUSHC",
-"PUSHB",
-"FBASE",
-"SIZE",
-"LDC",
-"LDB",
-"STC",
-"STB",
-"LDCH",
-"LDBH",
-"STCH",
-"STBH",
-"IDX",
-"SWS",
-"POP",
-"A2S",
-"POPA",
-"S2A",
-"RVA",
-"SWA",
-"ADD_INT",
-"SUB_INT",
-"MULT_INT",
-"DIV_INT",
-"MOD_INT",
-"SUB_FLOAT",
-"ADD_FLOAT",
-"MULT_FLOAT",
-"DIV_FLOAT",
-"LOG",
-"POW_INT",
-"POW_FLOAT",
-"NOT",
-"OR",
-"AND",
-"EQ_INT",
-"EQ_FLOAT",
-"GT_INT",
-"GT_FLOAT",
-"GEQ_INT",
-"GEQ_FLOAT",
-"LT_INT",
-"LT_FLOAT",
-"LEQ_INT",
-"LEQ_FLOAT",
-"JMP",
-"CALL",
-"RETURN",
-"FLOAT2INT",
-"INT2FLOAT",
-"FORK",
-"SPLIT",
-"JOIN",
-"MEM_MARK",
-"MEM_FREE",
-"ALLOC",
-"ENDVM",
+"NOOP",       // 0
+"PUSHC",      // 1
+"PUSHB",      // 2
+"FBASE",      // 3
+"SIZE",       // 4
+"LDC",        // 5
+"LDB",        // 6
+"STC",        // 7
+"STB",        // 8
+"LDCH",       // 9
+"LDBH",       // a
+"STCH",       // b
+"STBH",       // c
+"IDX",        // d
+"SWS",        // e
+"POP",        // f
+"A2S",        // 10
+"POPA",       // 11
+"S2A",        // 12
+"RVA",        // 13
+"SWA",        // 14
+"ADD_INT",    // 15
+"SUB_INT",    // 16
+"MULT_INT",   // 17
+"DIV_INT",    // 18
+"MOD_INT",    // 19
+"ADD_FLOAT",  // 1a
+"SUB_FLOAT",  // 1b
+"MULT_FLOAT", // 1c
+"DIV_FLOAT",  // 1d
+"LOG",        // 1e
+"POW_INT",    // 1f
+"POW_FLOAT",  // 20
+"NOT",        // 21
+"OR",         // 22
+"AND",        // 23
+"EQ_INT",     // 24
+"EQ_FLOAT",   // 25
+"GT_INT",     // 26
+"GT_FLOAT",   // 27
+"GEQ_INT",    // 28
+"GEQ_FLOAT",  // 29
+"LT_INT",     // 2a
+"LT_FLOAT",   // 2b 
+"LEQ_INT",    // 2c
+"LEQ_FLOAT",  // 2d 
+"JMP",        // 2e
+"CALL",       // 2f
+"RETURN",     // 30
+"FLOAT2INT",  // 31
+"INT2FLOAT",  // 32
+"FORK",       // 33
+"SPLIT",      // 34   
+"JOIN",       // 35
+"JOIN_JMP",   // 36
+"SETR",       // 37
+"MEM_MARK",   // 38
+"MEM_FREE",   // 39
+"ALLOC",      // 3a
+"ENDVM",      // 3b
+"LAST_BIT",   // 3c
+"SORT",       // 3d
 "???"
 };

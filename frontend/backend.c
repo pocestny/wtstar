@@ -27,12 +27,12 @@ int web_compile(char *name, char *text) {
   driver_init();
   driver_set_file(name,text);
   ast = driver_parse(name);
-  driver_destroy();
   
   if (!ast->error_occured) {
     emit_code(ast, code);
   }
 
+  driver_destroy();
   return ast->error_occured;
 }
 
@@ -42,6 +42,7 @@ int web_start(char *input) {
   if (outw) writer_t_delete(outw);
   outw = writer_t_new(WRITER_STRING);
   if (env) runtime_t_delete(env);
+  delete_errors();
   env = runtime_t_new((uint8_t*)(code->str.base), code->str.ptr);
 
   reader_t *r = reader_t_new(READER_STRING,input);
@@ -53,7 +54,7 @@ int web_start(char *input) {
 
 int web_run(int limit) {
   int res = execute(env, limit);
-  if (!res)  
+  if (res==0)  
     write_output(outw,env);
   return res;
 }

@@ -8,6 +8,13 @@
 #include <vm.h>
 #include <reader.h>
 #include <runtime.h>
+#include <errors.h>
+
+void error_handler(error_t *err) {
+  fprintf(stderr,"%s\n",err->msg->str.base);
+  exit(1);
+}
+
 
 int EXEC_DEBUG = 0;
 
@@ -49,6 +56,8 @@ int main(int argc, char **argv) {
   inf = NULL;
   parse_options(argc, argv);
   if (!inf) print_help(argc, argv);
+
+  register_error_handler(&error_handler);
 
   FILE *f = fopen(inf, "rb");
   fseek(f, 0, SEEK_END);

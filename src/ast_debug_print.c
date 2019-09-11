@@ -6,8 +6,8 @@
 
 static writer_t *writer;
 
-#define LOG(...) out_text(writer, __VA_ARGS__)
-#define OFS(n) LOG("%*s", n, " ")
+#define MSG(...) out_text(writer, __VA_ARGS__)
+#define OFS(n) MSG("%*s", n, " ")
 
 #define AST_NODE_NAME_BASE 52
 static const char *const node_names[] = {
@@ -35,64 +35,52 @@ static void print_node(int ofs, ast_node_t *node);
 static void print_token(int op) {
   switch (op) {
     case TOK_EQ:
-      LOG("==");
+      MSG("==");
       break;
     case TOK_NEQ:
-      LOG("!=");
+      MSG("!=");
       break;
     case TOK_LEQ:
-      LOG("<=");
+      MSG("<=");
       break;
     case TOK_GEQ:
-      LOG(">=");
+      MSG(">=");
       break;
     case TOK_AND:
-      LOG("&&");
+      MSG("&&");
       break;
     case TOK_OR:
-      LOG("||");
-      break;
-    case TOK_SHL:
-      LOG("<<");
-      break;
-    case TOK_SHR:
-      LOG(">>");
-      break;
-    case TOK_FIRST_BIT:
-      LOG("|~");
+      MSG("||");
       break;
     case TOK_LAST_BIT:
-      LOG("~|");
+      MSG("~|");
       break;
     case TOK_INC:
-      LOG("++");
+      MSG("++");
       break;
     case TOK_DEC:
-      LOG("--");
+      MSG("--");
       break;
     case TOK_PLUS_ASSIGN:
-      LOG("+=");
+      MSG("+=");
       break;
     case TOK_MINUS_ASSIGN:
-      LOG("-=");
+      MSG("-=");
       break;
     case TOK_TIMES_ASSIGN:
-      LOG("*=");
+      MSG("*=");
       break;
     case TOK_DIV_ASSIGN:
-      LOG("/=");
+      MSG("/=");
       break;
     case TOK_MOD_ASSIGN:
-      LOG("%%=");
-      break;
-    case TOK_POW_ASSIGN:
-      LOG("^=");
+      MSG("%%=");
       break;
     case TOK_DONT_CARE:
-      LOG("_");
+      MSG("_");
       break;
     default:
-      LOG("%c", (char)op);
+      MSG("%c", (char)op);
   }
 }
 
@@ -109,82 +97,82 @@ static void print_expr_params(int ofs, expression_t *e) {
 }
 
 static void print_expr_props(expression_t *e) {
-  if (e->variant == EXPR_VAR_NAME) LOG("var:'%s' ", e->val.v->var->name);
+  if (e->variant == EXPR_VAR_NAME) MSG("var:'%s' ", e->val.v->var->name);
 
   if (e->variant == EXPR_LITERAL) {
-    if (expr_int(e)) LOG("value:%d ", *(int *)(e->val.l));
+    if (expr_int(e)) MSG("value:%d ", *(int *)(e->val.l));
   }
 
   if (e->variant == EXPR_ARRAY_ELEMENT) {
-    LOG("array:'%s' ", e->val.v->var->name);
+    MSG("array:'%s' ", e->val.v->var->name);
   }
 
-  if (e->variant == EXPR_SIZEOF) LOG("variable:'%s' ", e->val.v->var->name);
+  if (e->variant == EXPR_SIZEOF) MSG("variable:'%s' ", e->val.v->var->name);
 
   if (e->variant == EXPR_BINARY || e->variant == EXPR_PREFIX ||
       e->variant == EXPR_POSTFIX) {
-    LOG("'");
+    MSG("'");
     print_token(e->val.o->oper);
-    LOG("' ");
+    MSG("' ");
   }
 }
 
 static void print_node(int ofs, ast_node_t *node) {
   if (!node) {
     OFS(ofs);
-    LOG("[NULL]\n");
+    MSG("[NULL]\n");
     return;
   }
   OFS(ofs);
-  LOG("[ %s ", node_names[node->node_type - AST_NODE_NAME_BASE]);
+  MSG("[ %s ", node_names[node->node_type - AST_NODE_NAME_BASE]);
 
   if (node->node_type == AST_NODE_STATEMENT)
-    LOG("%s ", stmt_names[node->val.s->variant - STMT_BASE]);
+    MSG("%s ", stmt_names[node->val.s->variant - STMT_BASE]);
 
   if (node->node_type == AST_NODE_EXPRESSION) {
-    LOG("%s ", expr_names[node->val.e->variant - EXPR_BASE]);
+    MSG("%s ", expr_names[node->val.e->variant - EXPR_BASE]);
     print_expr_props(node->val.e);
     char *name = inferred_type_name(node->val.e->type);
-    LOG("type:'%s' ", name);
+    MSG("type:'%s' ", name);
     if (name) free(name);
   }
 
-  LOG("this:%lx ", (unsigned long)node);
-  if (ast_node_name(node)) LOG("name:'%s' ", ast_node_name(node));
+  MSG("this:%lx ", (unsigned long)node);
+  if (ast_node_name(node)) MSG("name:'%s' ", ast_node_name(node));
 
   if (node->node_type == AST_NODE_VARIABLE) {
-    LOG("%s type:'%s' ", ioflag_names[node->val.v->io_flag],
+    MSG("%s type:'%s' ", ioflag_names[node->val.v->io_flag],
         node->val.v->base_type->name);
     if (node->val.v->num_dim > 0) {
-      LOG("num_dim=%d ", node->val.v->num_dim);
+      MSG("num_dim=%d ", node->val.v->num_dim);
     }
   }
 
   if (node->node_type == AST_NODE_STATIC_TYPE && node->val.t->members) {
-    LOG("members:{ ");
+    MSG("members:{ ");
     list_for(tm, static_type_member_t, node->val.t->members) {
-      LOG("'%s':'%s' ", tm->type->name, tm->name);
+      MSG("'%s':'%s' ", tm->type->name, tm->name);
     }
     list_for_end;
-    LOG("} ");
-    LOG("size: %d ", node->val.t->size);
+    MSG("} ");
+    MSG("size: %d ", node->val.t->size);
   }
 
-  LOG("next:%lx ", (unsigned long)node->next);
+  MSG("next:%lx ", (unsigned long)node->next);
 
   if (node->node_type == AST_NODE_SCOPE) {
-    LOG("\n");
+    MSG("\n");
     print_scope(ofs + 5, node->val.sc);
     OFS(ofs);
-    LOG("]\n");
+    MSG("]\n");
   } else
-    LOG("]\n");
+    MSG("]\n");
 
   if (node->node_type == AST_NODE_STATEMENT)
     for (int i = 0; i < 2; i++)
       if (node->val.s->par[i]) {
         OFS(ofs + 5);
-        LOG("par%d\n", i);
+        MSG("par%d\n", i);
         for (ast_node_t *nn = node->val.s->par[i]; nn; nn = nn->next)
           print_node(ofs + 5, nn);
       }
@@ -197,7 +185,7 @@ static void print_node(int ofs, ast_node_t *node) {
       print_node(ofs + 5, t);
     if (node->val.v->initializer) {
       OFS(ofs + 5);
-      LOG("init\n");
+      MSG("init\n");
       print_node(ofs + 5, node->val.v->initializer);
     }
   }
@@ -225,50 +213,50 @@ static void print_node(int ofs, ast_node_t *node) {
 static void print_scope(int ofs, scope_t *s) {
   if (!s) {
     OFS(ofs);
-    LOG("empty scope\n");
+    MSG("empty scope\n");
     return;
   }
   OFS(ofs);
-  LOG("scope this:%lx parent:%lx\n", (unsigned long)s,
+  MSG("scope this:%lx parent:%lx\n", (unsigned long)s,
       (unsigned long)s->parent);
   if (s->fn) {
     OFS(ofs);
-    LOG("params:\n");
+    MSG("params:\n");
     list_for(it, ast_node_t, s->fn->params) { print_node(ofs, it); }
     list_for_end;
   }
   OFS(ofs);
-  LOG("items:\n");
+  MSG("items:\n");
   list_for(it, ast_node_t, s->items) { print_node(ofs, it); }
   list_for_end;
   OFS(ofs);
-  LOG("scope end (%lx)\n", (unsigned long)s);
+  MSG("scope end (%lx)\n", (unsigned long)s);
 }
 
 void ast_debug_print(ast_t *ast, writer_t *wrt) {
   writer = wrt;
-  LOG("ast->types:\n");
+  MSG("ast->types:\n");
   list_for(tt, ast_node_t, ast->types) print_node(0, tt);
   list_for_end;
 
   // functions
   list_for(tt, ast_node_t, ast->functions) {
-    LOG("\n%s %s(", tt->val.f->out_type->name, tt->val.f->name);
+    MSG("\n%s %s(", tt->val.f->out_type->name, tt->val.f->name);
     list_for(p, ast_node_t, tt->val.f->params) {
-      LOG("%s %s", p->val.v->base_type->name, p->val.v->name);
+      MSG("%s %s", p->val.v->base_type->name, p->val.v->name);
     }
     list_for_end;
-    LOG("):\n");
+    MSG("):\n");
     print_scope(0, tt->val.f->root_scope);
-    LOG("\n");
+    MSG("\n");
   }
   list_for_end;
 
-  LOG("\nast->root_scope:\n");
+  MSG("\nast->root_scope:\n");
   print_scope(0, ast->root_scope);
 }
 
-#undef LOG
+#undef MSG
 #undef OFS
 #undef AST_NODE_NAME_BASE
 #undef STMT_BASE

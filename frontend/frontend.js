@@ -618,10 +618,10 @@
   }
 
 
-  var STACK_BASE = 24496,
-      STACK_MAX = 5267376,
-      DYNAMIC_BASE = 5267376,
-      DYNAMICTOP_PTR = 24240;
+  var STACK_BASE = 24752,
+      STACK_MAX = 5267632,
+      DYNAMIC_BASE = 5267632,
+      DYNAMICTOP_PTR = 24496;
 
   assert(STACK_BASE % 16 === 0, 'stack must start aligned');
   assert(DYNAMIC_BASE % 16 === 0, 'heap must start aligned');
@@ -1038,7 +1038,7 @@
 
 
 
-  // STATICTOP = STATIC_BASE + 23472;
+  // STATICTOP = STATIC_BASE + 23728;
   /* global initializers */ /*__ATINIT__.push();*/
 
 
@@ -1049,7 +1049,7 @@
 
 
   /* no memory initializer */
-  var tempDoublePtr = 24480;
+  var tempDoublePtr = 24736;
   assert(tempDoublePtr % 8 == 0);
 
   // {{PRE_LIBRARY}}
@@ -1273,6 +1273,22 @@
         exit(status);
       }
 
+    function _llvm_stackrestore(p) {
+        var self = _llvm_stacksave;
+        var ret = self.LLVM_SAVEDSTACKS[p];
+        self.LLVM_SAVEDSTACKS.splice(p, 1);
+        stackRestore(ret);
+      }
+
+    function _llvm_stacksave() {
+        var self = _llvm_stacksave;
+        if (!self.LLVM_SAVEDSTACKS) {
+          self.LLVM_SAVEDSTACKS = [];
+        }
+        self.LLVM_SAVEDSTACKS.push(stackSave());
+        return self.LLVM_SAVEDSTACKS.length-1;
+      }
+
     
     function _emscripten_memcpy_big(dest, src, num) {
         HEAPU8.set(HEAPU8.subarray(src, src+num), dest);
@@ -1311,6 +1327,8 @@
     "_emscripten_memcpy_big": _emscripten_memcpy_big,
     "_emscripten_resize_heap": _emscripten_resize_heap,
     "_exit": _exit,
+    "_llvm_stackrestore": _llvm_stackrestore,
+    "_llvm_stacksave": _llvm_stacksave,
     "abortOnCannotGrowMemory": abortOnCannotGrowMemory,
     "emscripten_realloc_buffer": emscripten_realloc_buffer,
     "flush_NO_FILESYSTEM": flush_NO_FILESYSTEM,
@@ -1958,6 +1976,15 @@
     wt.T             = cc.cwrap('web_T','number',[]);
   });
 
+  function format(wt) {
+    var n = Number(wt);
+    if (n<1000) return wt;
+    if (n<1e6) return n/1e3+"K";
+    if (n<1e9) return n/1e6+"M";
+    if (n<1e12) return n/1e9+"G";
+    return n/1e12+"T";
+  }
+
   function keyDownHandler(e) {
     // console.log(e.code);
     if ((e.which || e.keyCode) == 117) {
@@ -1999,11 +2026,11 @@
       logger.log("<span >compilation ok</span>",5,5);
       statusbar.left("program <span class='statusbar-strong'>"+
         name+"</span> ready");
-      w2ui['main_layout_left_toolbar'].set('run_button',{disabled:false});
+      w2ui['inner_layout_main_toolbar'].set('run_button',{disabled:false});
       program_ready=true;
     } else {
       logger.log("<span class='logger-error'>there were errors</span>",5,5);
-      w2ui['main_layout_left_toolbar'].set('run_button',{disabled:true});
+      w2ui['inner_layout_main_toolbar'].set('run_button',{disabled:true});
       statusbar.left(no_program_msg);
       program_ready=false;
     }
@@ -2015,22 +2042,32 @@
 
     var work = function() {
       var res = wt.run(5000);
-      if (res && !shouldStop) setTimeout(work,0);
-      else {
+      if (res == 1 && !shouldStop) {
+         statusbar.left("program <span class='statusbar-strong'>"+
+            name+"</span> running"
+            + " <div style='display:inline-block;min-width:200px;padding-left:10px'>work = "+
+            "<span style='font-family:Roboto;'>"+format(wt.W())+"</span>"
+            +" </div><span style='padding-left:10px'>&nbsp;</span>  time = "
+            +"<span style='font-family:Roboto;'>"+format(wt.T())+"</span>");
+        setTimeout(work,0);
+      } else {
         running=false;
         shouldStop=false;
         statusbar.left("program <span class='statusbar-strong'>"+
              name+"</span> ready");
-        logger.hr();
-        w2ui['main_layout_left_toolbar'].set('run_button',{caption:'Run (F4)'});
+        w2ui['inner_layout_main_toolbar'].set('run_button',{caption:'Run (F4)'});
         w2ui['inner_layout_main_toolbar'].set('compile_button',{disabled:false});
-        if (res) {
-          logger.log(name+" was interrupted.",0,5);
-        }  else {
+        if (res==1) {
+          logger.log("program was interrupted",0,5);
+        } else if (res<0) {  
+          for (let i = 0; i < wt.errnum(); i++) logger.log(wt.get_error_msg(i));
+          logger.log("<span class='logger-bad'>program crashed.</span>");
+        } else {
           iopanel.output(wt.output());
-          logger.log("<span class='logger-strong'>"+name+"</span> finished.");
-          logger.log("work = "+wt.W()+" <span style='padding-left:20px'>&nbsp;</span>  time = "
-            +wt.T(),0,5);
+          logger.log("finished. <span style='padding-left:10px'>&nbsp;</span>work = "
+            +format(wt.W())
+            +" <span style='padding-left:10px'>&nbsp;</span>  time = "
+            +format(wt.T()),0,5);
         }
       }
     };
@@ -2042,14 +2079,26 @@
         } else {
           // not runnning - start
           name =  editor.sessionCaption(editor.currentSession());
+          iopanel.output(" ");
           wt.start(iopanel.input());
-          running = true;
-          iopanel.output("");
-          statusbar.left("program <span class='statusbar-strong'>"+
+          if (wt.errnum()>0) {
+            logger.hr();
+            logger.log("failed to run program <span class='statusbar-strong'>"+
+              name+"</span>");
+            for (let i = 0; i < wt.errnum(); i++) logger.log(wt.get_error_msg(i));
+          } else {
+            running = true;
+            iopanel.output("");
+            statusbar.left("program <span class='statusbar-strong'>"+
               name+"</span> running");
-          w2ui['main_layout_left_toolbar'].set('run_button',{caption:'Stop (F4)'});
-          w2ui['inner_layout_main_toolbar'].set('compile_button',{disabled:true});
-          setTimeout(work,0);
+            logger.hr();
+            logger.log("running program <span class='statusbar-strong'>"+
+              name+"</span>");
+
+            w2ui['inner_layout_main_toolbar'].set('run_button',{caption:'Stop (F4)'});
+            w2ui['inner_layout_main_toolbar'].set('compile_button',{disabled:true});
+            setTimeout(work,0);
+          }
         }
       }
     }
@@ -2112,6 +2161,8 @@
             },
             { type: 'button',  caption: 'New', onClick: ()=>getString("title","name",addTab)},
             { type: 'button',  id:'compile_button', caption: 'Compile (F3)', onClick: compile },
+            { type: 'button',  id:'run_button', caption: 'Run (F4)', 
+              onClick: runner.toggle, disabled:true },
             { type: 'spacer' },
             { type: 'check', id: 'toggle_io_button', caption: 'I/O (F6)', checked:true,
                 onClick: function(){ w2ui['main_layout'].toggle('left',true); }
@@ -2145,7 +2196,10 @@
         size:'120', 
         content: logger.html
       }
-    ]
+    ],
+    onResize: function(event) {
+        if (editor) event.onComplete = () => { editor.ace.resize(true); };
+    }
   });
                               
   $().w2layout({
@@ -2154,12 +2208,6 @@
     panels: [
       { 
         type: 'left', 
-        toolbar: {
-          items: [
-            { type: 'button',  id:'run_button', caption: 'Run (F4)', 
-              onClick: runner.toggle, disabled:true },
-          ]
-        },
         resizable:true,
         size:'30%',
         content: iopanel.html
@@ -2178,10 +2226,7 @@
         size:'28',
         content:statusbar.html
       }
-    ],
-    onResize: function(event) {
-        if (editor) event.onComplete = () => { editor.ace.resize(true); };
-    }
+    ]
   });
 
   w2ui['main_layout'].content('main',w2ui['inner_layout']);

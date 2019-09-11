@@ -15,6 +15,8 @@
 #define DEBUG(...) printf(__VA_ARGS__)
 #endif
 
+extern ast_node_t *__type__int;
+
 static ast_t *ast;
 static int was_error = 0;
 
@@ -29,25 +31,6 @@ static void error(YYLTYPE *loc, const char *format, ...) {
   append_error_vmsg(err, n, format, args);
   va_end(args);
   emit_error(err);
-}
-
-static int assign_oper(int oper) {
-  if (oper == '=' || oper == TOK_PLUS_ASSIGN || oper == TOK_MINUS_ASSIGN)
-    return 1;
-  return 0;
-}
-
-static int binary_oper(int oper) {
-  if (oper == '+' || oper == '-' || oper == '*' || oper == '^' || oper == '/')
-    return 1;
-  return 0;
-}
-
-static int comparison_oper(int oper) {
-  if (oper == TOK_EQ || oper == TOK_NEQ || oper == TOK_GEQ || oper == TOK_LEQ ||
-      oper == '<' || oper == '>')
-    return 1;
-  return 0;
 }
 
 static void emit_code_scope(code_block_t *code, scope_t *sc);
@@ -99,6 +82,7 @@ void add_instr(code_block_t *out, int code, ...) {
       case PUSHC:
       case JMP:
       case CALL:
+      case JOIN_JMP:
         lval(buf + len, int32_t) = va_arg(args, int);
         len += 4;
         break;
@@ -295,6 +279,10 @@ static void emit_code_store_value(code_block_t *code, int on_heap, int *casts,
  *
  */
 static void emit_code_cast_value(code_block_t *code, int *casts, int n_casts) {
+  int needed = 0;
+  for (int i = 0; i < n_casts; i++)
+    if (conversion_needed(casts[i])) needed = 1;
+  if (!needed) return;
   for (int i = 0; i < n_casts; i++) {
     if (conversion_needed(casts[i])) {
       int conv = (casts[i] & CONVERT_TO_FLOAT) ? INT2FLOAT : FLOAT2INT;
@@ -306,8 +294,7 @@ static void emit_code_cast_value(code_block_t *code, int *casts, int n_casts) {
 }
 
 /* ----------------------------------------------------------------------------
- * the stack contains value of type tm->parent, make it so
- * that only tm->type part remains
+ * the stack contains value of type t, remove it
  *
  */
 static void emit_code_remove_type(code_block_t *code, static_type_t *t) {
@@ -315,6 +302,11 @@ static void emit_code_remove_type(code_block_t *code, static_type_t *t) {
   for (int i = 0; i < n; i++) add_instr(code, POP, 0);
 }
 
+/* ----------------------------------------------------------------------------
+ * the stack contains value of type tm->parent, make it so
+ * that only tm->type part remains
+ *
+ */
 static void emit_code_select_specifier(code_block_t *code,
                                        static_type_member_t *tm) {
   int n = static_type_layout(tm->type, NULL);
@@ -344,7 +336,12 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
   exn->emitted = 1;
   expression_t *ex = exn->val.e;
   switch (ex->variant) {
+    // --------------------------------------
     case EXPR_LITERAL:
+      if (addr) {
+        error(&(exn->loc), "cannot take address of expression");
+        return;
+      }
       if (!clear) {
         for (int n = inferred_type_size(ex->type); n > 0;) {
           if (n >= 4) {
@@ -358,7 +355,12 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
       }
       break;
 
+    // --------------------------------------
     case EXPR_CALL: {
+      if (addr) {
+        error(&(exn->loc), "cannot take address of expression");
+        return;
+      }
       int np = length(ex->val.f->params);
       if (length(ex->val.f->fn->params) != np) {
         error(&(exn->loc), "wrong number of parameters in call to '%s'",
@@ -389,9 +391,13 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
         }
       }
       add_instr(code, CALL, ex->val.f->fn->n, 0);
+      if (clear) emit_code_remove_type(code, ex->val.f->fn->out_type);
+
     } break;
 
+    // --------------------------------------
     case EXPR_VAR_NAME:
+      if (clear) break;
       emit_code_var_addr(code, ex->val.v->var);
       if (!addr) {
         // we want the value
@@ -416,6 +422,7 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
       }
       break;
 
+    // --------------------------------------
     case EXPR_CAST: {
       ast_node_t *oexn = ex->val.c->ex;
       static_type_t *nt = ex->val.c->type;
@@ -435,8 +442,12 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
       if (casts) free(casts);
     } break;
 
+    // --------------------------------------
     case EXPR_INITIALIZER: {
-      assert(!addr);
+      if (addr) {
+        error(&(exn->loc), "cannot take address of expression");
+        return;
+      }
       int n = length(ex->val.i);
       ast_node_t **tmp = (ast_node_t **)malloc(n * sizeof(ast_node_t *));
       ast_node_t *nd = ex->val.i;
@@ -446,6 +457,7 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
       free(tmp);
     } break;
 
+    // --------------------------------------
     case EXPR_ARRAY_ELEMENT: {
       int n = ex->val.v->var->num_dim;
 
@@ -468,13 +480,32 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
       }
     } break;
 
+    // --------------------------------------
     case EXPR_SIZEOF: {
+      if (addr) {
+        error(&(exn->loc), "cannot take address of expression");
+        return;
+      }
       variable_t *v = ex->val.v->var;
       emit_code_expression(code, ex->val.v->params, 0, 0);
       emit_code_var_addr(code, v);
       add_instr(code, SIZE, 0);
+      if (clear) add_instr(code, POP, 0);
     } break;
+
+    // --------------------------------------
     case EXPR_BINARY:
+      // no operation is allowed on arrays
+      if (ex->val.o->first->val.e->variant == EXPR_VAR_NAME &&
+          ex->val.o->first->val.e->val.v->var->num_dim > 0) {
+        error(&(ex->val.o->first->loc), "operation not permitted for arrays");
+        return;
+      }
+      if (ex->val.o->second->val.e->variant == EXPR_VAR_NAME &&
+          ex->val.o->second->val.e->val.v->var->num_dim > 0) {
+        error(&(ex->val.o->second->loc), "operation not permitted for arrays");
+        return;
+      }
       // ..........
       // assignment
       if (assign_oper(ex->val.o->oper)) {
@@ -482,9 +513,7 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
           error(&(exn->loc), "expression is not assignable");
           return;
         }
-
         int load, store;
-
         if (expr_on_heap(ex->val.o->first->val.e)) {
           load = LDCH;
           store = STCH;
@@ -492,16 +521,60 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
           load = LDC;
           store = STC;
         }
+        if (ex->val.o->oper != '=') {
+          // combined assignment
 
-        if (ex->val.o->oper == TOK_PLUS_ASSIGN ||
-            ex->val.o->oper == TOK_MINUS_ASSIGN) {
-          // TODO: check for numeric types
+          // must be numeric
+          if (ex->type->compound || ex->type->type->members) {
+            error(&(exn->loc), "operation not supported on compound types");
+            return;
+          }
+          int t = static_type_basic(ex->type->type);
+          int t2 = static_type_basic(ex->val.o->second->val.e->type->type);
+
+          if ((t == TYPE_FLOAT || t2 == TYPE_FLOAT) &&
+              ex->val.o->oper == TOK_MOD_ASSIGN) {
+            error(&(exn->loc), "remainder not supported on floats");
+            return;
+          }
           emit_code_expression(code, ex->val.o->second, 0, 0);
+          if (t2 == TYPE_FLOAT && t == TYPE_INT)
+            add_instr(code, FLOAT2INT, 0);
+          else if (t2 == TYPE_INT && t == TYPE_FLOAT)
+            add_instr(code, INT2FLOAT, 0);
+
           emit_code_expression(code, ex->val.o->first, 1, 0);
-          int op = (ex->val.o->oper == TOK_PLUS_ASSIGN) ? ADD_INT : SUB_INT;
-          add_instr(code, S2A, load, op, A2S, POPA, store, 0);
+
+          int op;
+          switch (ex->val.o->oper) {
+            case TOK_PLUS_ASSIGN:
+              op = (t == TYPE_INT) ? ADD_INT : ADD_FLOAT;
+              break;
+            case TOK_MINUS_ASSIGN:
+              op = (t == TYPE_INT) ? SUB_INT : SUB_FLOAT;
+              break;
+            case TOK_TIMES_ASSIGN:
+              op = (t == TYPE_INT) ? MULT_INT : MULT_FLOAT;
+              break;
+            case TOK_DIV_ASSIGN:
+              op = (t == TYPE_INT) ? DIV_INT : DIV_FLOAT;
+              break;
+            case TOK_MOD_ASSIGN:
+              op = MOD_INT;
+              break;
+          }
+          add_instr(code, S2A, load, op, 0);
+          if (addr) {
+            add_instr(code, A2S, store, 0);
+            if (!clear) add_instr(code, A2S, 0);
+            add_instr(code, POPA, 0);
+          } else {
+            if (!clear) add_instr(code, S2A, SWA, 0);
+            add_instr(code, A2S, POPA, store, 0);
+            if (!clear) add_instr(code, A2S, POPA, 0);
+          }
         } else {
-          // just assign
+          // assignment
           int *casts = NULL, n_casts;
           ast_node_t *l = ex->val.o->first, *r = ex->val.o->second;
           if (l->val.e->type->compound) {
@@ -509,11 +582,25 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
                   "This should not have happened, we are all doomed now.");
             assert(0);
           }
+
+          // the types should be identical (checked in parser.y)
+          // so this is basically only to create a uniform array of casts
+          // (or if we wanted more implicit conversions in the future....)
           if (inferred_type_compatible(l->val.e->type->type, r->val.e->type,
                                        &casts, &n_casts)) {
             emit_code_expression(code, r, 0, 0);
             emit_code_expression(code, l, 1, 0);
+            if (!clear) add_instr(code, S2A, 0);
             emit_code_store_value(code, expr_on_heap(l->val.e), casts, n_casts);
+            if (!clear) {
+              add_instr(code, A2S, POPA, 0);
+              if (!addr) {
+                uint8_t *layout;
+                int ts = inferred_type_layout(l->val.e->type, &layout);
+                emit_code_load_value(code, expr_on_heap(l->val.e), ts, layout);
+                free(layout);
+              }
+            }
           } else {
             error(&(exn->loc),
                   "assignment of incompatible types (maybe add explicit cast)");
@@ -521,93 +608,245 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
           if (casts) free(casts);
         }
 
-      } else if (binary_oper(ex->val.o->oper)) {
+      } else if (numeric_oper(ex->val.o->oper)) {
         // ..........
         // binary op other that assignment
+        if (ex->type->compound || ex->type->type->members) {
+          error(&(exn->loc), "operation not supported on compound types");
+          return;
+        }
+        int t = static_type_basic(ex->type->type);
+        int t1 = static_type_basic(ex->val.o->first->val.e->type->type);
+        int t2 = static_type_basic(ex->val.o->second->val.e->type->type);
 
-        // TODO check types
-        emit_code_expression(code, ex->val.o->second, 0, 0);
-        emit_code_expression(code, ex->val.o->first, 0, 0);
+        if (t == TYPE_FLOAT && ex->val.o->oper == '%') {
+          error(&(exn->loc), "remainder not supported on floats");
+          return;
+        }
+
         int op;
         switch (ex->val.o->oper) {
           case '+':
-            op = ADD_INT;
+            op = (t == TYPE_INT) ? ADD_INT : ADD_FLOAT;
             break;
           case '-':
-            op = SUB_INT;
+            op = (t == TYPE_INT) ? SUB_INT : SUB_FLOAT;
             break;
           case '*':
-            op = MULT_INT;
+            op = (t == TYPE_INT) ? MULT_INT : MULT_FLOAT;
             break;
           case '^':
-            op = POW_INT;
+            op = (t == TYPE_INT) ? POW_INT : POW_FLOAT;
             break;
           case '/':
-            op = DIV_INT;
+            op = (t == TYPE_INT) ? DIV_INT : DIV_FLOAT;
+            break;
+          case '%':
+            op = MOD_INT;
             break;
         }
+        emit_code_expression(code, ex->val.o->second, 0, 0);
+        if (t2 == TYPE_INT && t == TYPE_FLOAT) add_instr(code, INT2FLOAT, 0);
+
+        emit_code_expression(code, ex->val.o->first, 0, 0);
+        if (t1 == TYPE_INT && t == TYPE_FLOAT) add_instr(code, INT2FLOAT, 0);
+
         add_instr(code, op, 0);
+        if (clear) add_instr(code, POP, 0);
+
       } else if (comparison_oper(ex->val.o->oper)) {
         // ..........
         // comparison
+        if (addr) {
+          error(&(exn->loc), "cannot take address of expression");
+          return;
+        }
+        if (!ex->type->compound && ex->type->type->members &&
+            (ex->val.o->oper == TOK_EQ || ex->val.o->oper == TOK_NEQ)) {
+          // comparison of compound type - both operands have the same type
+          uint8_t *layout, ts;
+          ts = inferred_type_layout(ex->type, &layout);
+          emit_code_expression(code, ex->val.o->second, 0, 0);
+          for (int i = 0; i < ts; i++) add_instr(code, S2A, POP, 0);
+          add_instr(code, RVA, 0);
+          emit_code_expression(code, ex->val.o->first, 0, 0);
+          for (int i = 0; i < ts; i++) {
+            add_instr(code, A2S, POPA, 0);
+            if (layout[i] == TYPE_FLOAT)
+              add_instr(code, EQ_FLOAT, 0);
+            else
+              add_instr(code, EQ_INT, 0);
+            if (i > 0) add_instr(code, AND, 0);
+            if (i < ts - 1) add_instr(code, SWS, 0);
+          }
+          if (clear) add_instr(code, POP, 0);
+          break;
+        }
+        // comparison of numbers
+        if (ex->type->compound || ex->type->type->members) {
+          error(&(exn->loc), "operation not supported on compound types");
+          return;
+        }
+        int t = static_type_basic(ex->type->type);
+        assert(t == TYPE_INT);
+        int t1 = static_type_basic(ex->val.o->first->val.e->type->type);
+        int t2 = static_type_basic(ex->val.o->second->val.e->type->type);
+        int conv = ((t1 == TYPE_FLOAT) || (t2 == TYPE_FLOAT));
         int op;
         switch (ex->val.o->oper) {
           case TOK_EQ:
-            op = EQ_INT;
+            op = (conv ? EQ_FLOAT : EQ_INT);
             break;
           case TOK_NEQ:
-            op = EQ_INT;
+            op = (conv ? EQ_FLOAT : EQ_INT);
             break;
           case TOK_LEQ:
-            op = LEQ_INT;
+            op = (conv ? LEQ_FLOAT : LEQ_INT);
             break;
           case TOK_GEQ:
-            op = GEQ_INT;
+            op = (conv ? GEQ_FLOAT : GEQ_INT);
             break;
           case '<':
-            op = LT_INT;
+            op = (conv ? LT_FLOAT : LT_INT);
             break;
           case '>':
-            op = GT_INT;
+            op = (conv ? GT_FLOAT : GT_INT);
             break;
         }
-
         emit_code_expression(code, ex->val.o->second, 0, 0);
+        if (conv && t2 == TYPE_INT) add_instr(code, INT2FLOAT, 0);
         emit_code_expression(code, ex->val.o->first, 0, 0);
+        if (conv && t1 == TYPE_INT) add_instr(code, INT2FLOAT, 0);
         add_instr(code, op, 0);
         if (ex->val.o->oper == TOK_NEQ) add_instr(code, NOT, 0);
-      }
+        if (clear) add_instr(code, POP, 0);
 
+      } else if (ex->val.o->oper == TOK_AND || ex->val.o->oper == TOK_OR) {
+        // ..........
+        // logical and or
+        if (addr) {
+          error(&(exn->loc), "cannot take address of expression");
+          return;
+        }
+        if (ex->type->compound || ex->type->type->members) {
+          error(&(exn->loc), "operation not supported on compound types");
+          return;
+        }
+        int t = static_type_basic(ex->type->type);
+        assert(t == TYPE_INT);
+        int t1 = static_type_basic(ex->val.o->first->val.e->type->type);
+        int t2 = static_type_basic(ex->val.o->second->val.e->type->type);
+        if (t1 == TYPE_FLOAT && t2 == TYPE_FLOAT) {
+          error(&(exn->loc), "logical operation needs integral type");
+          return;
+        }
+        emit_code_expression(code, ex->val.o->second, 0, 0);
+        emit_code_expression(code, ex->val.o->first, 0, 0);
+        if (ex->val.o->oper == TOK_AND)
+          add_instr(code, AND, 0);
+        else
+          add_instr(code, OR, 0);
+        if (clear) add_instr(code, POP, 0);
+      }
       break;
+
+    // --------------------------------------
     case EXPR_PREFIX:
+      // no operation is allowed on arrays
+      if (ex->val.o->first->val.e->variant == EXPR_VAR_NAME &&
+          ex->val.o->first->val.e->val.v->var->num_dim > 0) {
+        error(&(ex->val.o->first->loc), "operation not permitted for arrays");
+        return;
+      }
+      if (ex->type->compound || ex->type->type->members) {
+        error(&(exn->loc), "operation not supported on compound types");
+        return;
+      }
       if (ex->val.o->oper == TOK_DEC || ex->val.o->oper == TOK_INC) {
+        // ..........
+        // inc dec
         int onheap = expr_on_heap(ex->val.o->first->val.e);
         int load = onheap ? LDCH : LDC;
         int store = onheap ? STCH : STC;
-        int op = (ex->val.o->oper == TOK_DEC) ? SUB_INT : ADD_INT;
-
+        int type = static_type_basic(ex->type->type);
+        int op;
+        if (ex->val.o->oper == TOK_DEC)
+          op = (type == TYPE_FLOAT) ? SUB_FLOAT : SUB_INT;
+        else
+          op = (type == TYPE_FLOAT) ? ADD_FLOAT : ADD_INT;
         add_instr(code, PUSHB, 1, 0);
         emit_code_expression(code, ex->val.o->first, 1, 0);
         add_instr(code, S2A, load, op, 0);
-        if (!clear) add_instr(code, S2A, SWA, 0);
-        add_instr(code, A2S, POPA, store, 0);
+        if (!clear && !addr) add_instr(code, S2A, SWA, 0);
+        add_instr(code, A2S, store, 0);
+        if (clear || !addr) add_instr(code, POPA, 0);
         if (!clear) add_instr(code, A2S, POPA, 0);
       } else if (ex->val.o->oper == '-') {
-        emit_code_expression(code, ex->val.o->first, 0, 0);
+        // ..........
+        // unary -
+        if (addr) {
+          emit_code_expression(code, ex->val.o->first, 1, 0);
+          add_instr(code, S2A, 0);
+          int onheap = expr_on_heap(ex->val.o->first->val.e);
+          int load = onheap ? LDCH : LDC;
+          int store = onheap ? STCH : STC;
+          add_instr(code, load, 0);
+        } else
+          emit_code_expression(code, ex->val.o->first, 0, 0);
         add_instr(code, PUSHB, 0, 0);
         if (static_type_basic(ex->val.o->first->val.e->type->type) ==
             TYPE_FLOAT)
           add_instr(code, SUB_FLOAT, 0);
         else
           add_instr(code, SUB_INT, 0);
-      }
+        if (clear || addr) add_instr(code, POP, 0);
+        if (addr) add_instr(code, A2S, POPA, 0);
+      } else if (ex->val.o->oper == '!') {
+        // ..........
+        // not
+        if (addr) {
+          error(&(exn->loc), "cannot take address of expression");
+          return;
+        }
+        if (ex->type->compound || ex->type->type->members) {
+          error(&(exn->loc), "operation not supported on compound types");
+          return;
+        }
+        int t = static_type_basic(ex->type->type);
+        if (t != TYPE_INT) {
+          error(&(exn->loc), "operation needs integral type");
+          return;
+        }
+        emit_code_expression(code, ex->val.o->first, 0, clear);
+        if (!clear) add_instr(code, NOT, 0);
+      };
       break;
+    // --------------------------------------
     case EXPR_POSTFIX:
+      // no operation is allowed on arrays
+      if (ex->val.o->first->val.e->variant == EXPR_VAR_NAME &&
+          ex->val.o->first->val.e->val.v->var->num_dim > 0) {
+        error(&(ex->val.o->first->loc), "operation not permitted for arrays");
+        return;
+      }
       if (ex->val.o->oper == TOK_DEC || ex->val.o->oper == TOK_INC) {
+        // ..........
+        // inc dec
+        if (ex->type->compound || ex->type->type->members) {
+          error(&(exn->loc), "operation not supported on compound types");
+          return;
+        }
+        int type = static_type_basic(ex->type->type);
+
         int onheap = expr_on_heap(ex->val.o->first->val.e);
         int load = onheap ? LDCH : LDC;
         int store = onheap ? STCH : STC;
-        int op = (ex->val.o->oper == TOK_DEC) ? SUB_INT : ADD_INT;
+
+        int op;
+        if (ex->val.o->oper == TOK_DEC)
+          op = (type == TYPE_FLOAT) ? SUB_FLOAT : SUB_INT;
+        else
+          op = (type == TYPE_FLOAT) ? ADD_FLOAT : ADD_INT;
 
         add_instr(code, PUSHB, 1, 0);
         emit_code_expression(code, ex->val.o->first, 1, 0);
@@ -615,8 +854,27 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
         if (!clear) add_instr(code, S2A, SWA, 0);
         add_instr(code, op, A2S, POPA, store, 0);
         if (!clear) add_instr(code, A2S, POPA, 0);
+      } else if (ex->val.o->oper == TOK_LAST_BIT) {
+        // ..........
+        // last bit
+        if (addr) {
+          error(&(exn->loc), "cannot take address of expression");
+          return;
+        }
+        if (ex->type->compound || ex->type->type->members) {
+          error(&(exn->loc), "operation not supported on compound types");
+          return;
+        }
+        int t = static_type_basic(ex->type->type);
+        if (t != TYPE_INT) {
+          error(&(exn->loc), "operation needs integral type");
+          return;
+        }
+        emit_code_expression(code, ex->val.o->first, 0, clear);
+        if (!clear) add_instr(code, LAST_BIT, 0);
       }
       break;
+    // --------------------------------------
     case EXPR_SPECIFIER: {
       if (is_lval_expression(ex->val.s->ex->val.e)) {
         emit_code_expression(code, ex->val.s->ex, 1, 0);
@@ -633,6 +891,30 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
         emit_code_expression(code, ex->val.s->ex, 0, 0);
         emit_code_select_specifier(code, ex->val.s->memb);
       }
+    } break;
+    // --------------------------------------
+    case EXPR_SORT: {
+      if (addr) {
+        error(&(exn->loc), "cannot take address of expression");
+        return;
+      }
+      expression_t *spec = ex->val.v->params->val.e;
+      if (spec->type->compound || spec->type->type->members) {
+        error(&(exn->loc), "can sort only based on numeric key");
+        return;
+      }
+      int t = static_type_basic(spec->type->type);
+      add_instr(code, PUSHB, t, 0);
+
+      int offs = 0;
+      for (expression_t *p = spec; p->variant == EXPR_SPECIFIER;
+           p = p->val.s->ex->val.e)
+        offs += p->val.s->memb->offset;
+
+      add_instr(code, PUSHC, offs, PUSHC, ex->val.v->var->base_type->size, 0);
+
+      emit_code_var_addr(code, ex->val.v->var);
+      add_instr(code, SORT, 0);
     } break;
   }
 }
@@ -690,9 +972,9 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
             emit_code_store_value(code, 0, casts, n_casts);
             free(casts);
           } else
-            error(
-                &(node->loc),
-                "incompatible types in initializer (maybe add explicit cast)");
+            error(&(node->loc),
+                  "incompatible types in initializer (maybe add explicit "
+                  "cast)");
 
         } else {
           error(&(node->loc), "initializers are not supported for arrays");
@@ -701,7 +983,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
       break;
     // ................................
     case AST_NODE_EXPRESSION:
-      emit_code_expression(code, node, 1, 1);
+      emit_code_expression(code, node, 0, 1);
       break;
     // ................................
     case AST_NODE_STATEMENT:
@@ -712,17 +994,52 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           ast_node_t *B = A->next;
           ast_node_t *C = B->next;
           ast_node_t *D = C->next;
-
+          if (B->val.e->type->compound ||
+              B->val.e->type->type != __type__int->val.t) {
+            error(&(node->loc), "condition must be of integral type");
+            return;
+          }
           emit_code_node(code, A);
           int ret = code->pos;
           emit_code_expression(code, B, 0, 0);
           add_instr(code, SPLIT, JOIN, 0);
           if (D) emit_code_node(code, D);
           emit_code_node(code, C);
-          add_instr(code, JMP, 10, JOIN, JMP, 10, JOIN, 0);
-          add_instr(code, JMP, ret - code->pos - 1, MEM_FREE, 0);
+          add_instr(code, JMP, 9, JOIN_JMP, 9, 0);
+          add_instr(code, JOIN_JMP, ret - code->pos - 1, MEM_FREE, 0);
         } break;
+        case STMT_WHILE: {
+          int ret = code->pos;
+          if (node->val.s->par[0]->val.e->type->compound ||
+              node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
+            error(&(node->loc), "condition must be of integral type");
+            return;
+          }
+          emit_code_expression(code, node->val.s->par[0], 0, 0);
+          add_instr(code, SPLIT, JOIN, 0);
+          if (node->next) emit_code_node(code, node->next);
+          add_instr(code, JMP, 9, JOIN_JMP, 9, 0);
+          add_instr(code, JOIN_JMP, ret - code->pos - 1, 0);
+        }; break;
+        case STMT_DO: {
+          int ret = code->pos;
+          if (node->val.s->par[0]->val.e->type->compound ||
+              node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
+            error(&(node->loc), "condition must be of integral type");
+            return;
+          }
+          if (node->next) emit_code_node(code, node->next);
+          emit_code_expression(code, node->val.s->par[0], 0, 0);
+          add_instr(code, SPLIT, JOIN, 0);
+          add_instr(code, JMP, 9, JOIN_JMP, 9, 0);
+          add_instr(code, JOIN_JMP, ret - code->pos - 1, 0);
+        }; break;
         case STMT_PARDO: {
+          if (node->val.s->par[1]->val.e->type->compound ||
+              node->val.s->par[1]->val.e->type->type != __type__int->val.t) {
+            error(&(node->loc), "condition must be of integral type");
+            return;
+          }
           emit_code_expression(code, node->val.s->par[1], 0, 0);
           emit_code_var_addr(code, node->val.s->par[0]->val.sc->items->val.v);
           add_instr(code, FORK, 0);
@@ -730,6 +1047,11 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, JOIN, 0);
         } break;
         case STMT_COND: {
+          if (node->val.s->par[0]->val.e->type->compound ||
+              node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
+            error(&(node->loc), "condition must be of integral type");
+            return;
+          }
           emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, SPLIT, 0);
           emit_code_node(code, node->next->next);
@@ -738,10 +1060,34 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, JOIN, 0);
         } break;
         case STMT_RETURN: {
-          // FIXME: return within pardo has to join threads
-          if (node->val.s->par[0])
-            emit_code_expression(code, node->val.s->par[0], 0, 0);
-          add_instr(code, RETURN, 0);
+          if (!node->val.s->ret_fn) {
+            error(&(node->loc), "return statement outside of function");
+            return;
+          }
+          if (node->val.s->par[0]) {
+            int *casts, n_casts;
+            if (inferred_type_compatible(node->val.s->ret_fn->out_type,
+                                         node->val.s->par[0]->val.e->type,
+                                         &casts, &n_casts)) {
+              emit_code_expression(code, node->val.s->par[0], 0, 0);
+              emit_code_cast_value(code, casts, n_casts);
+              free(casts);
+            } else {
+              error(&(node->loc),
+                    "incpomatible types in return satement: function %s should "
+                    "return %s",
+                    node->val.s->ret_fn->name,
+                    node->val.s->ret_fn->out_type->name);
+              return;
+            }
+          } else if (strcmp(node->val.s->ret_fn->out_type->name, "void")) {
+            error(&(node->loc),
+                  "return statement without parameter in a function "
+                  "returning %s",
+                  node->val.s->ret_fn->out_type->name);
+            return;
+          }
+          add_instr(code, SETR, 0);
         } break;
       }
       break;
@@ -763,6 +1109,34 @@ static void emit_code_scope(code_block_t *code, scope_t *sc) {
   add_instr(code, MEM_FREE, 0);
 }
 
+/* ----------------------------------------------------------------------------
+ * generate code for function
+ */
+
+static void check_pardo_return(ast_node_t *node, int inside) {
+  switch (node->node_type) {
+    case AST_NODE_SCOPE: {
+      for (ast_node_t *it = node->val.sc->items; it; it = it->next)
+        check_pardo_return(it, inside);
+    } break;
+    case AST_NODE_STATEMENT: {
+      switch (node->val.s->variant) {
+        case STMT_FOR:
+          check_pardo_return(node->val.s->par[0], inside);
+          break;
+        case STMT_PARDO:
+          check_pardo_return(node->val.s->par[0], 1);
+          break;
+        case STMT_RETURN:
+          if (inside) {
+            error(&(node->loc), "return statement inside pardo");
+            return;
+          }
+      }
+    } break;
+  }
+}
+
 static void emit_code_function(code_block_t *code, ast_node_t *fn) {
   assert(fn->node_type == AST_NODE_FUNCTION);
 
@@ -782,7 +1156,14 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
     }
   }
 
+  // error for return within pardo
+  for (ast_node_t *n = fn->val.f->root_scope->items; n; n = n->next)
+    check_pardo_return(n, 0);
+
+  // error  for end of control without return
+
   emit_code_scope(code, fn->val.f->root_scope);
+  add_instr(code, RETURN, 0);
 }
 
 /* ----------------------------------------------------------------------------
@@ -797,9 +1178,11 @@ static void write_io_variables(writer_t *out, int flag) {
       out_raw(out, &(x->val.v->addr), 4);
       out_raw(out, &(x->val.v->num_dim), 1);
       uint8_t *layout;
-      int ts = static_type_layout(x->val.v->base_type, &layout);
+      uint8_t ts = static_type_layout(x->val.v->base_type, &layout);
       out_raw(out, &ts, 1);
-      for (int i = 0; i < ts; i++) out_raw(out, layout + i, 1);
+      for (int i = 0; i < ts; i++) {
+        out_raw(out, &(layout[i]), 1);
+      }
       free(layout);
     }
 }
@@ -875,6 +1258,18 @@ void emit_code(ast_t *_ast, writer_t *out) {
       int version = 1;
       out_raw(out, &version, 1);
       out_raw(out, &global_size, 4);
+      uint8_t mm;
+      switch (ast->mem_mode) {
+        case TOK_MODE_EREW:
+          mm = MEM_MODE_EREW;
+          break;
+        case TOK_MODE_CCRCW:
+          mm = MEM_MODE_CCRCW;
+          break;
+        default:
+          mm = MEM_MODE_CREW;
+      }
+      out_raw(out, &mm,1);
     }
 
     {
@@ -894,8 +1289,16 @@ void emit_code(ast_t *_ast, writer_t *out) {
       out_raw(out, &section, 1);
       uint32_t n = length(ast->functions);
       out_raw(out, &n, 4);
-      for (ast_node_t *fn = ast->functions; fn; fn = fn->next)
+      for (ast_node_t *fn = ast->functions; fn; fn = fn->next) {
         out_raw(out, &(fn->val.f->addr), 4);
+        int32_t out_size = fn->val.f->out_type->size;
+        for (ast_node_t *p = fn->val.f->params; p; p = p->next)
+          if (p->val.v->num_dim == 0)
+            out_size -= p->val.v->base_type->size;
+          else
+            out_size -= 4 * (2 + p->val.v->num_dim);
+        out_raw(out, &(out_size), 4);
+      }
     }
 
     {

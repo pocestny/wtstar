@@ -9,6 +9,7 @@
   #include <stdlib.h>
 
   #include <ast.h>
+  #include <code.h>
 }
 
 %debug
@@ -23,14 +24,14 @@
        int yylex(YYSTYPE * yylval_param, YYLTYPE * yylloc_param, ast_t* ast)
    YY_DECL;
   void yyerror (YYLTYPE *yylloc, ast_t *, char const *, ...);
-  #include "parser_utils.c"
+  #include <parser_utils.c>
 
 }
 
 %initial-action {
   add_basic_types(ast);
-  #define LOG(...) fprintf(stderr,__VA_ARGS__)
-
+  #define MSG(...) fprintf(stderr,__VA_ARGS__)
+  ast->mem_mode=TOK_MODE_CREW;
 }
 
 %define api.token.prefix {TOK_} 
@@ -51,7 +52,7 @@
 %token <string_val>       STRING_LITERAL IDENT 
 %token <static_type_val>  TYPENAME
 
-%token TYPE INPUT OUTPUT IF ELSE FOR WHILE PARDO DO RETURN SIZE DIM
+%token TYPE INPUT OUTPUT IF ELSE FOR WHILE PARDO DO RETURN SIZE DIM SORT MODE_CREW MODE_EREW MODE_CCRCW
 
 %token < > EQ "=="
 %token < > NEQ "!="
@@ -60,9 +61,6 @@
 %token < > AND "&&"
 %token < > OR "||"
 
-%token < > SHL "<<"
-%token < > SHR ">>"
-%token < > FIRST_BIT "|~"
 %token < > LAST_BIT "~|"
 
 %token < > INC "++"
@@ -73,7 +71,6 @@
 %token < > TIMES_ASSIGN "*="
 %token < > DIV_ASSIGN "/="
 %token < > MOD_ASSIGN "%="
-%token < > POW_ASSIGN "^="
 
 %token < > DONT_CARE "_"
 
@@ -109,6 +106,7 @@
     nonempty_parameter_declarator_list parameter_declarator_list 
     parameter_declarator
     stmt_scope open_function
+    specifier_list
 
 %type <static_type_val> type_decl
 
@@ -130,6 +128,9 @@ program_item
              |  output_declaration  
              |  function_declaration 
              |  stmt
+             | MODE_EREW {ast->mem_mode=TOK_MODE_EREW;}
+             | MODE_CREW {ast->mem_mode=TOK_MODE_CREW;}
+             | MODE_CCRCW {ast->mem_mode=TOK_MODE_CCRCW;}
              ;
 
   
@@ -579,7 +580,13 @@ expr_unary:
 
 expr_postfix: 
     expr_primary  {$$=$1;}
-    | 
+    |
+    expr_postfix LAST_BIT {
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_POSTFIX,$1,TOK_LAST_BIT);
+        if (!fix_expression_type(ast,&@$,$$))
+          YYERROR;
+    }
+    |
     expr_postfix '.' IDENT
       {
         $$=NULL;
@@ -676,6 +683,11 @@ expr_primary:
         }
       }
     | 
+    SORT '(' IDENT ',' specifier_list ')' {
+      $$ = expression_sort(ast,&@$,$3,$5);
+      if (!$$) YYERROR;
+    }
+    | 
     IDENT '(' expr_list ')' 
       {
         $$=expression_call(ast,&@$,$1,$3);
@@ -693,11 +705,31 @@ expr_primary:
     expr_literal {$$=$1;}
     ;
 
+specifier_list:
+              TYPENAME {
+                $$=ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_EMPTY);
+                $$->val.e->type->type=$1;
+              }
+              |
+              specifier_list '.' IDENT {
+                if (!$1) {
+                  $$=NULL;
+                  free($3);
+                } else {
+                  $$ = create_specifier_expr(&@$,ast,$1,$3,&@3);
+                  if (!$$) YYERROR;
+                }
+              }
+              |
+              error '.' IDENT {
+                $$=NULL;
+                free($3);
+              }
 
 expr_literal: 
     INT_LITERAL
       {
-        $$=ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
+        $$=ast_node_t_new(&@$, AST_NODE_EXPRESSION, EXPR_LITERAL);
         $$->val.e->type->type = __type__int->val.t;
         $$->val.e->val.l = malloc(sizeof(int));
         *((int *)($$->val.e->val.l)) = $1;
@@ -705,7 +737,7 @@ expr_literal:
     |
     FLOAT_LITERAL 
       {
-        $$=ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
+        $$=ast_node_t_new(&@$, AST_NODE_EXPRESSION, EXPR_LITERAL);
         $$->val.e->type->type = __type__float->val.t;
         $$->val.e->val.l = malloc(sizeof(float));
         *((float *)($$->val.e->val.l)) = $1;
@@ -713,7 +745,7 @@ expr_literal:
     | 
     CHAR_LITERAL 
       {
-        $$=ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
+        $$=ast_node_t_new(&@$, AST_NODE_EXPRESSION, EXPR_LITERAL);
         $$->val.e->type->type = __type__char->val.t;
         $$->val.e->val.l = malloc(1);
         *((char *)($$->val.e->val.l)) = $1;
@@ -947,6 +979,7 @@ stmt_jump
             ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_RETURN);
             n->val.s->par[0]=$2;
             append(ast_node_t,&ast->current_scope->items,n);
+            n->val.s->ret_fn=ast->current_scope->fn;
           }
          ;
 

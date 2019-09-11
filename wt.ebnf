@@ -18,5 +18,5 @@ parameter_declarator ::= typename identifier ( "[" _ ("," "_")* "]" | )
 expression ::= expression operator expression 
 
 
-
+statement ::= '{' (statement | variable_declaration) + '}' | expression ';' | 'if' '(' cond_expression ')' statement (|'else' statement) | 'while' '(' cond_expression ')' statement | 'do' statement 'while' '(' cond_expression ')' | 'for' '(' ((|expression) ';' | variable_declaration) cond_expression ';' (|expression)')'(';'|statement) | 'pardo' '(' identifier ':' int_expression ')' statement 
 

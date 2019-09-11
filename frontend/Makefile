@@ -4,8 +4,8 @@ CFLAGS=-I ../src
 EMCCFLAGS=-g -s EXTRA_EXPORTED_RUNTIME_METHODS="['cwrap']" -s EXPORT_ES6=1 -s MODULARIZE=1 \
 					 -s ALLOW_MEMORY_GROWTH=1 -s NO_FILESYSTEM=1 
 			
-BACKENDSRC=ast.c parser.c scanner.c driver.c writer.c code_generation.c errors.c runtime.c reader.c vm.c instr_names.c
-BACKENDHDR=ast.h parser.y scanner.l driver.h writer.h code_generation.h errors.h runtime.h reader.h vm.h 
+BACKENDSRC=ast.c parser.c scanner.c driver.c writer.c code_generation.c errors.c runtime.c reader.c vm.c instr_names.c hash.c
+BACKENDHDR=ast.h parser.y scanner.l driver.h writer.h code_generation.h errors.h runtime.h reader.h vm.h hash.h
 
 CSRC=backend.c $(foreach file,${BACKENDSRC},../src/${file})
 

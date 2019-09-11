@@ -57,7 +57,6 @@ int main(int argc, char **argv) {
 
   driver_init();
   ast_t *r = driver_parse(inf);
-  driver_destroy();
 
   writer_t *out;
   out = writer_t_new(WRITER_FILE);
@@ -87,6 +86,7 @@ int main(int argc, char **argv) {
   else
       emit_code(r, out);
 
+  driver_destroy();
   ast_t_delete(r);
 
   writer_t_delete(out);

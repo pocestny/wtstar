@@ -73,17 +73,12 @@ void driver_init() {
 
 /* preload / unload the given file */
 void driver_set_file(const char *filename, const char *content) {
- 
   include_file_t *file;
-
   for(file=files;file&&strcmp(file->name,filename);file=file->next);
-
   if (file && (file->f || file->buf)) {
     driver_error_handler("declined to preload current file, skipping");
     return;
   }
-
-
   if (file == NULL)
     file = insert_file(filename);
   else if (file->content)
@@ -97,7 +92,6 @@ void driver_set_file(const char *filename, const char *content) {
 /* main parsing function */
 ast_t *driver_parse(const char *filename) {
   ast_t * ast = ast_t_new();
-
   driver_push_file(filename);
   yylineno=1; yycolumn=1;
   if (driver_current_file()) yyparse(ast);

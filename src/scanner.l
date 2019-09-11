@@ -12,19 +12,19 @@ extern writer_t *driver_error_writer;
 const char* const symbols[]={
   "(",")","{","}","[","]",
   ":",";",".",",",
-  "<",">","!","~",
-  "+","-","*","/", "%", "^","&","|","=",NULL};
+  "<",">","!",
+  "+","-","*","/", "%", "^","=",NULL};
 
 const char* const symbols2[]={
   "==","!=","<=",">=",
-  "&&","||","<<",">>","|~","~|",
+  "&&","||","~|",
   "++","--",
   "+=","-=","*=","/=","%=",NULL
   };
 
 const int  values2[]={
 TOK_EQ, TOK_NEQ, TOK_LEQ, TOK_GEQ,
-TOK_AND,TOK_OR,TOK_SHL,TOK_SHR,TOK_FIRST_BIT,TOK_LAST_BIT,
+TOK_AND,TOK_OR,TOK_LAST_BIT,
 TOK_INC,TOK_DEC,
 TOK_PLUS_ASSIGN, TOK_MINUS_ASSIGN, TOK_TIMES_ASSIGN, TOK_DIV_ASSIGN, TOK_MOD_ASSIGN,
  -1};
@@ -108,6 +108,11 @@ while/[^a-zA-Z0-9]     { return TOK_WHILE; }
 pardo/[^a-zA-Z0-9]       { return TOK_PARDO; }
 do/[^a-zA-Z0-9]        { return TOK_DO; }
 return/[^a-zA-Z0-9]    { return TOK_RETURN; }
+sort/[^a-zA-Z0-9]    { return TOK_SORT; }
+#mode[ \t]+EREW    { return TOK_MODE_EREW; }
+#mode[ \t]+CREW    { return TOK_MODE_CREW; }
+#mode[ \t]+cCRCW    { return TOK_MODE_CCRCW; }
+
 \.{SPACE}*size/[^a-zA-Z0-9]      { return TOK_SIZE; }
 \.{SPACE}*dim/[^a-zA-Z0-9]       { return TOK_DIM; }
 
