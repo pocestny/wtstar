@@ -206,11 +206,13 @@ As expected, assignment is left associative, so `int z = x = y = 4` works.
 Apart from assignment, which is also an expression, there are the usual operators
 which act only on numeric types. The binary operators are
 
-|-------------------------------|-----------------------------|---------
-|      combined assignment      | `+=` `-=` `*=` `/=` `%=`    | `%=` works only on integers
-|      relational operators     | `==` `<=` `>=` `!=` `<` `>` |
-|      logical operators        | `||` `&&`                   | work on integers only
-|      numerical operatos       | `+` `-` `*` `/` `%` `^`     | `^` is exponentiation
+|                               |                             |                             |
+|-------------------------------|-----------------------------|-----------------------------|
+|      combined assignment      | `+=` `-=` `*=` `/=` `%=`    | `%=` works only on integers |
+|      relational operators     | `==` `<=` `>=` `!=` `<` `>` |                             |
+|      logical operators        | `||` `&&`                   | work on integers only       | 
+|      numerical operatos       | `+` `-` `*` `/` `%` `^`     | `^` is exponentiation       |
+
 
 Unary increment and decrement `++` `--` are supported both as prefix and as suffix.
 Unary `-` and logical `!` are present. Unary postfix operator `~|` works on
