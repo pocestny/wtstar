@@ -390,7 +390,22 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
           return;
         }
       }
-      add_instr(code, CALL, ex->val.f->fn->n, 0);
+
+      if (!strcmp(ex->val.f->fn->name, "sqrt")) {
+        add_instr(code, SQRT, 0);
+      } else if (!strcmp(ex->val.f->fn->name, "sqrtf")) {
+        add_instr(code, SQRTF, 0);
+      } else if (!strcmp(ex->val.f->fn->name, "log")) {
+        add_instr(code, LOG, 0);
+      } else if (!strcmp(ex->val.f->fn->name, "logf")) {
+        add_instr(code, LOGF, 0);
+      } else {
+        if (!ex->val.f->fn->root_scope) {
+          error(&(exn->loc), "function was only declared without definition");
+          return;
+        }
+        add_instr(code, CALL, ex->val.f->fn->n, 0);
+      }
       if (clear) emit_code_remove_type(code, ex->val.f->fn->out_type);
 
     } break;
@@ -979,6 +994,20 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
         } else {
           error(&(node->loc), "initializers are not supported for arrays");
         }
+      } else if (node->val.v->num_dim==0 && node->val.v->need_init) {
+        // variables are zero-initialized
+        // (internal: important for thread memory allcoation)
+        uint8_t *layout;
+        int n = static_type_layout(node->val.v->base_type,&layout);
+        for (int i=0,offs=0;i<n;i++) {
+          add_instr(code,PUSHB,0,0);
+          emit_code_var_addr(code, node->val.v);
+          if (offs>0) add_instr(code,PUSHC,offs,ADD_INT,0);
+          add_instr(code, (layout[i]==TYPE_CHAR)?STB:STC,0);
+          offs+=(layout[i]==TYPE_CHAR)?1:4;
+
+        }
+        free(layout);
       }
       break;
     // ................................
@@ -1142,6 +1171,7 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
 
   // load parameters
   // on the stack are values
+  DEBUG("emit_code_function %s (addr: %d)\n", fn->val.f->name, code->pos);
   for (ast_node_t *p = fn->val.f->params; p; p = p->next) {
     if (p->val.v->num_dim == 0) {
       add_instr(code, PUSHC, p->val.v->addr, FBASE, ADD_INT, 0);
@@ -1207,6 +1237,10 @@ void emit_code(ast_t *_ast, writer_t *out) {
     int n = 0;
     for (ast_node_t *fn = ast->functions; fn; fn = fn->next) {
       assert(fn->node_type == AST_NODE_FUNCTION);
+      if (!fn->val.f->root_scope) {
+        DEBUG("function %s without scope\n", fn->val.f->name);
+        continue;
+      }
       fn->val.f->n = n++;
       uint32_t base = 0;
       DEBUG("\nfunction #%d: %s\n", fn->val.f->n, fn->val.f->name);
@@ -1214,7 +1248,7 @@ void emit_code(ast_t *_ast, writer_t *out) {
         base = assign_single_variable_address(base, p->val.v);
       DEBUG("items:\n");
       assign_scope_variable_addresses(base, fn->val.f->root_scope);
-      DEBUG("function #%d done\n", fn->val.f->n);
+      DEBUG("function #%d done\n\n", fn->val.f->n);
     }
   }
 
@@ -1232,10 +1266,11 @@ void emit_code(ast_t *_ast, writer_t *out) {
   emit_code_scope(code, ast->root_scope);
   add_instr(code, ENDVM, 0);
 
-  for (ast_node_t *fn = ast->functions; fn; fn = fn->next) {
-    fn->val.f->addr = code->pos;
-    emit_code_function(code, fn);
-  }
+  for (ast_node_t *fn = ast->functions; fn; fn = fn->next)
+    if (fn->val.f->root_scope) {
+      fn->val.f->addr = code->pos;
+      emit_code_function(code, fn);
+    }
 
   uint32_t global_size = 0;
   for (ast_node_t *nd = ast->root_scope->items; nd; nd = nd->next)
@@ -1269,7 +1304,7 @@ void emit_code(ast_t *_ast, writer_t *out) {
         default:
           mm = MEM_MODE_CREW;
       }
-      out_raw(out, &mm,1);
+      out_raw(out, &mm, 1);
     }
 
     {
@@ -1287,18 +1322,21 @@ void emit_code(ast_t *_ast, writer_t *out) {
     {
       section = SECTION_FNMAP;
       out_raw(out, &section, 1);
-      uint32_t n = length(ast->functions);
+      uint32_t n = 0;
+      for (ast_node_t *fn = ast->functions; fn; fn = fn->next)
+        if (fn->val.f->root_scope) n++;
       out_raw(out, &n, 4);
-      for (ast_node_t *fn = ast->functions; fn; fn = fn->next) {
-        out_raw(out, &(fn->val.f->addr), 4);
-        int32_t out_size = fn->val.f->out_type->size;
-        for (ast_node_t *p = fn->val.f->params; p; p = p->next)
-          if (p->val.v->num_dim == 0)
-            out_size -= p->val.v->base_type->size;
-          else
-            out_size -= 4 * (2 + p->val.v->num_dim);
-        out_raw(out, &(out_size), 4);
-      }
+      for (ast_node_t *fn = ast->functions; fn; fn = fn->next)
+        if (fn->val.f->root_scope) {
+          out_raw(out, &(fn->val.f->addr), 4);
+          int32_t out_size = fn->val.f->out_type->size;
+          for (ast_node_t *p = fn->val.f->params; p; p = p->next)
+            if (p->val.v->num_dim == 0)
+              out_size -= p->val.v->base_type->size;
+            else
+              out_size -= 4 * (2 + p->val.v->num_dim);
+          out_raw(out, &(out_size), 4);
+        }
     }
 
     {

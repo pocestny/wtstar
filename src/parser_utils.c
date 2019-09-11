@@ -19,6 +19,37 @@ void add_basic_types(ast_t *ast) {
   ADD_STATIC_TYPEDEF(char, 1)
 }
 
+
+#define NEW_BUILTIN_FUNCTION(name,outtype) \
+  fn = ast_node_t_new(NULL,AST_NODE_FUNCTION,#name);\
+  fn->val.f->out_type = __type__##outtype->val.t;
+
+#define BUILTIN_PARAM(name,typename) \
+  p = ast_node_t_new(NULL,AST_NODE_VARIABLE,#name); \
+   p->val.v->base_type = __type__##typename->val.t; \
+   append(ast_node_t,&fn->val.f->params,p);
+
+
+void add_builtin_functions(ast_t *ast) {
+  ast_node_t *fn, *p;
+
+  NEW_BUILTIN_FUNCTION(sqrtf,float)
+  BUILTIN_PARAM(x,float)
+  append(ast_node_t,&ast->functions,fn);
+  
+  NEW_BUILTIN_FUNCTION(sqrt,int)
+  BUILTIN_PARAM(x,int)
+  append(ast_node_t,&ast->functions,fn);
+
+  NEW_BUILTIN_FUNCTION(logf,float)
+  BUILTIN_PARAM(x,float)
+  append(ast_node_t,&ast->functions,fn);
+  
+  NEW_BUILTIN_FUNCTION(log,int)
+  BUILTIN_PARAM(x,int)
+  append(ast_node_t,&ast->functions,fn);
+}
+
 void make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
                   static_type_member_t *members) {
   if (!members || !ident) {

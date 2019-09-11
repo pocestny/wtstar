@@ -3,7 +3,7 @@
 # WT\*: a framework for SIMD algorithms design
 
 <h3 style="text-align:center;width:100%;margin-bottom:40px;"><i> 
---- preliminary draft --- 
+--- version alpha.1 --- 
 </i></h3>
 
 WT\* is a framework to study and teach the design of SIMD parallel algorithms. It's
@@ -41,6 +41,7 @@ The structure of this document is as follows:
     * [Expressions](#expressions)
     * [Statements](#statements)
     * [Functions](#functions)
+    * [Memory modes](#modes)
 3. [Demos](#demos)    
     * [Factorial](#demo-factorial)
     * [Sum](#demo-sum)
@@ -104,7 +105,9 @@ Variables are declared by specifying the type:
 The *variable declarator* is in the simplest form the name of the variable, e.g.
 `my_type quak;`. 
 With several active threads, the variable declaration creates a separate copy of
-the variable in each active thread.
+the variable in each active thread. Members of he type are accessed via the dot-notation
+`a.p.x`
+
 The language supports multidimensional arrays. The number of dimensions
 is fixed. The size of each
 dimension 
@@ -196,19 +199,30 @@ Then `t1 var3 = var2;` is okay, but `var1 = var2` is not; you need to cast the v
 with `var1 = (t1)var2`. Also when assigning literals of compound types, these must be 
 typecasted, e.g. `var1 = {9,10};` is wrong, it should be `var1 = (t1){9,10}`.
 
+As expected, assignment is left associative, so `int z = x = y = 4` works.
+
 ### Expressions <a name="expressions"></a>
 
+Apart from assignment, which is also an expression, there are the usual operators
+which act only on numeric types. The binary operators are
 
-|      relational operators     | 
-|:-------------:| 
-|    ==         |     
-|    <=           |     
-|    >=           |     
-|    !=  |
-|<|
-|>|
+|-------------------------------|-----------------------------|---------
+|      combined assignment      | `+=` `-=` `*=` `/=` `%=`    | `%=` works only on integers
+|      relational operators     | `==` `<=` `>=` `!=` `<` `>` |
+|      logical operators        | `||` `&&`                   | work on integers only
+|      numerical operatos       | `+` `-` `*` `/` `%` `^`     | `^` is exponentiation
+
+Unary increment and decrement `++` `--` are supported both as prefix and as suffix.
+Unary `-` and logical `!` are present. Unary postfix operator `~|` works on
+integers an gives the least significant bit that is set, i.e. `12~|==2`.
+
 
 ### Statements <a name="statements"></a>
+
+Most of the statements have the usual semantics. The only exception is the `pardo`
+statement. `pardo(<var>:<range>) <statement>` creates `<range>` new threads
+numbered `0...<range>-1`. The number is stored in a local variable `<var>`, and
+all threads continue to execute `<statement>`. After finishing, the threads are joined.
 
 ![statement](./frontend/static/img/statement.png)
 
@@ -247,6 +261,37 @@ it
 will end up in having the stack filled with some default values, which you probably (surely)
 don't want.
 
+There are some built-in functions:
+
+name       | parameter | output type | value
+-----------|-----------|-------------|---- 
+`sqrt(x)`  | `int`     | `int`       | `ceiling(sqrt(x))`
+`sqrtf(x)` | `float`   | `float`     | `sqrt(x)`
+`log(x)`   | `int`     | `int`       | `ceiling(log2(x))`
+`logf(x)`  | `float`   | `float`     | `ceiling(log2(x))`
+
+Also, technically not a function, there is a way to sort an array (incurring `log n` time
+and `n log n` work, where `n` is the size of the array) using a function-like syntax
+`sort(<array>,<key_specifier>)` where `key_specifier` refers to the type member that 
+serves as key, so e.g.
+
+    type point {float x,y;}
+    type pair {point key;int val;}
+
+    input pair A[_];
+    output pair B[A.size];
+
+    pardo(i:A.size)B[i]=A[i];
+    sort(B,pair.key.x);
+
+on an input `[ {8 1 4} {3 4 6} {9 6 10} {1 7 5} ]` produces
+`[{ 1.000000 7.000000 5 } { 3.000000 4.000000 6 } { 8.000000 1.000000 4 } 
+{ 9.000000 6.000000 10 }]`
+
+### Memory modes <a name="modes"></a>
+
+One can use `#mode <mode>` to switch memory mode to one of `EREW`, `CREW` (default),
+`cCRCW`.
 
 [--toc--](#toc)
 

@@ -69,6 +69,7 @@ CONSTRUCTOR(variable_t, char *name) {
   r->initializer = NULL;
 
   r->ranges = NULL;
+  r->need_init = 0;
   return r;
 }
 

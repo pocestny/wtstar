@@ -1,0 +1,35 @@
+/*
+
+  find the index of the first '1' in an array - logarithmic version
+
+  T = O(n)
+  W = O(n)
+
+*/
+
+int min(int a, int b) {
+  if (a < b)
+    return a;
+  else
+    return b;
+}
+
+input int A[_];
+int n = A.size;
+output int x;
+
+int ln = 0;
+while (2 ^ ln < n) ln++;
+
+int B[2 ^ ln];
+
+pardo(i : 2 ^ ln) B[i] = 2 ^ ln + 1;
+pardo(i : n) if (A[i] = 1) B[i] = i;
+
+n = 2 ^ ln;
+
+for (int t = 0; 2 ^ t < n; t++)
+  pardo(i : n / 2 ^ (t + 1)) 
+    B[i] = min(B[2 * i], B[2 * i + 1]);
+
+x = B[0];

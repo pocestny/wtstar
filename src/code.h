@@ -52,7 +52,6 @@
 #define SUB_FLOAT   0x1BU
 #define MULT_FLOAT  0x1CU
 #define DIV_FLOAT   0x1DU
-#define LOG         0x1EU  //  LOG      : a... -> b... (a,b:float)
 #define POW_INT     0x1FU
 #define POW_FLOAT   0x20U
 
@@ -111,6 +110,12 @@
                            // sort it based on a key of type, located at offs in
                            //    the record
                            // type = TYPE_INT, TYPE_FLOAT, TYPE_CHAR
+
+#define LOGF        0x3eU  //  LOGF      : a... -> b... (a,b:float) b=log2
+#define LOG         0x3fU  //  LOG       : a... -> b... (a,b:int) b = ceiling log2
+#define SQRT        0x40U  //  SQRT      : a... -> b... (a,b:int) b = ceiling(sqrt(a))
+#define SQRTF       0x41U  //  SQRTF     : a... -> b... (a,b:float) b = sqrt(a)
+
 
 #define SECTION_HEADER  0x77U
 #define SECTION_INPUT   0x88U

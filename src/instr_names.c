@@ -29,7 +29,7 @@ const char* const instr_names[]={
 "SUB_FLOAT",  // 1b
 "MULT_FLOAT", // 1c
 "DIV_FLOAT",  // 1d
-"LOG",        // 1e
+"----",       // 1e
 "POW_INT",    // 1f
 "POW_FLOAT",  // 20
 "NOT",        // 21
@@ -61,5 +61,9 @@ const char* const instr_names[]={
 "ENDVM",      // 3b
 "LAST_BIT",   // 3c
 "SORT",       // 3d
+"LOGF",       // 3e
+"LOG",        // 3f
+"SQRT",       // 40
+"SQRTF",      // 41
 "???"
 };

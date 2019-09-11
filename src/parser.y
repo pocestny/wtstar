@@ -30,6 +30,7 @@
 
 %initial-action {
   add_basic_types(ast);
+  add_builtin_functions(ast);
   #define MSG(...) fprintf(stderr,__VA_ARGS__)
   ast->mem_mode=TOK_MODE_CREW;
 }
@@ -281,7 +282,7 @@ variable_init_declarator:
 
 
 variable_declarator: 
-    static_variable_declarator {$$=$1;}
+    static_variable_declarator {$$=$1;$$->val.v->need_init=1;}
     | 
     static_variable_declarator '[' expr_list ']'
       {
@@ -461,8 +462,10 @@ expr_assign:
     expr_unary  assign_operator expr_assign 
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        if (!fix_expression_type(ast,&@$,$$)) {
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     ;
 
@@ -472,8 +475,10 @@ expr_or:
     expr_or OR expr_and
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,TOK_OR,$3);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        if (!fix_expression_type(ast,&@$,$$)) {
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     ;
 
@@ -483,8 +488,10 @@ expr_and:
     expr_and AND expr_eq
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,TOK_AND,$3);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        if (!fix_expression_type(ast,&@$,$$)) {
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     ;
 
@@ -495,8 +502,10 @@ expr_eq:
     expr_eq  eq_operator expr_rel
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        if (!fix_expression_type(ast,&@$,$$)){
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     ;
 
@@ -507,8 +516,10 @@ expr_rel:
     expr_rel  rel_operator  expr_add
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        if (!fix_expression_type(ast,&@$,$$)) {
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     ;
 
@@ -519,8 +530,10 @@ expr_add:
     expr_add    add_operator    expr_mult
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        if (!fix_expression_type(ast,&@$,$$)) {
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     ;
 
@@ -530,8 +543,10 @@ expr_mult:
     expr_mult   mult_operator   expr_pow
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,$2,$3);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        if (!fix_expression_type(ast,&@$,$$)){
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     ;
 
@@ -542,8 +557,10 @@ expr_pow:
     expr_cast '^' expr_pow
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_BINARY,$1,'^',$3);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        if (!fix_expression_type(ast,&@$,$$)){
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     ;
 
@@ -554,16 +571,20 @@ expr_cast:
     '(' TYPENAME ')'  expr_cast
       {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_CAST,$2,$4);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        if (!fix_expression_type(ast,&@$,$$)) {
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     | 
     '(' TYPENAME ')' '{' initializer_list '}'
       {
          $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_CAST,$2,$5);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
-       }
+        if (!fix_expression_type(ast,&@$,$$)) {
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
+     }
     ;
 
 expr_unary:   
@@ -571,9 +592,11 @@ expr_unary:
     | 
     unary_operator expr_postfix
       {
-         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_PREFIX,$1,$2);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_PREFIX,$1,$2);
+        if (!fix_expression_type(ast,&@$,$$)){
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     ;
 
@@ -583,29 +606,34 @@ expr_postfix:
     |
     expr_postfix LAST_BIT {
         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_POSTFIX,$1,TOK_LAST_BIT);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        if (!fix_expression_type(ast,&@$,$$)){
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
     }
     |
     expr_postfix '.' IDENT
       {
         $$=NULL;
         if($1) $$ = create_specifier_expr(&@$,ast,$1,$3,&@3);
-        if (!$$) YYERROR;
       }
     |
     expr_postfix INC 
       {
-         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_POSTFIX,$1,TOK_INC);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_POSTFIX,$1,TOK_INC);
+        if (!fix_expression_type(ast,&@$,$$)){
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     | 
     expr_postfix DEC
       {
-         $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_POSTFIX,$1,TOK_DEC);
-        if (!fix_expression_type(ast,&@$,$$))
-          YYERROR;
+        $$ = ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_POSTFIX,$1,TOK_DEC);
+        if (!fix_expression_type(ast,&@$,$$)) {
+          ast_node_t_delete($$);
+          $$=NULL;
+        }
       }
     ;
 
@@ -673,31 +701,24 @@ expr_primary:
     IDENT '[' expr_list ']' 
       {
         $$=expression_variable(ast,&@1,$1);
-        if ($$) {
-          if (!add_expression_array_parameters($$,$3))
-            YYERROR;
-        }
+        if ($$) add_expression_array_parameters($$,$3);
         else {
           ast_node_t_delete($3);
-          YYERROR;
         }
       }
     | 
     SORT '(' IDENT ',' specifier_list ')' {
       $$ = expression_sort(ast,&@$,$3,$5);
-      if (!$$) YYERROR;
     }
     | 
     IDENT '(' expr_list ')' 
       {
         $$=expression_call(ast,&@$,$1,$3);
-        if (!$$) YYERROR;
       }
     | 
     IDENT '(' ')' 
       {
         $$=expression_call(ast,&@$,$1,NULL);
-        if (!$$) YYERROR;
       }
     | 
     '(' expr ')' {$$=$2;}
@@ -717,7 +738,6 @@ specifier_list:
                   free($3);
                 } else {
                   $$ = create_specifier_expr(&@$,ast,$1,$3,&@3);
-                  if (!$$) YYERROR;
                 }
               }
               |

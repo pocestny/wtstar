@@ -618,10 +618,10 @@
   }
 
 
-  var STACK_BASE = 24752,
-      STACK_MAX = 5267632,
-      DYNAMIC_BASE = 5267632,
-      DYNAMICTOP_PTR = 24496;
+  var STACK_BASE = 26128,
+      STACK_MAX = 5269008,
+      DYNAMIC_BASE = 5269008,
+      DYNAMICTOP_PTR = 25872;
 
   assert(STACK_BASE % 16 === 0, 'stack must start aligned');
   assert(DYNAMIC_BASE % 16 === 0, 'heap must start aligned');
@@ -1022,8 +1022,8 @@
     ;
     // import table
     env['table'] = wasmTable = new WebAssembly.Table({
-      'initial': 10,
-      'maximum': 10,
+      'initial': 42,
+      'maximum': 42,
       'element': 'anyfunc'
     });
     env['__memory_base'] = 1024; // tell the memory segments where to place themselves
@@ -1038,7 +1038,7 @@
 
 
 
-  // STATICTOP = STATIC_BASE + 23728;
+  // STATICTOP = STATIC_BASE + 25104;
   /* global initializers */ /*__ATINIT__.push();*/
 
 
@@ -1049,7 +1049,7 @@
 
 
   /* no memory initializer */
-  var tempDoublePtr = 24736;
+  var tempDoublePtr = 26112;
   assert(tempDoublePtr % 8 == 0);
 
   // {{PRE_LIBRARY}}
@@ -1300,7 +1300,11 @@
 
   function nullFunc_ii(x) { err("Invalid function pointer called with signature 'ii'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  err("Build with ASSERTIONS=2 for more info.");abort(x); }
 
+  function nullFunc_iii(x) { err("Invalid function pointer called with signature 'iii'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  err("Build with ASSERTIONS=2 for more info.");abort(x); }
+
   function nullFunc_iiii(x) { err("Invalid function pointer called with signature 'iiii'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  err("Build with ASSERTIONS=2 for more info.");abort(x); }
+
+  function nullFunc_vi(x) { err("Invalid function pointer called with signature 'vi'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this)");  err("Build with ASSERTIONS=2 for more info.");abort(x); }
 
   var asmGlobalArg = {};
 
@@ -1310,7 +1314,9 @@
     "getTempRet0": getTempRet0,
     "abortStackOverflow": abortStackOverflow,
     "nullFunc_ii": nullFunc_ii,
+    "nullFunc_iii": nullFunc_iii,
     "nullFunc_iiii": nullFunc_iiii,
+    "nullFunc_vi": nullFunc_vi,
     "___assert_fail": ___assert_fail,
     "___lock": ___lock,
     "___setErrNo": ___setErrNo,
@@ -1505,10 +1511,18 @@
     assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
     assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
     return Module["asm"]["dynCall_ii"].apply(null, arguments) };
+  var dynCall_iii = Module["dynCall_iii"] = function() {
+    assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+    assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+    return Module["asm"]["dynCall_iii"].apply(null, arguments) };
   var dynCall_iiii = Module["dynCall_iiii"] = function() {
     assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
     assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
     return Module["asm"]["dynCall_iiii"].apply(null, arguments) };
+  var dynCall_vi = Module["dynCall_vi"] = function() {
+    assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+    assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+    return Module["asm"]["dynCall_vi"].apply(null, arguments) };
 
 
 

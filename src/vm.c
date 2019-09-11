@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <math.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -20,12 +19,15 @@ extern int EXEC_DEBUG;
 
 extern const char *const instr_names[];
 
+// qsort_r has some portability issues, so just use global var instead
 typedef struct {
   uint32_t offs, type;
 } sort_param_t;
 
-static int sort_compare(const void *a, const void *b, void *param) {
-  sort_param_t *p = (sort_param_t *)param;
+static sort_param_t sort_param;
+
+static int sort_compare(const void *a, const void *b) {
+  sort_param_t *p = &sort_param;
   uint8_t *A = ((uint8_t *)a) + p->offs;
   uint8_t *B = ((uint8_t *)b) + p->offs;
 
@@ -70,6 +72,30 @@ int ilog2(int n) {
   if (pw == 1) res--;
   return res;
 }
+
+// from http://www.codecodex.com/wiki/Calculate_an_integer_square_root
+unsigned long isqrt(unsigned long x)
+{
+    register unsigned long op, res, one;
+
+    op = x;
+    res = 0;
+
+    /* "one" starts at the highest power of four <= than the argument. */
+    one = 1 << 30;  /* second-to-top bit set */
+    while (one > op) one >>= 2;
+
+    while (one!= 0) {
+        if (op >= res + one) {
+            op -= res + one;
+            res += one << 1;  // <-- faster than 2 * one
+        }
+        res >>= 1;
+        one >>= 2;
+    }
+    return res;
+}
+
 
 CONSTRUCTOR(stack_t) {
   ALLOC_VAR(r, stack_t)
@@ -838,11 +864,6 @@ int execute(runtime_t *env, int limit) {
                 _PUSH(a, 4);
               } break;
 
-                /*
-                case LOG: {
-                } break;
-                */
-
               case POW_INT: {
                 int32_t a, b;
                 _POP(a, 4);
@@ -878,7 +899,7 @@ int execute(runtime_t *env, int limit) {
                 int32_t a, b;
                 _POP(a, 4);
                 _POP(b, 4);
-                a = a || b;
+                a = a && b;
                 _PUSH(a, 4);
               } break;
 
@@ -995,20 +1016,49 @@ int execute(runtime_t *env, int limit) {
                 _PUSH(b, 4);
               } break;
 
+              case LOGF: {
+                float a;
+                _POP(a, 4);
+                a = logf(a)/logf(2);
+                _PUSH(a, 4);
+              } break;
+
+              case LOG: {
+                int32_t a;
+                _POP(a, 4);
+                a = ilog2(a);
+                _PUSH(a, 4);
+              } break;
+                        
+              case SQRT: {
+                int32_t a;
+                _POP(a, 4);
+                int32_t b = isqrt(a);
+                if (b*b!=a) b++; 
+                _PUSH(b, 4);
+              } break;
+                        
+              case SQRTF: {
+                float a;
+                _POP(a, 4);
+                a = sqrtf(a);
+                _PUSH(a, 4);
+              } break;
+
               case SORT: {
                 uint32_t a, size, offs, type;
                 _POP(a, 4);
                 _POP(size, 4);
                 _POP(offs, 4);
                 _POP(type, 4);
-                sort_param_t p;
-                p.offs = offs;
-                p.type = type;
+                sort_param.offs = offs;
+                sort_param.type = type;
                 uint32_t n = lval(get_addr(env->thr[t], a + 8, 4), uint32_t);
                 uint32_t addr = lval(get_addr(env->thr[t], a, 4), uint32_t);
                 void *base = (void *)(env->heap->data + addr);
                 check_write_mem(env, mem_used, base, 1);
-                qsort_r(base, n, size, sort_compare, (void *)(&p));
+                
+                qsort(base, n, size, sort_compare);
               } break;
 
               default:
