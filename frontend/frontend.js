@@ -618,10 +618,10 @@
   }
 
 
-  var STACK_BASE = 26128,
-      STACK_MAX = 5269008,
-      DYNAMIC_BASE = 5269008,
-      DYNAMICTOP_PTR = 25872;
+  var STACK_BASE = 26160,
+      STACK_MAX = 5269040,
+      DYNAMIC_BASE = 5269040,
+      DYNAMICTOP_PTR = 25904;
 
   assert(STACK_BASE % 16 === 0, 'stack must start aligned');
   assert(DYNAMIC_BASE % 16 === 0, 'heap must start aligned');
@@ -1038,7 +1038,7 @@
 
 
 
-  // STATICTOP = STATIC_BASE + 25104;
+  // STATICTOP = STATIC_BASE + 25136;
   /* global initializers */ /*__ATINIT__.push();*/
 
 
@@ -1049,7 +1049,7 @@
 
 
   /* no memory initializer */
-  var tempDoublePtr = 26112;
+  var tempDoublePtr = 26144;
   assert(tempDoublePtr % 8 == 0);
 
   // {{PRE_LIBRARY}}
@@ -1955,9 +1955,9 @@
 
   var sum_sequential_demo = "/*\n\nsimple sequential sum algorithm\n\ninput:  array of integers\noutput: sum\n\n*/\n\ninput int A[_];\noutput int sum = 0;\n\nfor (int i = 0; i < A.size; i++) \n    sum += A[i];\n";
 
-  var first_1_simple_demo = "/*\n\n  find the index of the first '1' in an array on common CRCW\n\n  T = O(1)\n  W = O(n^2)\n\n*/\n#mode cCRCW\ninput int A[_];\nint n = A.size;\nint B[n];\noutput int x;\n\npardo(i : n) {\n  B[i] = A[i];\n  if (i > 0) pardo(j : i) if (A[j] == 1) B[i] = 0;\n  if (B[i] == 1) x = i;\n}\n";
+  var first_1_simple_demo = "/*\n\n  find the index of the first '1' in an array on common CRCW\n\n  T = O(1)\n  W = O(n^2)\n\n*/\n#mode cCRCW\ninput int A[_];\nint n = A.size;\nint B[n];\noutput int x = -1;\n\npardo(i : n) {\n  B[i] = A[i];\n  if (i > 0) pardo(j : i) if (A[j] == 1) B[i] = 0;\n  if (B[i] == 1) x = i;\n}\n";
 
-  var first_1_best_demo = "/*\n\n  find the index of the first '1' in an array on common CRCW\n\n  T = O(1)\n  W = O(n)\n\n*/\n#mode cCRCW\ninput int A[_];\nint n = A.size;\noutput int x;\n\nint first_one_simple(int A[_]) {\n  int n = A.size;\n  int B[n];\n  int result;\n\n  pardo(i : n) {\n    B[i] = A[i];\n    if (i > 0) pardo(j : i) if (A[j] == 1) B[i] = 0;\n    if (B[i] == 1) result = i;\n  }\n  return result;\n}\n\n// make the input square\nint sn = sqrt(n);\nint nn = sn ^ 2;\nint B[nn];\npardo(i : nn) B[i] = 0;\npardo(i : n) B[i] = A[i];\n\n// buckets\nint Box[sn];\n\n// which buckets are empty\npardo(i : sn) {\n  Box[i] = 0;\n  pardo(j : sn) if (B[i * sn + j] == 1) Box[i] = 1;\n}\n\n// first non-empty bucket\nint fb = first_one_simple(Box);\n\nint C[sn];\npardo(i : sn) C[i] = B[fb * sn + i];\n\n// first one of first non-empty bucket\nx = first_one_simple(C) + fb * sn;\n";
+  var first_1_best_demo = "/*\n\n  find the index of the first '1' in an array on common CRCW\n\n  T = O(1)\n  W = O(n)\n\n*/\n#mode cCRCW\ninput int A[_];\nint n = A.size;\noutput int x = -1;\n\nint first_one_simple(int A[_]) {\n  int n = A.size;\n  int B[n];\n  int result;\n\n  pardo(i : n) {\n    B[i] = A[i];\n    if (i > 0) pardo(j : i) if (A[j] == 1) B[i] = 0;\n    if (B[i] == 1) result = i;\n  }\n  return result;\n}\n\n// make the input square\nint sn = sqrt(n);\nint nn = sn ^ 2;\nint B[nn];\npardo(i : nn) B[i] = 0;\npardo(i : n) B[i] = A[i];\n\n// buckets\nint Box[sn];\n\n// which buckets are empty\npardo(i : sn) {\n  Box[i] = 0;\n  pardo(j : sn) if (B[i * sn + j] == 1) Box[i] = 1;\n}\n\n// first non-empty bucket\nint fb = first_one_simple(Box);\n\nint C[sn];\npardo(i : sn) C[i] = B[fb * sn + i];\n\n// first one of first non-empty bucket\nx = first_one_simple(C) + fb * sn;\n";
 
   // import 'core-js';
 

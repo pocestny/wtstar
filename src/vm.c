@@ -525,10 +525,6 @@ int execute(runtime_t *env, int limit) {
         if (env->a_thr > 0) {
           env->W++;
           env->T++;
-        }
-        if (env->virtual_grps > 0)
-          env->virtual_grps--;
-        else {
           for (int t = 0; t < env->n_thr; t++) env->thr[t]->returned = 1;
           env->a_thr = 0;
           for (int t = 0; t < env->n_thr; t++)
@@ -1089,7 +1085,8 @@ int execute(runtime_t *env, int limit) {
       for (int i = 0; i < STACK_SIZE(env->threads, stack_t *); i++)
         printf(" %lu ",
                STACK_SIZE(STACK(env->threads, stack_t *)[i], thread_t *));
-      printf("\nenv->n_thr=%2d env->a_thr=%2d\n", env->n_thr, env->a_thr);
+      printf("\nenv->n_thr=%2d env->a_thr=%2d env->virtual_grps=%d\n", 
+          env->n_thr, env->a_thr, env->virtual_grps);
       if (env->a_thr > 0) {
         printf("fbase=%d\n", env->frame->base);
         for (int t = 0; t < env->n_thr; t++) {

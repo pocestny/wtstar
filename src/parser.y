@@ -158,7 +158,7 @@ program_item
    */
 
 typedef 
-       : TYPE IDENT '{' typedef_list '}' {make_typedef(ast,&@$,$2,&@2,$4);}
+       : TYPE IDENT '{' typedef_list '}' {make_typedef(ast,&@$,$2,&@2,$4);$2=NULL;}
        | TYPE error '}' 
        ;
 
@@ -188,9 +188,9 @@ typedef_item
 
 
 typedef_ident_list: 
-    error ',' IDENT  { $$=static_type_member_t_new($3,NULL); free($3); }
+    error ',' IDENT  { $$=static_type_member_t_new($3,NULL); free($3); $3=NULL;}
     |
-    IDENT { $$=static_type_member_t_new($1,NULL); free($1); }
+    IDENT { $$=static_type_member_t_new($1,NULL); free($1); $1=NULL;}
     | 
     typedef_ident_list ',' IDENT 
         {
@@ -202,6 +202,7 @@ typedef_ident_list:
             append(static_type_member_t,&$$,nt);
           }
           free($3);
+          $3=NULL;
         }
     ;
 
@@ -360,6 +361,7 @@ static_variable_declarator: IDENT
                                  append_variables(ast,$$);
                                  $$->val.v->base_type=ast->current_type;
                                 }
+                                $1=NULL;
                             }
 
 
@@ -401,6 +403,7 @@ open_function:
     type_decl IDENT '(' parameter_declarator_list ')'
       {
         $$=define_function(ast,&@$,$1,$2,&@2,$4);
+        $2=NULL;
       }
     |
     error ')' {$$=NULL;}
@@ -688,21 +691,25 @@ expr_primary:
     IDENT  
       {
         $$=expression_variable(ast,&@1,$1);
+        $1=NULL;
       }
     |
     IDENT DIM 
       {
         $$ = array_dimensions(ast,&@1,$1);
+        $1=NULL;
       }
     |
     IDENT SIZE 
       {
         $$=expression_sizeof(ast,&@1,$1,NULL);
+        $1=NULL;
       }
     |
     IDENT SIZE '(' expr_assign ')' 
       {
         $$=expression_sizeof(ast,&@1,$1,$4);
+        $1=NULL;
       }
     |
     IDENT '[' expr_list ']' 
@@ -712,20 +719,24 @@ expr_primary:
         else {
           ast_node_t_delete($3);
         }
+        $1=NULL;
       }
     | 
     SORT '(' IDENT ',' specifier_list ')' {
       $$ = expression_sort(ast,&@$,$3,$5);
+      $3=NULL;
     }
     | 
     IDENT '(' expr_list ')' 
       {
         $$=expression_call(ast,&@$,$1,$3);
+        $1=NULL;
       }
     | 
     IDENT '(' ')' 
       {
         $$=expression_call(ast,&@$,$1,NULL);
+        $1=NULL;
       }
     | 
     '(' expr ')' {$$=$2;}
@@ -856,11 +867,11 @@ expr_list:
   
   STMT_COND:
     par[0] = expression
-    following two nodes are "then" "else" statements
+    par[1]  is a scope with two items: then and else
 
   STMT_WHILE and STMT_DO
     par[0] = expression
-    next node is the statement
+    par[1]  is a scope with the statement
 
   STMT_FOR:
     par[0] = encapsulating scope 
@@ -976,6 +987,7 @@ stmt_iter
               ast_node_t *v = init_variable(ast,&@3,$3);
               v->val.v->base_type=__type__int->val.t;
               append_variables(ast,v);
+              $3=NULL;
             } 
             expr ')' stmt
             {

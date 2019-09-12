@@ -62,7 +62,7 @@ void print_code(writer_t *w, uint8_t *code, int size) {
       out_text(w, "???\n");
       continue;
     }
-    out_text(w, "%04d %s", i, instr_names[instr]);
+    out_text(w, "%04d (%04x) %s", i, i, instr_names[instr]);
     switch (instr) {
       case PUSHC:
       case JMP:

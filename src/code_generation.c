@@ -1053,7 +1053,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           }
           emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, SPLIT, JOIN, 0);
-          emit_code_node(code, node->val.s->par[1]);
+          emit_code_node(code, node->val.s->par[1]->val.sc->items);
           add_instr(code, JMP, 9, JOIN_JMP, 9, 0);
           add_instr(code, JOIN_JMP, ret - code->pos - 1, 0);
         }; break;
@@ -1065,7 +1065,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
-          if (node->next) emit_code_node(code, node->next);
+          emit_code_node(code, node->val.s->par[1]->val.sc->items);
           emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, SPLIT, JOIN, 0);
           add_instr(code, JMP, 9, JOIN_JMP, 9, 0);
