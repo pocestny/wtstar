@@ -1160,6 +1160,11 @@ static void check_pardo_return(ast_node_t *node, int inside) {
     } break;
     case AST_NODE_STATEMENT: {
       switch (node->val.s->variant) {
+        case STMT_COND:
+        case STMT_WHILE:
+        case STMT_DO:
+          check_pardo_return(node->val.s->par[1], inside);
+          break;
         case STMT_FOR:
           check_pardo_return(node->val.s->par[0], inside);
           break;

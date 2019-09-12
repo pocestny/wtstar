@@ -56,12 +56,12 @@ The simplest way to use the framework is via the [live web frontend](./frontend.
 
 ### CLI tools <a name="cli"></a>
 
-* `wtc` is a compiler from the WT\* language to a binary format
-* `wtr` runs the binary (reads input from stdin)
+* `wtc` is a compiler from the WT\* language to a binary format (`wtc demo.wt -o demo.wtr`)
+* `wtr` runs the binary (reads input from stdin) 
 
 ### Building from source <a name="building"></a>
 
-TODO
+
 
 [--toc--](#toc)
 
