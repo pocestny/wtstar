@@ -342,7 +342,9 @@ static int check_write_mem(runtime_t *env, hash_table_t *mem_used, void *addr,
   mem_check_value_t *data = hash_get(mem_used, key);
   if (data &&
       (env->mem_mode != MEM_MODE_CCRCW || data->value_written != value)) {
-    error("write memory access violation");
+    //printf("%x %d %d\n",env->mem_mode,data->value_written,value);
+    error("write memory access violation.");
+
     return 0;
   }
   hash_put(mem_used, key, mem_check_value_t_new(ACCESS_WRITE, value));

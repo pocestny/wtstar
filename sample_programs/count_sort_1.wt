@@ -1,5 +1,5 @@
 /*
-   input: k, and an array of integers a_1,...,a_n from 1...k 
+   input: k, and an array of integers a_1,...,a_n from 0...k-1
    output: sorted array
 
    T = O(log n)

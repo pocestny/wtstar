@@ -18,3 +18,4 @@ int fact(int n) {
 }
 
 x = fact(n);
+

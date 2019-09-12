@@ -128,6 +128,11 @@ static int assign_node_variable_addresses(uint32_t base, ast_node_t *node) {
       if (node->val.s->variant == STMT_FOR ||
           node->val.s->variant == STMT_PARDO)
         base = assign_node_variable_addresses(base, node->val.s->par[0]);
+      if (node->val.s->variant == STMT_COND ||
+          node->val.s->variant == STMT_WHILE ||
+          node->val.s->variant == STMT_DO
+          )
+        base = assign_node_variable_addresses(base, node->val.s->par[1]);
       break;
   }
   return base;
@@ -938,7 +943,7 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
  * generate code for an AST node
  */
 static void emit_code_node(code_block_t *code, ast_node_t *node) {
-  if (node->emitted) return;
+  if (!node || node->emitted) return;
   node->emitted = 1;
   switch (node->node_type) {
     // ................................
@@ -1018,6 +1023,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
     case AST_NODE_STATEMENT:
       switch (node->val.s->variant) {
         case STMT_FOR: {
+          if (!node->val.s->par[0] ) return;                
           add_instr(code, MEM_MARK, 0);
           ast_node_t *A = node->val.s->par[0]->val.sc->items;
           ast_node_t *B = A->next;
@@ -1038,6 +1044,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, JOIN_JMP, ret - code->pos - 1, MEM_FREE, 0);
         } break;
         case STMT_WHILE: {
+          if (!node->val.s->par[0] || !node->val.s->par[1]) return;                
           int ret = code->pos;
           if (node->val.s->par[0]->val.e->type->compound ||
               node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
@@ -1046,11 +1053,12 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           }
           emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, SPLIT, JOIN, 0);
-          if (node->next) emit_code_node(code, node->next);
+          emit_code_node(code, node->val.s->par[1]);
           add_instr(code, JMP, 9, JOIN_JMP, 9, 0);
           add_instr(code, JOIN_JMP, ret - code->pos - 1, 0);
         }; break;
         case STMT_DO: {
+          if (!node->val.s->par[0] || !node->val.s->par[1]) return;                
           int ret = code->pos;
           if (node->val.s->par[0]->val.e->type->compound ||
               node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
@@ -1064,6 +1072,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, JOIN_JMP, ret - code->pos - 1, 0);
         }; break;
         case STMT_PARDO: {
+          if (!node->val.s->par[0] || !node->val.s->par[1]) return;                
           if (node->val.s->par[1]->val.e->type->compound ||
               node->val.s->par[1]->val.e->type->type != __type__int->val.t) {
             error(&(node->loc), "condition must be of integral type");
@@ -1076,6 +1085,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, JOIN, 0);
         } break;
         case STMT_COND: {
+          if (!node->val.s->par[0] || !node->val.s->par[1]) return;                
           if (node->val.s->par[0]->val.e->type->compound ||
               node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
             error(&(node->loc), "condition must be of integral type");
@@ -1083,9 +1093,9 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           }
           emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, SPLIT, 0);
-          emit_code_node(code, node->next->next);
+          emit_code_node(code, node->val.s->par[1]->val.sc->items->next);
           add_instr(code, JOIN, 0);
-          emit_code_node(code, node->next);
+          emit_code_node(code, node->val.s->par[1]->val.sc->items);
           add_instr(code, JOIN, 0);
         } break;
         case STMT_RETURN: {

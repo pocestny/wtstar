@@ -78,9 +78,16 @@
 
 %destructor { if ($$) free($$); $$=NULL;} <string_val>
 %destructor { 
-  if ($$) {
-    if ($$->node_type == AST_NODE_SCOPE && ast->current_scope == $$->val.sc)
-        ast->current_scope=ast->current_scope->parent;
+if ($$) {
+  if (
+    ($$->node_type == AST_NODE_SCOPE && ast->current_scope == $$->val.sc) ||
+    ($$->node_type == AST_NODE_STATEMENT && 
+      ($$->val.s->variant == STMT_COND || $$->val.s->variant == STMT_WHILE ||
+        $$->val.s->variant == STMT_DO
+      ) &&
+      ast->current_scope == $$->val.s->par[1]->val.sc 
+    )
+    )  ast->current_scope=ast->current_scope->parent;
     ast_node_t_delete($$); 
   }
   $$=NULL;
@@ -905,9 +912,14 @@ stmt_cond
           {
             ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_COND);
             n->val.s->par[0]=$3;
-            append(ast_node_t,&ast->current_scope->items,n);
+            n->val.s->par[1]= ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
+            ast->current_scope=n->val.s->par[1]->val.sc;
+            $<ast_node_val>$ = n;  
           }
-          stmt maybe_else 
+          stmt maybe_else {
+            ast->current_scope=ast->current_scope->parent;
+            append(ast_node_t,&ast->current_scope->items,$<ast_node_val>5);
+          }
          ;
 
 maybe_else 
@@ -923,17 +935,26 @@ stmt_iter
           {
             ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_WHILE);
             n->val.s->par[0]=$3;
-            append(ast_node_t,&ast->current_scope->items,n);
+            n->val.s->par[1]= ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
+            ast->current_scope=n->val.s->par[1]->val.sc;
+            $<ast_node_val>$ = n;  
           }
-          stmt
+          stmt {
+            ast->current_scope=ast->current_scope->parent;
+            append(ast_node_t,&ast->current_scope->items,$<ast_node_val>5);
+          }
          | DO 
           {
-            $<ast_node_val>$ =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_DO);
-            append(ast_node_t,&ast->current_scope->items,$<ast_node_val>$);
+            ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_DO);
+            n->val.s->par[1]= ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
+            ast->current_scope=n->val.s->par[1]->val.sc;
+            $<ast_node_val>$ = n;  
           }
           stmt WHILE '(' expr ')' ';'
           {
             $<ast_node_val>2->val.s->par[0]=$6;
+            ast->current_scope=ast->current_scope->parent;
+            append(ast_node_t,&ast->current_scope->items,$<ast_node_val>2);
           }
          |  FOR '('  
             {
