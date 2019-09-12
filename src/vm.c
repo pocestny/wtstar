@@ -74,28 +74,26 @@ int ilog2(int n) {
 }
 
 // from http://www.codecodex.com/wiki/Calculate_an_integer_square_root
-unsigned long isqrt(unsigned long x)
-{
-    register unsigned long op, res, one;
+unsigned long isqrt(unsigned long x) {
+  register unsigned long op, res, one;
 
-    op = x;
-    res = 0;
+  op = x;
+  res = 0;
 
-    /* "one" starts at the highest power of four <= than the argument. */
-    one = 1 << 30;  /* second-to-top bit set */
-    while (one > op) one >>= 2;
+  /* "one" starts at the highest power of four <= than the argument. */
+  one = 1 << 30; /* second-to-top bit set */
+  while (one > op) one >>= 2;
 
-    while (one!= 0) {
-        if (op >= res + one) {
-            op -= res + one;
-            res += one << 1;  // <-- faster than 2 * one
-        }
-        res >>= 1;
-        one >>= 2;
+  while (one != 0) {
+    if (op >= res + one) {
+      op -= res + one;
+      res += one << 1;  // <-- faster than 2 * one
     }
-    return res;
+    res >>= 1;
+    one >>= 2;
+  }
+  return res;
 }
-
 
 CONSTRUCTOR(stack_t) {
   ALLOC_VAR(r, stack_t)
@@ -225,7 +223,7 @@ CONSTRUCTOR(runtime_t, uint8_t *in, int len) {
         GET(uint8_t, version, 1)
         GET(uint32_t, global_size, 4)
         stack_t_alloc(main_thread->mem, global_size);
-        GET(uint8_t,r->mem_mode,1)
+        GET(uint8_t, r->mem_mode, 1)
       } break;
       case SECTION_INPUT:
         GET(uint32_t, r->n_in_vars, 4)
@@ -342,7 +340,7 @@ static int check_write_mem(runtime_t *env, hash_table_t *mem_used, void *addr,
   mem_check_value_t *data = hash_get(mem_used, key);
   if (data &&
       (env->mem_mode != MEM_MODE_CCRCW || data->value_written != value)) {
-    //printf("%x %d %d\n",env->mem_mode,data->value_written,value);
+    // printf("%x %d %d\n",env->mem_mode,data->value_written,value);
     error("write memory access violation.");
 
     return 0;
@@ -450,9 +448,14 @@ int execute(runtime_t *env, int limit) {
 
           for (int t = 0; t < env->n_thr; t++)
             if (!env->thr[t]->returned) {
-              uint32_t a, n;
+              uint32_t a;
+              int32_t n;
               _POP(a, 4);
               _POP(n, 4);
+              if (n < 0) {
+                error("negative number of threads in FORK\n");
+                return -1;
+              }
               for (int j = 0; j < n; j++) {
                 thread_t *nt = clone_thread(env->thr[t]);
                 lval(get_addr(nt, a, 4), int32_t) = j;
@@ -687,7 +690,7 @@ int execute(runtime_t *env, int limit) {
               case LDCH: {
                 uint32_t a;
                 _POP(a, 4);
-                void *addr=(void*)(env->heap->data + a);
+                void *addr = (void *)(env->heap->data + a);
                 stack_t_push(env->thr[t]->op_stack, addr, 4);
                 check_read_mem(env, mem_used, addr);
               } break;
@@ -695,7 +698,7 @@ int execute(runtime_t *env, int limit) {
               case LDBH: {
                 uint32_t a;
                 _POP(a, 4);
-                void *addr=(void*)(env->heap->data + a);
+                void *addr = (void *)(env->heap->data + a);
                 int32_t w = lval(addr, uint8_t);
                 _PUSH(w, 4);
                 check_read_mem(env, mem_used, addr);
@@ -706,7 +709,7 @@ int execute(runtime_t *env, int limit) {
                 int32_t v;
                 _POP(a, 4);
                 _POP(v, 4);
-                void *addr=(void*)(env->heap->data + a);
+                void *addr = (void *)(env->heap->data + a);
                 lval(addr, int32_t) = v;
                 check_write_mem(env, mem_used, addr, v);
               } break;
@@ -718,7 +721,7 @@ int execute(runtime_t *env, int limit) {
                 _POP(a, 4);
                 _POP(v, 4);
                 w = v;
-                void *addr=(void*)(env->heap->data + a);
+                void *addr = (void *)(env->heap->data + a);
                 lval(addr, int32_t) = w;
                 check_write_mem(env, mem_used, addr, v);
               } break;
@@ -1021,7 +1024,7 @@ int execute(runtime_t *env, int limit) {
               case LOGF: {
                 float a;
                 _POP(a, 4);
-                a = logf(a)/logf(2);
+                a = logf(a) / logf(2);
                 _PUSH(a, 4);
               } break;
 
@@ -1031,15 +1034,15 @@ int execute(runtime_t *env, int limit) {
                 a = ilog2(a);
                 _PUSH(a, 4);
               } break;
-                        
+
               case SQRT: {
                 int32_t a;
                 _POP(a, 4);
                 int32_t b = isqrt(a);
-                if (b*b!=a) b++; 
+                if (b * b != a) b++;
                 _PUSH(b, 4);
               } break;
-                        
+
               case SQRTF: {
                 float a;
                 _POP(a, 4);
@@ -1059,7 +1062,7 @@ int execute(runtime_t *env, int limit) {
                 uint32_t addr = lval(get_addr(env->thr[t], a, 4), uint32_t);
                 void *base = (void *)(env->heap->data + addr);
                 check_write_mem(env, mem_used, base, 1);
-                
+
                 qsort(base, n, size, sort_compare);
               } break;
 
