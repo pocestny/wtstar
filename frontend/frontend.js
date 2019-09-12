@@ -1955,6 +1955,10 @@
 
   var sum_sequential_demo = "/*\n\nsimple sequential sum algorithm\n\ninput:  array of integers\noutput: sum\n\n*/\n\ninput int A[_];\noutput int sum = 0;\n\nfor (int i = 0; i < A.size; i++) \n    sum += A[i];\n";
 
+  var first_1_simple_demo = "/*\n\n  find the index of the first '1' in an array on common CRCW\n\n  T = O(1)\n  W = O(n^2)\n\n*/\n#mode cCRCW\ninput int A[_];\nint n = A.size;\nint B[n];\noutput int x;\n\npardo(i : n) {\n  B[i] = A[i];\n  if (i > 0) pardo(j : i) if (A[j] == 1) B[i] = 0;\n  if (B[i] == 1) x = i;\n}\n";
+
+  var first_1_best_demo = "/*\n\n  find the index of the first '1' in an array on common CRCW\n\n  T = O(1)\n  W = O(n)\n\n*/\n#mode cCRCW\ninput int A[_];\nint n = A.size;\noutput int x;\n\nint first_one_simple(int A[_]) {\n  int n = A.size;\n  int B[n];\n  int result;\n\n  pardo(i : n) {\n    B[i] = A[i];\n    if (i > 0) pardo(j : i) if (A[j] == 1) B[i] = 0;\n    if (B[i] == 1) result = i;\n  }\n  return result;\n}\n\n// make the input square\nint sn = sqrt(n);\nint nn = sn ^ 2;\nint B[nn];\npardo(i : nn) B[i] = 0;\npardo(i : n) B[i] = A[i];\n\n// buckets\nint Box[sn];\n\n// which buckets are empty\npardo(i : sn) {\n  Box[i] = 0;\n  pardo(j : sn) if (B[i * sn + j] == 1) Box[i] = 1;\n}\n\n// first non-empty bucket\nint fb = first_one_simple(Box);\n\nint C[sn];\npardo(i : sn) C[i] = B[fb * sn + i];\n\n// first one of first non-empty bucket\nx = first_one_simple(C) + fb * sn;\n";
+
   // import 'core-js';
 
   const no_program_msg = "no program loaded";
@@ -1965,7 +1969,9 @@
     demo3: {name:'sum_logarithmic.wt',code:sum_logarithmic_demo},
     demo4: {name:'prefix_sums_sequential.wt',code:prefix_sums_sequential_demo},
     demo5: {name:'prefix_sums_recursive.wt',code:prefix_sums_recursive_demo},
-    demo6: {name:'prefix_sums_nonrecursive.wt',code:prefix_sums_nonrecursive_demo}
+    demo6: {name:'prefix_sums_nonrecursive.wt',code:prefix_sums_nonrecursive_demo},
+    demo7: {name:'first_one_simple.wt',code:first_1_simple_demo},
+    demo8: {name:'first_one_optimal.wt',code:first_1_best_demo}
   };
 
   var wt = {};
@@ -2170,7 +2176,9 @@
                 {id:'demo3',text:'sum (logarithmic)'},
                 {id:'demo4',text:'prefix sums (sequential)'},
                 {id:'demo5',text:'prefix sums (recursive)'},
-                {id:'demo6',text:'prefix sums (non-recursive)'}
+                {id:'demo6',text:'prefix sums (non-recursive)'},
+                {id:'demo7',text:'index of first 1 on cCRCW (simple)'},
+                {id:'demo8',text:'index of first 1 on cCRCW (optimal)'}
               ]
             },
             { type: 'button',  caption: 'New', onClick: ()=>getString("title","name",addTab)},

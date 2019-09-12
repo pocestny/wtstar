@@ -46,6 +46,7 @@ The structure of this document is as follows:
     * [Factorial](#demo-factorial)
     * [Sum](#demo-sum)
     * [Prefix Sums](#demo-prefix-sums)
+    * [Index of first '1'](#demo-first-one)
 
 ## Usage <a name="usage"></a>
 
@@ -436,3 +437,55 @@ the elements on odd positions.
           }
 
       pardo(i : n) S[i] = B[0, i];
+
+### Index of fist '1' <a name="demo-first-one"></a>
+
+We could use the same technique as for computing the sum to get logarithmic time and linear 
+work. However, we want to show the advantages of the cCRCW mode. Consider the following
+program:
+
+    #mode cCRCW
+    input int A[_];
+    int n = A.size;
+    int B[n];
+    output int x = -1;
+
+    pardo(i : n) {
+      B[i] = A[i];
+      if (i > 0) pardo(j : i) if (A[j] == 1) B[i] = 0;
+      if (B[i] == 1) x = i;
+    }
+
+There is outer `pardo` is used to separately consider each position in the input array. Each 
+thread than spawns a number of threads to check whether it is actually the first one 
+(effectively, the inner `pardo` computed an unbounded-fan-in AND function in constant time).
+Note that several threads may try to write to the same variable `B[i]`, but all of them 
+are writing the same value so the cCRCW mode allows it. The subsequent write is
+performed by at most one thread. This program runs in constant time and quadratic work. 
+We can improve on it:
+
+    #mode cCRCW
+    input int A[_];
+    int n = A.size;
+    output int x = -1;
+
+    int sn = sqrt(n);
+
+    int Box[sn];
+
+    pardo(i : sn) {
+      Box[i] = 0;
+      pardo(j : sn) if (A[i * sn + j] == 1) Box[i] = 1;
+    }
+
+    int fb = first_one_simple(Box);
+
+    int C[sn];
+    pardo(i : sn) C[i] = A[fb * sn + i];
+
+    x = first_one_simple(C) + fb * sn;
+
+We first cut the input into boxes of size `sqrt(n)`. For each box, use the parallel-AND 
+technique to find out if it is empty or not. Using the previous algorithm we find the 
+first non-empty box. Then again using the previous algorithm we find the first '1' in
+this box. The time is still constant, and the work is linear.

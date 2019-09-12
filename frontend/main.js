@@ -16,6 +16,8 @@ import sum_logarithmic_demo from './demos/sum_logarithmic.txt'
 import prefix_sums_nonrecursive_demo from './demos/prefix_sums_nonrecursive.txt'  
 import prefix_sums_sequential_demo from './demos/prefix_sums_sequential.txt' 
 import sum_sequential_demo from './demos/sum_sequential.txt'
+import first_1_simple_demo from './demos/first_1_crcw_simple.txt'
+import first_1_best_demo from './demos/first_1_crcw_best.txt'
 
 const no_program_msg = "no program loaded"
 
@@ -25,7 +27,9 @@ var demos = {
   demo3: {name:'sum_logarithmic.wt',code:sum_logarithmic_demo},
   demo4: {name:'prefix_sums_sequential.wt',code:prefix_sums_sequential_demo},
   demo5: {name:'prefix_sums_recursive.wt',code:prefix_sums_recursive_demo},
-  demo6: {name:'prefix_sums_nonrecursive.wt',code:prefix_sums_nonrecursive_demo}
+  demo6: {name:'prefix_sums_nonrecursive.wt',code:prefix_sums_nonrecursive_demo},
+  demo7: {name:'first_one_simple.wt',code:first_1_simple_demo},
+  demo8: {name:'first_one_optimal.wt',code:first_1_best_demo}
 }
 
 var wt = {}
@@ -230,7 +234,9 @@ $().w2layout({
               {id:'demo3',text:'sum (logarithmic)'},
               {id:'demo4',text:'prefix sums (sequential)'},
               {id:'demo5',text:'prefix sums (recursive)'},
-              {id:'demo6',text:'prefix sums (non-recursive)'}
+              {id:'demo6',text:'prefix sums (non-recursive)'},
+              {id:'demo7',text:'index of first 1 on cCRCW (simple)'},
+              {id:'demo8',text:'index of first 1 on cCRCW (optimal)'}
             ]
           },
           { type: 'button',  caption: 'New', onClick: ()=>getString("title","name",addTab)},
