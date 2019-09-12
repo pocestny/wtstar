@@ -218,6 +218,8 @@ Unary increment and decrement `++` `--` are supported both as prefix and as suff
 Unary `-` and logical `!` are present. Unary postfix operator `~|` works on
 integers an gives the least significant bit that is set, i.e. `12~|==2`.
 
+Note that logical operators are evaluated in full, i.e. `0 && <bad stuff>` produces
+error.
 
 ### Statements <a name="statements"></a>
 
