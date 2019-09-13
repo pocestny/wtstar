@@ -28,6 +28,6 @@ void add_code_block(code_block_t *dst, code_block_t *src);
 void add_instr(code_block_t *out, int code, ...);
 
 // this is the main interface
-void emit_code(ast_t *_ast, writer_t *out) ;
+int emit_code(ast_t *_ast, writer_t *out) ;
 
 #endif

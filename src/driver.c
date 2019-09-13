@@ -38,6 +38,8 @@ static CONSTRUCTOR(include_file_t,const char *name) {
   r->next=NULL;
   r->included_from=NULL;
   r->name=strdup(name);
+  r->next=NULL;
+  r->content=NULL;
   return r;
 }
 

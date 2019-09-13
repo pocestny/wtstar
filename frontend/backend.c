@@ -28,10 +28,9 @@ int web_compile(char *name, char *text) {
   driver_set_file(name,text);
   ast = driver_parse(name);
   
-  if (!ast->error_occured) {
-    emit_code(ast, code);
-  }
-
+  if (!ast->error_occured) 
+    ast->error_occured = emit_code(ast, code);
+  
   driver_destroy();
   return ast->error_occured;
 }

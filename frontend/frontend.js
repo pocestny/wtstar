@@ -618,10 +618,10 @@
   }
 
 
-  var STACK_BASE = 26176,
-      STACK_MAX = 5269056,
-      DYNAMIC_BASE = 5269056,
-      DYNAMICTOP_PTR = 25920;
+  var STACK_BASE = 26336,
+      STACK_MAX = 5269216,
+      DYNAMIC_BASE = 5269216,
+      DYNAMICTOP_PTR = 26080;
 
   assert(STACK_BASE % 16 === 0, 'stack must start aligned');
   assert(DYNAMIC_BASE % 16 === 0, 'heap must start aligned');
@@ -1038,7 +1038,7 @@
 
 
 
-  // STATICTOP = STATIC_BASE + 25152;
+  // STATICTOP = STATIC_BASE + 25312;
   /* global initializers */ /*__ATINIT__.push();*/
 
 
@@ -1049,7 +1049,7 @@
 
 
   /* no memory initializer */
-  var tempDoublePtr = 26160;
+  var tempDoublePtr = 26320;
   assert(tempDoublePtr % 8 == 0);
 
   // {{PRE_LIBRARY}}

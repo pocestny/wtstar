@@ -1234,7 +1234,7 @@ static void write_io_variables(writer_t *out, int flag) {
 
 /* ----------------------------------------------------------------------------
  */
-void emit_code(ast_t *_ast, writer_t *out) {
+int emit_code(ast_t *_ast, writer_t *out) {
   ast = _ast;
 
   DEBUG("types\n");
@@ -1363,7 +1363,9 @@ void emit_code(ast_t *_ast, writer_t *out) {
 
   code_block_t_delete(code);
 
-  DEBUG("emit_code done\n");
+  if (was_error) DEBUG(" there were errors\n");
+  else DEBUG("emit_code done\n");
+  return was_error;
 }
 
 #undef DEBUG

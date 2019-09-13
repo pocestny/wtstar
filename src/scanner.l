@@ -79,6 +79,11 @@ SYMBOL2  [^a-zA-Z0-9 \t_'";]
     return TOK_INT_LITERAL; 
   }
 
+{DIGIT}*\.?{DIGIT}+([eE][-+]?{DIGIT}+) {
+    yylval->float_val = atof(yytext); 
+    return TOK_FLOAT_LITERAL; 
+}
+
 {DIGIT}*\.{DIGIT}+  {
     yylval->float_val = atof(yytext); 
     return TOK_FLOAT_LITERAL; 

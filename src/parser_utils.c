@@ -19,35 +19,33 @@ void add_basic_types(ast_t *ast) {
   ADD_STATIC_TYPEDEF(char, 1)
 }
 
-
-#define NEW_BUILTIN_FUNCTION(name,outtype) \
-  fn = ast_node_t_new(NULL,AST_NODE_FUNCTION,#name);\
+#define NEW_BUILTIN_FUNCTION(name, outtype)            \
+  fn = ast_node_t_new(NULL, AST_NODE_FUNCTION, #name); \
   fn->val.f->out_type = __type__##outtype->val.t;
 
-#define BUILTIN_PARAM(name,typename) \
-  p = ast_node_t_new(NULL,AST_NODE_VARIABLE,#name); \
-   p->val.v->base_type = __type__##typename->val.t; \
-   append(ast_node_t,&fn->val.f->params,p);
-
+#define BUILTIN_PARAM(name, typename)                 \
+  p = ast_node_t_new(NULL, AST_NODE_VARIABLE, #name); \
+  p->val.v->base_type = __type__##typename->val.t;    \
+  append(ast_node_t, &fn->val.f->params, p);
 
 void add_builtin_functions(ast_t *ast) {
   ast_node_t *fn, *p;
 
-  NEW_BUILTIN_FUNCTION(sqrtf,float)
-  BUILTIN_PARAM(x,float)
-  append(ast_node_t,&ast->functions,fn);
-  
-  NEW_BUILTIN_FUNCTION(sqrt,int)
-  BUILTIN_PARAM(x,int)
-  append(ast_node_t,&ast->functions,fn);
+  NEW_BUILTIN_FUNCTION(sqrtf, float)
+  BUILTIN_PARAM(x, float)
+  append(ast_node_t, &ast->functions, fn);
 
-  NEW_BUILTIN_FUNCTION(logf,float)
-  BUILTIN_PARAM(x,float)
-  append(ast_node_t,&ast->functions,fn);
-  
-  NEW_BUILTIN_FUNCTION(log,int)
-  BUILTIN_PARAM(x,int)
-  append(ast_node_t,&ast->functions,fn);
+  NEW_BUILTIN_FUNCTION(sqrt, int)
+  BUILTIN_PARAM(x, int)
+  append(ast_node_t, &ast->functions, fn);
+
+  NEW_BUILTIN_FUNCTION(logf, float)
+  BUILTIN_PARAM(x, float)
+  append(ast_node_t, &ast->functions, fn);
+
+  NEW_BUILTIN_FUNCTION(log, int)
+  BUILTIN_PARAM(x, int)
+  append(ast_node_t, &ast->functions, fn);
 }
 
 void make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
@@ -383,22 +381,23 @@ ast_node_t *expression_sort(ast_t *ast, YYLTYPE *loc, char *name,
   }
   if (var->val.v->num_dim != 1) {
     yyerror(loc, ast,
-            "only 1-dimensional arrays can be sorted; %s has %d dimensions", name,
-            var->val.v->num_dim);
+            "only 1-dimensional arrays can be sorted; %s has %d dimensions",
+            name, var->val.v->num_dim);
     free(name);
     ast_node_t_delete(params);
     return NULL;
   }
   ast_node_t *p = params;
 
-  while (p->val.e->variant==EXPR_SPECIFIER) p=p->val.e->val.s->ex;
-  if (p->val.e->type->compound||var->val.v->base_type != p->val.e->type->type) {
+  while (p->val.e->variant == EXPR_SPECIFIER) p = p->val.e->val.s->ex;
+  if (p->val.e->type->compound ||
+      var->val.v->base_type != p->val.e->type->type) {
     yyerror(loc, ast, "type mismatch");
     free(name);
     ast_node_t_delete(params);
     return NULL;
   }
-  
+
   ast_node_t *res = ast_node_t_new(loc, AST_NODE_EXPRESSION, EXPR_SORT);
   expression_t *e = res->val.e;
   e->type->type = var->val.v->base_type;
@@ -417,8 +416,14 @@ int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node) {
 
   if (e->variant == EXPR_BINARY) {
     if (e->val.o->first == NULL || e->val.o->second == NULL) return 0;
-    if (inferred_type_equal(e->val.o->first->val.e->type,
-                            e->val.o->second->val.e->type)) {
+    int equal = inferred_type_equal(e->val.o->first->val.e->type,
+                                    e->val.o->second->val.e->type);
+    
+    if ((e->val.o->oper == TOK_EQ ||
+         e->val.o->oper == TOK_NEQ) &&
+        equal && !e->val.o->first->val.e->type->compound) {
+      e->type->type = __type__int->val.t;
+    } else if (e->val.o->oper == '=' && equal) {
       inferred_type_t_delete(e->type);
       e->type = inferred_type_copy(e->val.o->first->val.e->type);
     } else {

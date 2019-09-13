@@ -5,10 +5,10 @@
 
 #include <code_generation.h>
 #include <driver.h>
-#include <writer.h>
 #include <errors.h>
+#include <writer.h>
 
-//extern int yydebug;
+// extern int yydebug;
 #include <ast_debug_print.h>
 
 char *outf, *inf;
@@ -41,9 +41,8 @@ void parse_options(int argc, char **argv) {
       inf = argv[i];
 }
 
-
 void error_handler(error_t *err) {
-  fprintf(stderr,"%s\n",err->msg->str.base);
+  fprintf(stderr, "%s\n", err->msg->str.base);
 }
 
 int main(int argc, char **argv) {
@@ -53,7 +52,7 @@ int main(int argc, char **argv) {
   if (!inf) print_help(argc, argv);
 
   register_error_handler(&error_handler);
-//   yydebug=1;
+  //   yydebug=1;
 
   driver_init();
   ast_t *r = driver_parse(inf);
@@ -64,31 +63,35 @@ int main(int argc, char **argv) {
   if (ast_debug) {
     if (!outf || !strcmp(outf, "-"))
       out->f = stdout;
-    else 
+    else
       out->f = fopen(outf, "wt");
   } else {
     if (outf && !strcmp(outf, "-"))
       out->f = stdout;
     else {
-      if (!outf) outf="a.out";
+      if (!outf) outf = "a.out";
       out->f = fopen(outf, "wb");
     }
   }
 
-  int err=0;
+  int was_error = 0;
   if (r->error_occured) {
-    err=1;
+    was_error = 1;
     error_t *err = error_t_new();
-    append_error_msg(err,"there were errors");
+    append_error_msg(err, "there were errors");
     emit_error(err);
   } else if (ast_debug)
-      ast_debug_print(r, out);
-  else
-      emit_code(r, out);
+    ast_debug_print(r, out);
+  else if (emit_code(r, out)) {
+    was_error = 1;
+    error_t *err = error_t_new();
+    append_error_msg(err, "there were errors");
+    emit_error(err);
+  }
 
   driver_destroy();
   ast_t_delete(r);
 
   writer_t_delete(out);
-  return err;
+  return was_error;
 }

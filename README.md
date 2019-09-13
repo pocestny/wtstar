@@ -224,10 +224,32 @@ error.
 
 ### Statements <a name="statements"></a>
 
-Most of the statements have the usual semantics. The only exception is the `pardo`
+Most of the statements have the usual semantics. The only statement not
+found in sequential languages is the `pardo`
 statement. `pardo(<var>:<range>) <statement>` creates `<range>` new threads
 numbered `0...<range>-1`. The number is stored in a local variable `<var>`, and
 all threads continue to execute `<statement>`. After finishing, the threads are joined.
+
+The SIMD mode of operation gives also a special semantics to the conditional statement:
+the `if (<condition>) <statement1>; else <statement2>;` construct splits the currently
+active threads into two groups based on the condition. The first group becomes active,
+and executes `<statement1>`, then the second group becomes active, and executes
+`<statement2>`. So the following code:
+
+    pardo (i:2)
+      if (i==0) do_someting(42);
+      else do_something(47);
+
+executes the two calls sequentially, whereas
+    
+    pardo(i:2) {
+      int p;
+      if (i==0) p=42; else p=47;
+      do_something(p);
+    }
+
+executes them in parallel.
+
 
 ![statement](./frontend/static/img/statement.png)
 

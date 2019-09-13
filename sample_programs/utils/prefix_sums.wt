@@ -4,7 +4,7 @@
 // T = O(log n)
 // W = O(n)
 // [ additional O(n log n) memory ]
-int prefix_sums(int A[_], int S[_]) {
+void prefix_sums(int A[_], int S[_]) {
   int n = 2^log2(A.size), ln=log2(n);
 
   int B[ln+1, n];  // storage
@@ -25,6 +25,5 @@ int prefix_sums(int A[_], int S[_]) {
 
   // write output
   pardo(i : A.size) S[i] = B[0, i];
-  return 0;
 }
 
