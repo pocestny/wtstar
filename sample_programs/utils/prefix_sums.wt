@@ -1,25 +1,4 @@
-
-// ceiling log
-int log2(int n) {
-  int ln=0;
-  for (; 2 ^ ln < n; ln++);
-  return ln;
-}
-
-// sum using balanced tree computation
-// T = O(log n)
-// W = O(n)
-int sum(int A[_]) {
-  int n = 2^log2(A.size),Y[n];
-  pardo(i:n) Y[i]=0;
-  pardo(i:A.size) Y[i]=A[i];
-
-  for (int t = 0; 2 ^ t < n; t++)
-    pardo(i : n / 2 ^ (t + 1)) 
-      Y[i] = Y[2 * i] + Y[2 * i + 1];
-
-  return Y[0];
-}
+#include "sum.wt"
 
 // nonrecursive prefix sums 
 // T = O(log n)
@@ -48,19 +27,4 @@ int prefix_sums(int A[_], int S[_]) {
   pardo(i : A.size) S[i] = B[0, i];
   return 0;
 }
-
-
-
-// compute the number of occurences of val in X
-// T=O(log n)
-// W=O(n)
-int count(int val, int X[_]) {
-  int n = X.size, tmp[n];
-
-  pardo(i : n) 
-    if (X[i] == val) tmp[i] = 1;
-    else tmp[i] = 0;
-  return sum(tmp);  
-}
-
 

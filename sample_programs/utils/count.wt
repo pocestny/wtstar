@@ -1,0 +1,16 @@
+
+#include "sum.wt"
+
+// compute the number of occurences of val in X
+// T=O(log n)
+// W=O(n)
+int count(int val, int X[_]) {
+  int n = X.size, tmp[n];
+
+  pardo(i : n) 
+    if (X[i] == val) tmp[i] = 1;
+    else tmp[i] = 0;
+  return sum(tmp);  
+}
+
+

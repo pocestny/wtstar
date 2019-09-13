@@ -1,0 +1,9 @@
+void reverse(int A[_], int B[_]) {
+  int n=A.size;
+  pardo(i:n) B[i]=A[i];
+  pardo(i:n/2) {
+    int tmp = B[i];
+    B[i]=B[n-1-i];
+    B[n-1-i]=tmp;
+  }
+}

@@ -4,6 +4,7 @@
 #include <parser.h>
 #include <scanner.h>
 #include <errors.h>
+#include <path.h>
 
 extern int yycolumn;
 
@@ -28,16 +29,15 @@ typedef struct _include_file_t{
   struct _include_file_t *next, *included_from;
 } include_file_t;
 
-static CONSTRUCTOR(include_file_t) {
+static CONSTRUCTOR(include_file_t,const char *name) {
   ALLOC_VAR(r,include_file_t)
-  r->name=NULL;
-  r->content = NULL;
   r->f = NULL;
   r->buf = NULL;
   r->lineno=0;
   r->col=0;
   r->next=NULL;
   r->included_from=NULL;
+  r->name=strdup(name);
   return r;
 }
 
@@ -58,10 +58,9 @@ writer_t *driver_error_writer=NULL;
 
 /* insert a new empty file  */
 static include_file_t *insert_file(const char *filename) {
-  include_file_t *file = include_file_t_new();
+  include_file_t *file = include_file_t_new(filename);
   if (files) file->next=files;
   files=file;
-  file->name = strdup(filename);
   return file;
 }
 
@@ -89,10 +88,33 @@ void driver_set_file(const char *filename, const char *content) {
     file->content = NULL;
 }
 
+
+char * normalize_filename(include_file_t *prefix,const char *f) {
+  path_t *p;
+  if (prefix) p = path_t_new(NULL,prefix->name);
+  else p=NULL;
+  if (p&&p->last) {
+    path_item_t *it = p->last;
+    p->last=p->last->prev;
+    if (!p->last) p->first=NULL;
+    path_item_t_delete(it);
+  }
+  path_t *np = path_t_new(p,f);
+  char *result = path_string(np);
+  path_t_delete(np);
+  path_t_delete(p);
+  return result;
+}
+
+
 /* main parsing function */
 ast_t *driver_parse(const char *filename) {
   ast_t * ast = ast_t_new();
-  driver_push_file(filename);
+  
+  char *name = normalize_filename(NULL,filename);
+  driver_push_file(name);
+  free(name);
+
   yylineno=1; yycolumn=1;
   if (driver_current_file()) yyparse(ast);
   return ast;
@@ -101,32 +123,37 @@ ast_t *driver_parse(const char *filename) {
 /* switch to a new file */
 void driver_push_file(const char *filename) {  
   
+  char *name = normalize_filename(current,filename);
+
   include_file_t *file;
-  for(file=files;file&&strcmp(file->name,filename);file=file->next);
+  for(file=files;file&&strcmp(file->name,name);file=file->next);
   
-  if (file == NULL) file = insert_file(filename);
+  if (file == NULL) file = insert_file(name);
   
   if (file->buf) {
-    driver_error_handler("circular includes not allowed (%s)",filename);
+    driver_error_handler("circular includes not allowed (%s)",name);
+    free(name);
     return;
   }
 
   if (file->content) {
     file->buf = yy_scan_string(file->content);
   } else {
-    file->f = fopen(filename, "r");
+    file->f = fopen(name, "r");
     if (file->f) {
       file->buf = yy_create_buffer(file->f, YY_BUF_SIZE);
       yy_switch_to_buffer(file->buf);
     }
     else {
-      driver_error_handler("cannot open file %s",filename);
+      driver_error_handler("cannot open file %s",name);
+      free(name);
       return;
     }
   }
 
   file->included_from=current;
   current=file;
+  free(name);
 }
 
 int driver_pop_file() {

@@ -1,1 +1,2 @@
-errors in typedefs
+Make sure random syntactically correct programs compile.
+(20B leak is as expected)
