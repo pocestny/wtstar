@@ -480,6 +480,10 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
     // --------------------------------------
     case EXPR_ARRAY_ELEMENT: {
       int n = ex->val.v->var->num_dim;
+      if (n==0) {
+        error(&(exn->loc), "%s is not an array", ex->val.v->var->name);
+        return;
+      }
 
       for (ast_node_t *x = ex->val.v->params; x; x = x->next) {
         emit_code_expression(code, x, 0, clear);

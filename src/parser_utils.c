@@ -460,11 +460,13 @@ int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node) {
       }
     }
   } else if (e->variant == EXPR_CAST) {
-    e->type->type = e->val.c->type;
+    if (e->val.c && e->val.c->type) e->type->type = e->val.c->type;
   } else {
     // unary expression
-    inferred_type_t_delete(e->type);
-    e->type = inferred_type_copy(e->val.o->first->val.e->type);
+    if (e->val.o->first) {
+      inferred_type_t_delete(e->type);
+      e->type = inferred_type_copy(e->val.o->first->val.e->type);
+    }
   }
   return 1;
 }

@@ -290,7 +290,7 @@ variable_init_declarator:
 
 
 variable_declarator: 
-    static_variable_declarator {$$=$1;$$->val.v->need_init=1;}
+    static_variable_declarator {$$=$1;if ($$) $$->val.v->need_init=1;}
     | 
     static_variable_declarator '[' expr_list ']'
       {
@@ -888,7 +888,7 @@ expr_list:
 
   */
 
-stmt: stmt_scope {ignore($1);}| stmt_expr  | stmt_cond | stmt_iter | stmt_jump ';' | error ';' ;
+stmt: stmt_scope {ignore($1);}| stmt_expr  | stmt_cond | stmt_iter | stmt_jump ';' | error ';';
 
 stmt_scope
             : '{' 

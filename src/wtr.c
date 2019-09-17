@@ -12,7 +12,6 @@
 
 void error_handler(error_t *err) {
   fprintf(stderr,"%s\n",err->msg->str.base);
-  exit(1);
 }
 
 
@@ -101,9 +100,12 @@ int main(int argc, char **argv) {
     reader_t *r = reader_t_new(READER_FILE,stdin);
     read_input(r,env);
     reader_t_delete(r);
-    execute(env, -1);
-    write_output(w,env);
-    out_text(w,"W/T: %d %d\n", env->W, env->T);
+    int err = execute(env, -1);
+    if (err==0) {
+      write_output(w,env);
+      out_text(w,"W/T: %d %d\n", env->W, env->T);
+    }
     if (dump_heap) dump_memory(w,env); 
+    exit(err);
   }
 }

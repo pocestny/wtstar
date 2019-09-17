@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import subprocess as su
 import random as rand
+import matplotlib.pyplot as plt
+
 
 """ 
     baseline solution
@@ -16,7 +18,7 @@ def print_error(test,result,got):
 
 n = 10000
 
-def test_p(f,p,count):
+def test_p(p,count):
     print('test %d'%p)
     w=t=0
     for test_case in range(count):
@@ -34,22 +36,33 @@ def test_p(f,p,count):
         else:
             w+=float(o[2])
             t+=float(o[3])
-    f.write("%d %f %f\n"%(p,w,t))
+    return w/count,t/count
 
 
-
-""" 
-    run tests
-"""
-if (__name__ == '__main__'):
+if __name__ == '__main__':
     su.Popen('wtc p_ary_search.wt -o p_ary_search.wtr'.split(), stdout=su.DEVNULL)
-    
-    f = open('p_ary_search.perf','w')
+    W=[]
+    T=[]
+    P=[]
     for p in range(1,300,1):
-        test_p(f,p,200)
-    for p in range(301,1000,10):
-        test_p(f,p,200)
-    for p in range(1001,3000,80):
-        test_p(f,p,200)
-    f.close()
-    su.run("rm p_ary_search.wtr",shell=True)
+        w,t = test_p(p,10)
+        P.append(p)
+        W.append(w)
+        T.append(t)
+    for p in range(301,1200,40):
+        w,t = test_p(p,10)
+        P.append(p)
+        W.append(w)
+        T.append(t)
+    plt.subplot(211)
+    plt.plot(P,T)
+    plt.title('time')
+    plt.xlabel('p (n=%d)'%n)
+    plt.subplot(212)
+    plt.plot(P,W)
+    plt.title('work')
+    plt.xlabel('p (n=%d)'%n)
+    plt.show()
+
+
+

@@ -9,7 +9,7 @@
 #mode cCRCW
 input int A[_];
 int n = A.size;
-output int x;
+output int x=-1;
 
 int first_one_simple(int A[_]) {
   int n = A.size;

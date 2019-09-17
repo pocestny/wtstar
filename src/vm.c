@@ -14,6 +14,9 @@
     emit_error(err);                    \
   }
 
+static int ___pc___;
+
+
 extern int EXEC_DEBUG;
 #include <stdio.h>  // for debug
 
@@ -40,7 +43,7 @@ static int sort_compare(const void *a, const void *b) {
     case TYPE_FLOAT: {
       float x = *(float *)(A);
       float y = *(float *)(B);
-      return x - y;
+      return x > y;
     } break;
     case TYPE_CHAR: {
       int8_t x = *(int8_t *)(A);
@@ -340,8 +343,8 @@ static int check_write_mem(runtime_t *env, hash_table_t *mem_used, void *addr,
   mem_check_value_t *data = hash_get(mem_used, key);
   if (data &&
       (env->mem_mode != MEM_MODE_CCRCW || data->value_written != value)) {
-    // printf("%x %d %d\n",env->mem_mode,data->value_written,value);
-    error("write memory access violation.");
+    printf("%x %d %d\n",env->mem_mode,data->value_written,value);
+    error("write memory access violation (%d).",___pc___);
 
     return 0;
   }
@@ -394,6 +397,7 @@ int execute(runtime_t *env, int limit) {
   if (EXEC_DEBUG) printf("code size: %d\n", env->code_size);
 
   while (1) {
+    ___pc___ = env->pc;
     if (limit > 0) limit--;
     if (limit == 0) return 1;
     uint8_t opcode = lval(env->code + env->pc, uint8_t);
@@ -443,17 +447,15 @@ int execute(runtime_t *env, int limit) {
         if (env->a_thr > 0) {
           env->W++;
           env->T++;
-
           stack_t *grp = stack_t_new();
-
           for (int t = 0; t < env->n_thr; t++)
             if (!env->thr[t]->returned) {
               uint32_t a;
               int32_t n;
               _POP(a, 4);
               _POP(n, 4);
-              if (n < 0) {
-                error("negative number of threads in FORK\n");
+              if (n <= 0) {
+                error("no threads to  FORK\n");
                 return -1;
               }
               for (int j = 0; j < n; j++) {
@@ -466,6 +468,8 @@ int execute(runtime_t *env, int limit) {
           env->thr = STACK(grp, thread_t *);
           env->n_thr = STACK_SIZE(grp, thread_t *);
           env->a_thr = env->n_thr;
+
+
         } else
           env->virtual_grps++;
         break;
@@ -576,6 +580,7 @@ int execute(runtime_t *env, int limit) {
           // jump
           env->pc = env->fnmap[lval(env->code + env->pc, uint32_t)].addr;
         }
+        else env->pc+=4;
         break;
 
       case RETURN: {
@@ -651,7 +656,7 @@ int execute(runtime_t *env, int limit) {
                 _POP(a, 4);
                 void *addr = get_addr(env->thr[t], a, 4);
                 stack_t_push(env->thr[t]->op_stack, addr, 4);
-                check_read_mem(env, mem_used, addr);
+                if (!check_read_mem(env, mem_used, addr)) return -5;
               } break;
 
               case LDB: {
@@ -660,7 +665,7 @@ int execute(runtime_t *env, int limit) {
                 void *addr = get_addr(env->thr[t], a, 1);
                 int32_t w = lval(addr, uint8_t);
                 _PUSH(w, 4);
-                check_read_mem(env, mem_used, addr);
+                if (!check_read_mem(env, mem_used, addr)) return -5;
               } break;
 
               case STC: {
@@ -670,7 +675,7 @@ int execute(runtime_t *env, int limit) {
                 _POP(v, 4);
                 void *addr = get_addr(env->thr[t], a, 4);
                 lval(addr, int32_t) = v;
-                check_write_mem(env, mem_used, addr, v);
+                if (!check_write_mem(env, mem_used, addr, v)) return -5;
               } break;
 
               case STB: {
@@ -680,7 +685,7 @@ int execute(runtime_t *env, int limit) {
                 _POP(v, 4);
                 void *addr = get_addr(env->thr[t], a, 1);
                 lval(addr, uint8_t) = (uint8_t)v;
-                check_write_mem(env, mem_used, addr, v);
+                if (!check_write_mem(env, mem_used, addr, v)) return -5;
               } break;
 
               case LDCH: {
@@ -688,7 +693,7 @@ int execute(runtime_t *env, int limit) {
                 _POP(a, 4);
                 void *addr = (void *)(env->heap->data + a);
                 stack_t_push(env->thr[t]->op_stack, addr, 4);
-                check_read_mem(env, mem_used, addr);
+                if (!check_read_mem(env, mem_used, addr)) return -5;
               } break;
 
               case LDBH: {
@@ -697,7 +702,7 @@ int execute(runtime_t *env, int limit) {
                 void *addr = (void *)(env->heap->data + a);
                 int32_t w = lval(addr, uint8_t);
                 _PUSH(w, 4);
-                check_read_mem(env, mem_used, addr);
+                if (!check_read_mem(env, mem_used, addr)) return -5;
               } break;
 
               case STCH: {
@@ -707,7 +712,7 @@ int execute(runtime_t *env, int limit) {
                 _POP(v, 4);
                 void *addr = (void *)(env->heap->data + a);
                 lval(addr, int32_t) = v;
-                check_write_mem(env, mem_used, addr, v);
+                if (!check_write_mem(env, mem_used, addr, v)) return -5;
               } break;
 
               case STBH: {
@@ -719,13 +724,18 @@ int execute(runtime_t *env, int limit) {
                 w = v;
                 void *addr = (void *)(env->heap->data + a);
                 lval(addr, int32_t) = w;
-                check_write_mem(env, mem_used, addr, v);
+                if (!check_write_mem(env, mem_used, addr, v))return -5;
               } break;
 
               case IDX: {
                 uint8_t nd = lval(&env->code[env->pc], uint8_t);
                 uint32_t addr;
                 _POP(addr, 4);
+                uint32_t nd2 = lval(get_addr(env->thr[t],addr+4,4),uint32_t);
+                if (nd!=nd2) {
+                  error("mismatch in dimensions %d %d (%d)",nd,nd2,___pc___);
+                  return -3;
+                }
 
                 for (int i = 0; i < nd; i++) {
                   env->arr_sizes[i] = lval(
@@ -734,7 +744,7 @@ int execute(runtime_t *env, int limit) {
                   _POP(v, 4);
                   env->arr_offs[i] = v;
                   if (v >= env->arr_sizes[i]) {
-                    error("range check error\n");
+                    error("range check error %d (%d).",addr,___pc___);
                     return -2;
                   }
                 }
@@ -1057,7 +1067,7 @@ int execute(runtime_t *env, int limit) {
                 uint32_t n = lval(get_addr(env->thr[t], a + 8, 4), uint32_t);
                 uint32_t addr = lval(get_addr(env->thr[t], a, 4), uint32_t);
                 void *base = (void *)(env->heap->data + addr);
-                check_write_mem(env, mem_used, base, 1);
+                if (!check_write_mem(env, mem_used, base, 1)) return -5;
 
                 qsort(base, n, size, sort_compare);
               } break;
@@ -1090,14 +1100,14 @@ int execute(runtime_t *env, int limit) {
       if (env->a_thr > 0) {
         printf("fbase=%d\n", env->frame->base);
         for (int t = 0; t < env->n_thr; t++) {
-          printf("mem_base=%d size=%d", env->thr[t]->mem_base,
-                 env->thr[t]->mem->top);
+          printf("mem_base=%d size=%d parent=%lu", env->thr[t]->mem_base,
+                 env->thr[t]->mem->top,(unsigned long)env->thr[t]->parent);
           printf("     [");
           for (int i = 0; i < env->thr[t]->op_stack->top; i++)
             printf("%d ", env->thr[t]->op_stack->data[i]);
           printf("]\n");
-          printf("W=%d T=%d\n\n", env->W, env->T);
         }
+        printf("W=%d T=%d\n\n", env->W, env->T);
       } else
         printf("\n");
     }

@@ -1,0 +1,15 @@
+type point { float x, y; }
+
+float signed_triangle_area(point a, point b, point c) {
+  return (
+      (a.x * b.y - a.y * b.x + a.y * c.x - a.x * c.y + b.x * c.y - c.x * b.y) /
+      2.0);
+}
+
+int dir_cw(point a, point b, point c) {
+  return (signed_triangle_area(a, b, c) < -1e-15);
+}
+int dir_ccw(point a, point b, point c) {
+  return (signed_triangle_area(a, b, c) > 1e-15);
+}
+

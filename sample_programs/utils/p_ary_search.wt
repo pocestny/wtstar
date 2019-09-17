@@ -6,7 +6,7 @@
   output: the position of y in A or -1
 */
 
-int _search_internal(int B[_], int l, int r) {
+int _search_internal(int B[_], int l, int r, int y, int p) {
   int n = r - l + 1;
   int result = -1;
 
@@ -43,7 +43,7 @@ int p_ary_search(int A[_], int y, int p) {
     B[n + 1] = 99999;
     pardo(i : n) B[i + 1] = A[i];
 
-    int result = _search_internal(1, n);
+    int result = _search_internal(B,1, n,y,p);
     if (result > 0) result--;
     return result;
   }

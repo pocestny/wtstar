@@ -10,7 +10,7 @@
 input int A[_];
 int n = A.size;
 int B[n];
-output int x;
+output int x=-1;
 
 pardo(i : n) {
   B[i] = A[i];
