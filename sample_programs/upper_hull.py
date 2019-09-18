@@ -41,9 +41,10 @@ def neg_pts(pts):
 
 W=0
 T=0
+faults=0
 
 def run_hull_half(input_string,dr):
-    global W,T
+    global W,T,faults
     pts=[]
     try:    
         o = su.check_output("wtr upper_hull.wtr".split(),input=input_string,encoding='ascii')
@@ -52,9 +53,10 @@ def run_hull_half(input_string,dr):
         print (input_string)
         print (e.output)
         print (e.returncode)
+        faults+=1
         return pts
     o = o.split()
-    print(o[len(o)-2],o[len(o)-1])
+    #print(o[len(o)-2],o[len(o)-1])
     W+=int(o[len(o)-2])
     T+=int(o[len(o)-1])
     for i in range(int(o[0])):
@@ -67,11 +69,13 @@ def run_hull(data):
 
 # compare the baseline with wtr solution composed of two half-hulls
 def test(data):
+    global faults
     ground = scipy_hull(data)
     dist =np.linalg.norm(np.array(list(map(lambda p: np.array(p[0])-np.array(p[1]), zip(run_hull(data),ground)))))
     if dist>0.1:
         print('TEST FAILED (%f)'%dist)
         print(data)
+        faults+=1
     return 
 
 
@@ -125,7 +129,6 @@ def random_data(n):
 
 
 
-
 if (__name__ == '__main__'):
     su.Popen('wtc upper_hull.wt -o upper_hull.wtr'.split(), stdout=su.DEVNULL)
     what =''
@@ -150,23 +153,25 @@ if (__name__ == '__main__'):
         Ws=[]
         Ts=[]
         Ns=[]
-        for n in range(10,1500,30):
+        for n in range(10,1500,3):
             print(n)
             W=T=0
-            cnt=20
+            cnt=200
             for i in range(cnt):
                 test(random_data(n))
             Ns.append(n)
             Ws.append(W/cnt)
             Ts.append(T/cnt)
-        plt.subplot(211)
-        plt.plot(Ns,Ts)
-        plt.title('time')
-        plt.xlabel('n')
-        plt.subplot(212)
-        plt.plot(Ns,Ws)
-        plt.title('work')
-        plt.xlabel('n')
+        fig,(ax1, ax2) = plt.subplots(nrows=2)    
+        ax1.plot(Ns,Ts)
+        ax1.set_title('time')
+        ax1.set_xlabel('n')
+        ax2.plot(Ns,Ws)
+        ax2.set_title('work')
+        ax2.set_xlabel('n')
+        plt.subplots_adjust(hspace=1)
+        plt.savefig('upper_hull.png')
+        print('%d failures'%faults)
         plt.show()
 
             

@@ -45,23 +45,24 @@ if __name__ == '__main__':
     T=[]
     P=[]
     for p in range(1,300,1):
-        w,t = test_p(p,10)
+        w,t = test_p(p,300)
         P.append(p)
         W.append(w)
         T.append(t)
-    for p in range(301,1200,40):
-        w,t = test_p(p,10)
+    for p in range(301,1400,40):
+        w,t = test_p(p,300)
         P.append(p)
         W.append(w)
         T.append(t)
-    plt.subplot(211)
-    plt.plot(P,T)
-    plt.title('time')
-    plt.xlabel('p (n=%d)'%n)
-    plt.subplot(212)
-    plt.plot(P,W)
-    plt.title('work')
-    plt.xlabel('p (n=%d)'%n)
+    fig,(ax1, ax2) = plt.subplots(nrows=2)    
+    ax1.plot(P,T)
+    ax1.set_title('time')
+    ax1.set_xlabel('p (n=%d)'%n)
+    ax2.plot(P,W)
+    ax2.set_title('work')
+    ax2.set_xlabel('p (n=%d)'%n)
+    plt.subplots_adjust(hspace=1)
+    plt.savefig('p_ary_search.png')
     plt.show()
 
 

@@ -18,13 +18,11 @@ input int A[_];
 int n = A.size;
 output int x;
 
-int ln = 0;
-while (2 ^ ln < n) ln++;
-
+int ln=log(n);
 int B[2 ^ ln];
 
-pardo(i : 2 ^ ln) B[i] = 2 ^ ln + 1;
-pardo(i : n) if (A[i] = 1) B[i] = i;
+pardo(i : 2 ^ ln) B[i] = 2^ln+1;
+pardo(i : n) if (A[i] == 1) B[i] = i;
 
 n = 2 ^ ln;
 

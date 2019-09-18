@@ -455,10 +455,13 @@ int execute(runtime_t *env, int limit) {
               int32_t n;
               _POP(a, 4);
               _POP(n, 4);
+              // is this really needed?
+              /*
               if (n <= 0) {
                 error("no threads to  FORK\n");
                 return -1;
               }
+              */
               for (int j = 0; j < n; j++) {
                 thread_t *nt = clone_thread(env->thr[t]);
                 lval(get_addr(nt, a, 4), int32_t) = j;
