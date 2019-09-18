@@ -2,6 +2,7 @@ node_modules
 backend.js
 index.js
 frontend.css
+frontend.js
 lock.*
 *.wasm
 *.wasm.map

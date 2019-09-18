@@ -4,7 +4,6 @@ CC=clang
 BUILD_DIR=../_build
 CFLAGS=-I /usr/lib/clang/7/include -I .
 
-
 ifeq ($(DEBUG),1)
 CFLAGS+=-g
 BISONFLAGS= -v -fdiagnostics-show-caret -fdiagnostics-parseable-fixit
@@ -13,12 +12,21 @@ CFLAGS+=-O3
 BISONFLAGS=
 endif
 
-WTC_SRC = ast.c parser.c scanner.c driver.c writer.c wtc.c ast_debug_print.c code_generation.c errors.c path.c
-WTC_HDRS= ast.h parser.h scanner.h driver.h writer.h code.h utils.h ast_debug_print.h code_generation.h errors.h path.h
+WTC_SRC = ast.c parser.c scanner.c driver.c writer.c wtc.c \
+					ast_debug_print.c code_generation.c errors.c path.c \
+					debug.c hash.c
+
+WTC_HDRS= ast.h parser.h scanner.h driver.h writer.h code.h\
+					utils.h ast_debug_print.h code_generation.h errors.h \
+					path.h debug.h hash.h
+
 WTC_DEPS=${WTC_SRC} ${WTC_HDRS} parser_utils.c
 
+
 WTR_SRC = wtr.c vm.c instr_names.c reader.c writer.c runtime.c errors.c hash.c
+
 WTR_HDRS= code.h vm.h reader.h writer.h runtime.h errors.h hash.h
+
 WTR_DEPS=${WTR_SRC} ${WTR_HDRS} 
 
 all: wtc wtr

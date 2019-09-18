@@ -7,6 +7,7 @@
 #include <utils.h>
 #include <writer.h>
 
+
 /* ----------------------------------------------------------------------------
  * ast_node_t
  *
@@ -49,6 +50,9 @@ DESTRUCTOR(static_type_t);
 
 // return the TYPE_* descriptor (see code.h) of a basic type
 // (for non-basic type assert fails)
+/*!
+ * stuff
+ */
 int static_type_basic(static_type_t *t);
 
 /*
@@ -344,6 +348,7 @@ DESTRUCTOR(statement_t);
 typedef struct _ast_node_t {
   int node_type;
   YYLTYPE loc;
+  int id,code_from,code_to;
   union {
     static_type_t *t;
     variable_t *v;

@@ -1,3 +1,8 @@
+/*!
+ * @file editor.js
+ *
+ * huh
+ */
 export default (function (){
   var elem = $("<div style='width:100%;height:calc( 100% - 10px );'></div>");
   var editor = ace.edit(elem[0], {

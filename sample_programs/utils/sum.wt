@@ -1,11 +1,8 @@
-#include "log.wt"
-
-
 // sum using balanced tree computation
 // T = O(log n)
 // W = O(n)
 int sum(int A[_]) {
-  int n = 2^log2(A.size),Y[n];
+  int n = 2^log(A.size),Y[n];
   pardo(i:n) Y[i]=0;
   pardo(i:A.size) Y[i]=A[i];
 

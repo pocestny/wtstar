@@ -49,6 +49,7 @@ def run_hull_half(input_string,dr):
         o = su.check_output("wtr upper_hull.wtr".split(),input=input_string,encoding='ascii')
     except su.CalledProcessError as e:
         print ('EXEC FAILED')
+        print (input_string)
         print (e.output)
         print (e.returncode)
         return pts
