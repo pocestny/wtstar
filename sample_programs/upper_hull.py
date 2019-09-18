@@ -127,7 +127,7 @@ def random_data(n):
     data = list(map(list, np.unique(np.array(data),axis=0)   ))
     return data
 
-
+data=[[ 133.359633, 704.533089 ], [ 167.439189, 314.309827 ], [ 512.790171, 385.451808 ], [ 520.050707, 993.017012 ], [ 615.227455 ,150.527229 ], [ 648.000987 ,272.888335 ], [ 830.540102, 228.476275 ] ]
 
 if (__name__ == '__main__'):
     su.Popen('wtc upper_hull.wt -o upper_hull.wtr'.split(), stdout=su.DEVNULL)
@@ -148,6 +148,7 @@ if (__name__ == '__main__'):
         sys.exit(2)
    
     if what=='plot':
+        plot(data)
         plot(random_data(80))
     else:
         Ws=[]

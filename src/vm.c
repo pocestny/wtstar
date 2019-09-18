@@ -43,7 +43,9 @@ static int sort_compare(const void *a, const void *b) {
     case TYPE_FLOAT: {
       float x = *(float *)(A);
       float y = *(float *)(B);
-      return x > y;
+      if (x-y > 1e-15) return 1;
+      if (x-y < 1e-15) return -1;
+      return 0;
     } break;
     case TYPE_CHAR: {
       int8_t x = *(int8_t *)(A);
@@ -1072,7 +1074,6 @@ int execute(runtime_t *env, int limit) {
                 uint32_t addr = lval(get_addr(env->thr[t], a, 4), uint32_t);
                 void *base = (void *)(env->heap->data + addr);
                 if (!check_write_mem(env, mem_used, base, 1)) return -5;
-
                 qsort(base, n, size, sort_compare);
               } break;
 
