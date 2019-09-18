@@ -1,3 +1,8 @@
+/*! @file main.js
+ *
+ *  @brief entry point
+ *
+ */
 // import 'core-js';
 
 import './frontend.scss'

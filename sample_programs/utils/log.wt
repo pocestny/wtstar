@@ -1,7 +1,0 @@
-
-// ceiling log
-int log2(int n) {
-  int ln=0;
-  for (; 2 ^ ln < n; ln++);
-  return ln;
-}

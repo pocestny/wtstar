@@ -1,6 +1,3 @@
-
-#include "sum.wt"
-
 // compute the number of occurences of val in X
 // T=O(log n)
 // W=O(n)

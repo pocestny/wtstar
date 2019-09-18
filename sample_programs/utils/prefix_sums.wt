@@ -5,7 +5,7 @@
 // W = O(n)
 // [ additional O(n log n) memory ]
 void prefix_sums(int A[_], int S[_]) {
-  int n = 2^log2(A.size), ln=log2(n);
+  int n = 2^log(A.size), ln=log(n);
 
   int B[ln+1, n];  // storage
 

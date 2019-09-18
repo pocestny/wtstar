@@ -66,15 +66,16 @@ int ipow(int base, int exp) {
 
 // ceiling log_2
 int ilog2(int n) {
-  int pw = 0, res = 0;
+  int pw = 0, res = -1;
   while (n) {
-    if (n % 2 == 0) pw++;
+    if (n % 2 != 0) pw++;
     n >>= 1;
     res++;
   }
-  if (pw == 1) res--;
+  if (pw > 1) res++;
   return res;
 }
+
 
 // from http://www.codecodex.com/wiki/Calculate_an_integer_square_root
 unsigned long isqrt(unsigned long x) {

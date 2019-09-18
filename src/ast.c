@@ -5,6 +5,8 @@
 #include <ast.h>
 #include <code.h>
 
+static int __ast_node_t_id__ = 0;
+
 /* ----------------------------------------------------------------------------
  * static types
  */
@@ -245,7 +247,7 @@ int static_type_layout(static_type_t *t, uint8_t **layout) {
       if (layout) *layout = NULL;
     }
   } else {
-    if (layout) *layout=NULL;
+    if (layout) *layout = NULL;
     list_for(tm, static_type_member_t, t->members) {
       uint8_t *l, **al;
       if (layout)
@@ -254,7 +256,7 @@ int static_type_layout(static_type_t *t, uint8_t **layout) {
         al = NULL;
       int nn = static_type_layout(tm->type, al);
       if (layout) {
-        if (*layout==NULL)
+        if (*layout == NULL)
           *layout = l;
         else {
           (*layout) = (uint8_t *)realloc(*layout, n + nn);
@@ -296,23 +298,25 @@ int inferred_type_layout(inferred_type_t *t, uint8_t **layout) {
     return static_type_layout(t->type, layout);
 }
 
-int static_type_compatible(static_type_t *st, static_type_t *t,
-                             int **casts, int *n_casts) {
+int static_type_compatible(static_type_t *st, static_type_t *t, int **casts,
+                           int *n_casts) {
   if (st->members) {
-    int *my_casts=NULL,my_n_casts=0;
-    for(static_type_member_t *stm = st->members, *tm = t->members;1;
-        stm=stm->next,tm=tm->next) {
-      if (stm==NULL && tm==NULL) break;
-      if (stm==NULL || tm==NULL) {
+    int *my_casts = NULL, my_n_casts = 0;
+    for (static_type_member_t *stm = st->members, *tm = t->members; 1;
+         stm = stm->next, tm = tm->next) {
+      if (stm == NULL && tm == NULL) break;
+      if (stm == NULL || tm == NULL) {
         if (my_casts) free(my_casts);
         return 0;
       }
-      int *tmpc,tmpn;
-      if (static_type_compatible(stm->type,tm->type,(casts)?&tmpc:NULL,&tmpn)) {
+      int *tmpc, tmpn;
+      if (static_type_compatible(stm->type, tm->type, (casts) ? &tmpc : NULL,
+                                 &tmpn)) {
         if (casts) {
-          my_casts=(int*)realloc(my_casts,(my_n_casts+tmpn)*sizeof(int));
-          memcpy((void*)(my_casts+my_n_casts),tmpc,tmpn*sizeof(int));
-          my_n_casts+=tmpn;
+          my_casts =
+              (int *)realloc(my_casts, (my_n_casts + tmpn) * sizeof(int));
+          memcpy((void *)(my_casts + my_n_casts), tmpc, tmpn * sizeof(int));
+          my_n_casts += tmpn;
           free(tmpc);
         }
       } else {
@@ -321,8 +325,8 @@ int static_type_compatible(static_type_t *st, static_type_t *t,
       }
     }
     if (casts) {
-      *casts=my_casts;
-      *n_casts=my_n_casts;
+      *casts = my_casts;
+      *n_casts = my_n_casts;
     }
     return 1;
   } else {
@@ -331,22 +335,34 @@ int static_type_compatible(static_type_t *st, static_type_t *t,
 
     int to = static_type_basic(st);
     int from = static_type_basic(t);
-   
-    if (from==TYPE_FLOAT && to==TYPE_CHAR) return 0;
+
+    if (from == TYPE_FLOAT && to == TYPE_CHAR) return 0;
 
     if (casts) {
       (*casts) = (int *)malloc(sizeof(int));
       *n_casts = 1;
-      (*casts)[0]=0;
-      switch(from) {
-        case TYPE_INT: (*casts)[0]=CONVERT_FROM_INT;break;
-        case TYPE_FLOAT: (*casts)[0]=CONVERT_FROM_FLOAT;break;
-        case TYPE_CHAR: (*casts)[0]=CONVERT_FROM_INT;break;
+      (*casts)[0] = 0;
+      switch (from) {
+        case TYPE_INT:
+          (*casts)[0] = CONVERT_FROM_INT;
+          break;
+        case TYPE_FLOAT:
+          (*casts)[0] = CONVERT_FROM_FLOAT;
+          break;
+        case TYPE_CHAR:
+          (*casts)[0] = CONVERT_FROM_INT;
+          break;
       }
-      switch(to) {
-        case TYPE_INT: (*casts)[0]|=CONVERT_TO_INT;break;
-        case TYPE_FLOAT: (*casts)[0]|=CONVERT_TO_FLOAT;break;
-        case TYPE_CHAR: (*casts)[0]|=CONVERT_TO_CHAR;break;
+      switch (to) {
+        case TYPE_INT:
+          (*casts)[0] |= CONVERT_TO_INT;
+          break;
+        case TYPE_FLOAT:
+          (*casts)[0] |= CONVERT_TO_FLOAT;
+          break;
+        case TYPE_CHAR:
+          (*casts)[0] |= CONVERT_TO_CHAR;
+          break;
       }
     }
     return 1;
@@ -357,21 +373,23 @@ int inferred_type_compatible(static_type_t *st, inferred_type_t *it,
                              int **casts, int *n_casts) {
   if (it->compound) {
     if (!st->members) return 0;
-    int *my_casts=NULL,my_n_casts=0;
+    int *my_casts = NULL, my_n_casts = 0;
     static_type_member_t *stm = st->members;
     inferred_type_item_t *tm = it->list;
-    for(;1;stm=stm->next,tm=tm->next) {
-      if (stm==NULL && tm==NULL) break;
-      if (stm==NULL || tm==NULL) {
+    for (; 1; stm = stm->next, tm = tm->next) {
+      if (stm == NULL && tm == NULL) break;
+      if (stm == NULL || tm == NULL) {
         if (my_casts) free(my_casts);
         return 0;
       }
-      int *tmpc,tmpn;
-      if (inferred_type_compatible(stm->type,tm->type,(casts)?&tmpc:NULL,&tmpn)) {
+      int *tmpc, tmpn;
+      if (inferred_type_compatible(stm->type, tm->type, (casts) ? &tmpc : NULL,
+                                   &tmpn)) {
         if (casts) {
-          my_casts=(int*)realloc(my_casts,(my_n_casts+tmpn)*sizeof(int));
-          memcpy((void*)(my_casts+my_n_casts),tmpc,tmpn*sizeof(int));
-          my_n_casts+=tmpn;
+          my_casts =
+              (int *)realloc(my_casts, (my_n_casts + tmpn) * sizeof(int));
+          memcpy((void *)(my_casts + my_n_casts), tmpc, tmpn * sizeof(int));
+          my_n_casts += tmpn;
           free(tmpc);
         }
       } else {
@@ -380,13 +398,13 @@ int inferred_type_compatible(static_type_t *st, inferred_type_t *it,
       }
     }
     if (casts) {
-      *casts=my_casts;
-      *n_casts=my_n_casts;
+      *casts = my_casts;
+      *n_casts = my_n_casts;
     }
     return 1;
-    
-  } else 
-    return static_type_compatible(st,it->type,casts,n_casts);
+
+  } else
+    return static_type_compatible(st, it->type, casts, n_casts);
 }
 
 CONSTRUCTOR(expression_t, int variant) {
@@ -410,7 +428,7 @@ CONSTRUCTOR(expression_t, int variant) {
     } break;
     case EXPR_ARRAY_ELEMENT:
     case EXPR_VAR_NAME:
-    case EXPR_SORT:                
+    case EXPR_SORT:
     case EXPR_SIZEOF: {
       ALLOC_VAR(v, expr_variable_t);
       v->var = NULL;
@@ -510,6 +528,8 @@ DESTRUCTOR(statement_t) {
 
 CONSTRUCTOR(ast_node_t, YYLTYPE *iloc, int node_type, ...) {
   ALLOC_VAR(r, ast_node_t)
+  r->id = __ast_node_t_id__++;
+  r->code_from = r->code_to = -1;
   r->next = NULL;
   r->emitted = 0;
 

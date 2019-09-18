@@ -6,6 +6,7 @@
 #include <code_generation.h>
 #include <errors.h>
 #include <parser.h>
+#include <debug.h>
 
 // #define NODEBUG
 
@@ -949,6 +950,7 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
 static void emit_code_node(code_block_t *code, ast_node_t *node) {
   if (!node || node->emitted) return;
   node->emitted = 1;
+  node->code_from = code->pos;
   switch (node->node_type) {
     // ................................
     case AST_NODE_VARIABLE:
@@ -1141,6 +1143,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
     default:
       break;
   }
+  node->code_to = code->pos-1;
 }
 
 /* ----------------------------------------------------------------------------
@@ -1357,6 +1360,8 @@ int emit_code(ast_t *_ast, writer_t *out) {
           out_raw(out, &(out_size), 4);
         }
     }
+
+    //emit_debug_sections(out,ast,code->pos);
 
     {
       section = SECTION_CODE;
