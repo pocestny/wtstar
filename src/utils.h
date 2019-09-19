@@ -1,3 +1,6 @@
+/**
+ * @file utils.h
+ */
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
@@ -53,6 +56,12 @@ typedef struct YYLTYPE {
   while (0)
 #endif
 
+/**
+ * @brief Macro to get the length of the formatted string. 
+ * Expects to be called from somewhere where the `format` parameter
+ * is followed by a `va_list`.
+ * The result is stored in `len`
+ */
 #define get_printed_length(format, len)     \
   {                                         \
     va_list _args;                          \

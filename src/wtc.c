@@ -1,3 +1,16 @@
+/**
+ * @file  wtc.c
+ * @brief Compiler from the WT language to the virtual machine binary.
+ *
+ * Command line compiler. Supported options:
+ *      option   | meaning
+ *  -------------|-------------
+ *   -o file     | write output to file (default is a.out)
+ *   -D          | print intermediate AST instead of code
+ *
+ * @deprecated The -D option uses ast_debug_print.h which is terribly outdated
+ * and incoplete. Not intended for use.
+ */
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,9 +24,13 @@
 // extern int yydebug;
 #include <ast_debug_print.h>
 
-char *outf, *inf;
-int ast_debug = 0, outf_spec = 0;
+char *outf,  //!< name of output file
+    *inf;    //!< name of input file
 
+int ast_debug = 0,  //!< flag: -D option enabled
+    outf_spec = 0;  //!< flag: -o option enabled
+
+//! Print usage options.
 void print_help(int argc, char **argv) {
   printf("usage: %s [-h][-?][-D][-o file] file\n", argv[0]);
   printf("options:\n");
@@ -23,6 +40,7 @@ void print_help(int argc, char **argv) {
   exit(0);
 }
 
+//! Parse command line options and set global variables.
 void parse_options(int argc, char **argv) {
   for (int i = 1; i < argc; i++)
     if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "-?")) {
@@ -41,10 +59,25 @@ void parse_options(int argc, char **argv) {
       inf = argv[i];
 }
 
+//! Error handler used in errors.h Here just prints the error to stderr.
 void error_handler(error_t *err) {
   fprintf(stderr, "%s\n", err->msg->str.base);
 }
 
+/**
+ * @brief Main entry.
+ *
+ * Uses errors.h for error handling. Not needed here, since we only print the errors
+ * to stdout, but the copmilation should work also in web mode, where the errors 
+ * need to be stored.
+ *
+ * It initializes the driver from driver.h and feeds it the file from the command line
+ * to parse.
+ *
+ * It sets the \ref writer_t from writer.h to the appropriate file, and calls #emit_code
+ * from code_generation.h
+ * 
+ */
 int main(int argc, char **argv) {
   outf = NULL;
   inf = NULL;

@@ -7,7 +7,6 @@
 #include <code.h>
 #include <vm.h>
 #include <reader.h>
-#include <runtime.h>
 #include <errors.h>
 
 void error_handler(error_t *err) {
@@ -71,7 +70,7 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  runtime_t *env = runtime_t_new(in, len);
+  virtual_machine_t *env = virtual_machine_t_new(in, len);
   free(in);
 
   writer_t *w = writer_t_new(WRITER_FILE);

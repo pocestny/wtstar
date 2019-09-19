@@ -1,3 +1,6 @@
+/**
+ * @file code_generation.h
+ */
 #ifndef __CODE_GENERATION_H__
 #define __CODE_GENERATION_H__
 
@@ -27,7 +30,7 @@ void add_code_block(code_block_t *dst, code_block_t *src);
 // add one instruction with parameters to code block
 void add_instr(code_block_t *out, int code, ...);
 
-// this is the main interface
+//! this is the main interface
 int emit_code(ast_t *_ast, writer_t *out) ;
 
 #endif

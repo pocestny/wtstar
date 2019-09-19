@@ -122,6 +122,7 @@
 #define SECTION_OUTPUT  0x99U
 #define SECTION_FNMAP   0xaaU
 #define SECTION_CODE    0xbbU
+#define SECTION_DEBUG   0xccU
 
 /*
  
@@ -147,10 +148,23 @@ the restriction means that there are at most 256 dimensions in an array, and at 
 fnmap section: 
 uint32_t n
 addr_1,type_size 1, ... addr_n, type_size 2   
-      addr = ddress in the code segment 
+      addr = address in the code segment 
       type_size = how much the op_stack size should change after call 
       (out_type size - parameters size)
 
+
+debug section:
+n_files uint32_t
+n 0-terminated strings
+
+n_functions uint32_t
+fn_names 0-terminated strings
+
+n_items uint32_t - ast nodes that own some code
+uint32_t fileid, line, col, line, col
+
+code_map_size uint32_t
+items: break_point 
 
 */
 
