@@ -1,3 +1,7 @@
+/** 
+ * @file ast.h
+ *
+ * */
 #ifndef ___AST_H___
 #define ___AST_H___
 
@@ -6,6 +10,7 @@
 
 #include <utils.h>
 #include <writer.h>
+
 
 
 /* ----------------------------------------------------------------------------
@@ -36,6 +41,7 @@ struct _function_t;
  * contains:
  * size,name,list of members
  *
+ * 
  */
 struct _static_type_member_t;
 
@@ -377,12 +383,10 @@ int length(ast_node_t *list);
 // unchain the last element of the list
 void unchain_last(ast_node_t **list);
 
-/* ----------------------------------------------------------------------------
- *
- * main AST structure
- *
+// ----------------------------------------------------------------------------
+/**
+ * @brief main AST structure
  */
-
 typedef struct {
   ast_node_t *types;      // list of AST_NODE_STATIC_TYPE
   ast_node_t *functions;  // list of AST_NODE_FUNCTION
@@ -392,7 +396,9 @@ typedef struct {
   int mem_mode; // last issued token for memory mode
 } ast_t;
 
+//! allocates the ast_t structure and returns pointer
 CONSTRUCTOR(ast_t);
+//! free the structure and its members
 DESTRUCTOR(ast_t);
 
 /* ----------------------------------------------------------------------------

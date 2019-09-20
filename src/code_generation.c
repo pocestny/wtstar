@@ -1191,6 +1191,7 @@ static void check_pardo_return(ast_node_t *node, int inside) {
 static void emit_code_function(code_block_t *code, ast_node_t *fn) {
   assert(fn->node_type == AST_NODE_FUNCTION);
 
+  fn->code_from = code->pos;
   // load parameters
   // on the stack are values
   DEBUG("emit_code_function %s (addr: %d)\n", fn->val.f->name, code->pos);
@@ -1216,6 +1217,7 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
 
   emit_code_scope(code, fn->val.f->root_scope);
   add_instr(code, RETURN, 0);
+  fn->code_to = code->pos;
 }
 
 /* ----------------------------------------------------------------------------
@@ -1361,7 +1363,7 @@ int emit_code(ast_t *_ast, writer_t *out) {
         }
     }
 
-    //emit_debug_sections(out,ast,code->pos);
+    //emit_debug_section(out,ast,code->pos);
 
     {
       section = SECTION_CODE;

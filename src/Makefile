@@ -12,6 +12,11 @@ CFLAGS+=-O3
 BISONFLAGS=
 endif
 
+.PHONY:	wtc wtr wtdump
+all: wtc wtr wtdump
+
+##################################################################
+########  build wtc
 WTC_SRC = ast.c parser.c scanner.c driver.c writer.c wtc.c \
 					ast_debug_print.c code_generation.c errors.c path.c \
 					debug.c hash.c
@@ -23,17 +28,29 @@ WTC_HDRS= ast.h parser.h scanner.h driver.h writer.h code.h\
 WTC_DEPS=${WTC_SRC} ${WTC_HDRS} parser_utils.c
 
 
-WTR_SRC = wtr.c vm.c instr_names.c reader.c writer.c runtime.c errors.c hash.c
+##################################################################
+########  build wtr
+WTR_SRC = wtr.c vm.c instr_names.c reader.c writer.c  \
+					errors.c hash.c debug.c
 
-WTR_HDRS= code.h vm.h reader.h writer.h runtime.h errors.h hash.h
+WTR_HDRS= code.h vm.h reader.h writer.h  errors.h hash.h debug.h
 
 WTR_DEPS=${WTR_SRC} ${WTR_HDRS} 
 
-all: wtc wtr
 
-.PHONY:	wtc wtr
+##################################################################
+########  build wtdump
+WTDUMP_SRC = wtdump.c instr_names.c reader.c writer.c  \
+						 errors.c hash.c debug.c vm.c
+
+WTDUMP_HDRS= code.h reader.h writer.h  vm.h errors.h hash.h \
+						 debug.h
+
+WTDUMP_DEPS=${WTDUMP_SRC} ${WTDUMP_HDRS} 
+
 wtc: ${BUILD_DIR}/cli/wtc
 wtr: ${BUILD_DIR}/cli/wtr
+wtdump: ${BUILD_DIR}/cli/wtdump
 
 
 ${BUILD_DIR}/cli/wtc: ${WTC_DEPS}
@@ -43,6 +60,10 @@ ${BUILD_DIR}/cli/wtc: ${WTC_DEPS}
 ${BUILD_DIR}/cli/wtr: ${WTR_DEPS}
 	mkdir -p ${BUILD_DIR}/cli
 	${CC} ${CFLAGS} ${WTR_SRC} -o ${BUILD_DIR}/cli/wtr -lm
+
+${BUILD_DIR}/cli/wtdump: ${WTDUMP_DEPS}
+	mkdir -p ${BUILD_DIR}/cli
+	${CC} ${CFLAGS} ${WTDUMP_SRC} -o ${BUILD_DIR}/cli/wtdump -lm
 
 %.c: %.y
 	bison ${BISONFLAGS} -o $@ $<

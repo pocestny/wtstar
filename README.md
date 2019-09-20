@@ -61,6 +61,9 @@ The simplest way to use the framework is via the [live web frontend](./frontend.
 
 ### Building from source <a name="building"></a>
 
+TODO
+
+The source code documentation will is  [here](./source_documentation/html/index.html)
 
 
 [--toc--](#toc)

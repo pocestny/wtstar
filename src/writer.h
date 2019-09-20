@@ -1,3 +1,6 @@
+/**
+ * @file writer.h
+ */
 #ifndef __WRITER_H__
 #define __WRITER_H__
 
@@ -9,6 +12,9 @@
 #define WRITER_STRING 0
 #define WRITER_FILE 1
 
+/**
+ * @brief writer structure.
+ */
 typedef struct {
   int type;  // string or stream
   union {

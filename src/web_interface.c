@@ -4,13 +4,12 @@
 #include <driver.h>
 #include <errors.h>
 #include <code_generation.h>
-#include <runtime.h>
 #include <vm.h>
 
 static ast_t *ast = NULL;
 static writer_t *code=NULL;
 static writer_t *outw=NULL;
-static runtime_t *env= NULL;
+static virtual_machine_t *env= NULL;
 
 int EXEC_DEBUG=0;
 
@@ -40,9 +39,9 @@ int web_start(char *input) {
 
   if (outw) writer_t_delete(outw);
   outw = writer_t_new(WRITER_STRING);
-  if (env) runtime_t_delete(env);
+  if (env) virtual_machine_t_delete(env);
   delete_errors();
-  env = runtime_t_new((uint8_t*)(code->str.base), code->str.ptr);
+  env = virtual_machine_t_new((uint8_t*)(code->str.base), code->str.ptr);
 
   reader_t *r = reader_t_new(READER_STRING,input);
   read_input(r,env);
