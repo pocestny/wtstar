@@ -7,18 +7,71 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define GET(type, var, b)               \
-  {                                     \
-    if (*pos + (b) > len) {             \
-      throw("corrupted debug section"); \
-      debug_info_t_delete(r);           \
-      return NULL;                      \
-    }                                   \
-    var = *((type *)(in + (*pos)));     \
-    (*pos) += b;                        \
+#define GET(type, var, b)                                      \
+  {                                                            \
+    if (*pos + (b) > len) {                                    \
+      throw("corrupted debug section (cannot read code map)"); \
+      code_map_t_delete(r);                                    \
+      return NULL;                                             \
+    }                                                          \
+    var = *((type *)(in + (*pos)));                            \
+    (*pos) += b;                                               \
   }
 
-CONSTRUCTOR(debug_info_t, uint8_t *in, int *pos, int len) {
+CONSTRUCTOR(code_map_t, const uint8_t *in, int *pos, const int len) {
+  ALLOC_VAR(r, code_map_t);
+  r->bp = NULL;
+  r->val = NULL;
+  r->n = 0;
+  GET(uint32_t, r->n, 4);
+  r->bp = malloc(r->n * 4);
+  r->val = malloc(r->n * 4);
+  for (int i = 0; i < r->n; i++) {
+    GET(uint32_t, r->bp[i], 4);
+    GET(int32_t, r->val[i], 4);
+  }
+  return r;
+}
+#undef GET
+
+DESTRUCTOR(code_map_t) {
+  if (r->bp) free(r->bp);
+  if (r->val) free(r->val);
+  if (r == NULL) return;
+}
+
+
+int code_map_find(code_map_t *m, uint32_t pos) {
+  if (m->n==0) return -1;
+  if (pos>=m->bp[m->n-1]) return m->n-1;
+  if (pos<m->bp[0]) return -1;
+  int l=0,r=m->n-1;
+  while(1) {
+    if (l==r) return l;
+    if (l==r-1) {
+      if (pos==m->bp[r]) return r;
+      return l;
+    }
+    int a=(l+r)/2;
+    if (pos>=m->bp[a]) l=a;
+    else r=a;
+  }
+  return -1;
+}
+
+
+#define GET(type, var, b)                                        \
+  {                                                              \
+    if (*pos + (b) > len) {                                      \
+      throw("corrupted debug section (cannot read debug info)"); \
+      debug_info_t_delete(r);                                    \
+      return NULL;                                               \
+    }                                                            \
+    var = *((type *)(in + (*pos)));                              \
+    (*pos) += b;                                                 \
+  }
+
+CONSTRUCTOR(debug_info_t, const uint8_t *in, int *pos, const int len) {
   ALLOC_VAR(r, debug_info_t);
 
   r->files = NULL;
@@ -27,6 +80,7 @@ CONSTRUCTOR(debug_info_t, uint8_t *in, int *pos, int len) {
   r->n_fn = 0;
   r->items = NULL;
   r->n_items = 0;
+  r->source_items_map = NULL;
 
   GET(uint32_t, r->n_files, 4);
   r->files = malloc(r->n_files * sizeof(char *));
@@ -36,7 +90,7 @@ CONSTRUCTOR(debug_info_t, uint8_t *in, int *pos, int len) {
     while (in[*pos] && *pos <= len) (*pos)++;
     (*pos)++;
     if (*pos > len) {
-      throw("corrupted debug section");
+      throw("corrupted debug section (cannot read files) ");
       debug_info_t_delete(r);
       return NULL;
     }
@@ -50,7 +104,7 @@ CONSTRUCTOR(debug_info_t, uint8_t *in, int *pos, int len) {
     while (in[*pos] && *pos <= len) (*pos)++;
     (*pos)++;
     if (*pos > len) {
-      throw("corrupted debug section");
+      throw("corrupted debug section (cannot read function names)");
       debug_info_t_delete(r);
       return NULL;
     }
@@ -64,6 +118,12 @@ CONSTRUCTOR(debug_info_t, uint8_t *in, int *pos, int len) {
     GET(uint32_t, r->items[i].fc, 4);
     GET(uint32_t, r->items[i].ll, 4);
     GET(uint32_t, r->items[i].lc, 4);
+  }
+
+  r->source_items_map = code_map_t_new(in,pos,len);
+  if (!r->source_items_map) {
+    debug_info_t_delete(r);
+    return NULL;
   }
 
   return r;
@@ -82,6 +142,7 @@ DESTRUCTOR(debug_info_t) {
     free(r->fn_names);
   }
   if (r->items) free(r->items);
+  if (r->source_items_map) code_map_t_delete(r->source_items_map);
   free(r);
 }
 
@@ -231,14 +292,16 @@ void emit_debug_section(writer_t *out, ast_t *ast, int _code_size) {
   }
 
   {
-    uint32_t code_map_size=0;
+    uint32_t code_map_size = 0;
     for (int i = 1; i < code_size; i++)
       if (code_source[i - 1] != code_source[i]) code_map_size++;
-    out_raw(out,&code_map_size,4);
+    out_raw(out, &code_map_size, 4);
     for (int i = 1; i < code_size; i++)
       if (code_source[i - 1] != code_source[i]) {
-        out_raw(out,i,4);
-        out_raw(out,code_source[i],4);
+        out_raw(out, &i, 4);
+        out_raw(out, &code_source[i], 4);
+        printf("(%d %d) ",i,code_source[i]);
       }
+    printf("\n");
   }
 }

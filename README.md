@@ -1,6 +1,6 @@
 ![logo](./frontend/static/img/logo.png) 
 
-# WT\*: a framework for SIMD algorithms design
+# WT\*: a framework for the design of parallel algorithms
 
 <h3 style="text-align:center;width:100%;margin-bottom:40px;"><i> 
 --- version alpha.1 --- 
@@ -63,7 +63,7 @@ The simplest way to use the framework is via the [live web frontend](./frontend.
 
 TODO
 
-The source code documentation will is  [here](./source_documentation/html/index.html)
+The source code documentation  is  [here](./source_documentation/html/index.html)
 
 
 [--toc--](#toc)

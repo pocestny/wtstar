@@ -1,18 +1,16 @@
+#include <inttypes.h>
 #include <math.h>
 #include <stdarg.h>
-#include <stdlib.h>
-#include <string.h>
-#include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <errors.h>
 #include <hash.h>
-#include <vm.h>
 #include <reader.h>
+#include <vm.h>
 
 static int ___pc___;
-
 
 extern int EXEC_DEBUG;
 
@@ -39,8 +37,8 @@ static int sort_compare(const void *a, const void *b) {
     case TYPE_FLOAT: {
       float x = *(float *)(A);
       float y = *(float *)(B);
-      if (x-y > 1e-15) return 1;
-      if (x-y < 1e-15) return -1;
+      if (x - y > 1e-15) return 1;
+      if (x - y < 1e-15) return -1;
       return 0;
     } break;
     case TYPE_CHAR: {
@@ -73,7 +71,6 @@ int ilog2(int n) {
   if (pw > 1) res++;
   return res;
 }
-
 
 // from http://www.codecodex.com/wiki/Calculate_an_integer_square_root
 unsigned long isqrt(unsigned long x) {
@@ -193,7 +190,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
   ALLOC_VAR(r, virtual_machine_t)
 
   r->mem_mode = MEM_MODE_CREW;
-  r->debug_info=NULL;
+  r->debug_info = NULL;
 
   r->heap = stack_t_new();
   r->threads = stack_t_new();
@@ -272,7 +269,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
         pos = len;
         break;
       case SECTION_DEBUG:
-        r->debug_info = debug_info_t_new(in,&pos,len);
+        r->debug_info = debug_info_t_new(in, &pos, len);
         if (!r->debug_info) exit(-1);
         break;
     }
@@ -329,7 +326,8 @@ static mem_check_value_t *mem_check_value_t_new(uint8_t _access,
 
 static void mem_check_value_deleter(void *a) { free((mem_check_value_t *)a); }
 
-static int check_read_mem(virtual_machine_t *env, hash_table_t *mem_used, void *addr) {
+static int check_read_mem(virtual_machine_t *env, hash_table_t *mem_used,
+                          void *addr) {
   if (env->mem_mode == MEM_MODE_EREW) {
     uint64_t key = (uint64_t)addr;
     if (hash_get(mem_used, key)) {
@@ -341,14 +339,14 @@ static int check_read_mem(virtual_machine_t *env, hash_table_t *mem_used, void *
   return 1;
 }
 
-static int check_write_mem(virtual_machine_t *env, hash_table_t *mem_used, void *addr,
-                           int32_t value) {
+static int check_write_mem(virtual_machine_t *env, hash_table_t *mem_used,
+                           void *addr, int32_t value) {
   uint64_t key = (uint64_t)addr;
   mem_check_value_t *data = hash_get(mem_used, key);
   if (data &&
       (env->mem_mode != MEM_MODE_CCRCW || data->value_written != value)) {
-    printf("%x %d %d\n",env->mem_mode,data->value_written,value);
-    throw("write memory access violation (%d).",___pc___);
+    printf("%x %d %d\n", env->mem_mode, data->value_written, value);
+    throw("write memory access violation (%d).", ___pc___);
 
     return 0;
   }
@@ -409,7 +407,19 @@ int execute(virtual_machine_t *env, int limit) {
     env->pc++;
 
     if (EXEC_DEBUG) {
-      printf("\n%3d: %s", env->pc - 1, instr_names[opcode]);
+      printf("\n");
+      if (env->debug_info) {
+        int i = code_map_find(env->debug_info->source_items_map, env->pc - 1);
+        if (i > -1) {
+          int it = env->debug_info->source_items_map->val[i];
+          if (it > -1) {
+            item_info_t *item = &env->debug_info->items[it];
+            printf("%s:%d,%d ", env->debug_info->files[item->fileid], item->fl,
+                   item->fc);
+          }
+        }
+      }
+      printf("%3d: %s", env->pc - 1, instr_names[opcode]);
       switch (opcode) {
         case PUSHC:
         case JMP:
@@ -475,7 +485,6 @@ int execute(virtual_machine_t *env, int limit) {
           env->thr = STACK(grp, thread_t *);
           env->n_thr = STACK_SIZE(grp, thread_t *);
           env->a_thr = env->n_thr;
-
 
         } else
           env->virtual_grps++;
@@ -586,8 +595,8 @@ int execute(virtual_machine_t *env, int limit) {
 
           // jump
           env->pc = env->fnmap[lval(env->code + env->pc, uint32_t)].addr;
-        }
-        else env->pc+=4;
+        } else
+          env->pc += 4;
         break;
 
       case RETURN: {
@@ -731,16 +740,17 @@ int execute(virtual_machine_t *env, int limit) {
                 w = v;
                 void *addr = (void *)(env->heap->data + a);
                 lval(addr, int32_t) = w;
-                if (!check_write_mem(env, mem_used, addr, v))return -5;
+                if (!check_write_mem(env, mem_used, addr, v)) return -5;
               } break;
 
               case IDX: {
                 uint8_t nd = lval(&env->code[env->pc], uint8_t);
                 uint32_t addr;
                 _POP(addr, 4);
-                uint32_t nd2 = lval(get_addr(env->thr[t],addr+4,4),uint32_t);
-                if (nd!=nd2) {
-                  throw("mismatch in dimensions %d %d (%d)",nd,nd2,___pc___);
+                uint32_t nd2 =
+                    lval(get_addr(env->thr[t], addr + 4, 4), uint32_t);
+                if (nd != nd2) {
+                  throw("mismatch in dimensions %d %d (%d)", nd, nd2, ___pc___);
                   return -3;
                 }
 
@@ -751,7 +761,7 @@ int execute(virtual_machine_t *env, int limit) {
                   _POP(v, 4);
                   env->arr_offs[i] = v;
                   if (v >= env->arr_sizes[i]) {
-                    throw("range check error %d (%d).",addr,___pc___);
+                    throw("range check error %d (%d).", addr, ___pc___);
                     return -2;
                   }
                 }
@@ -1101,13 +1111,13 @@ int execute(virtual_machine_t *env, int limit) {
       for (int i = 0; i < STACK_SIZE(env->threads, stack_t *); i++)
         printf(" %lu ",
                STACK_SIZE(STACK(env->threads, stack_t *)[i], thread_t *));
-      printf("\nenv->n_thr=%2d env->a_thr=%2d env->virtual_grps=%d\n", 
-          env->n_thr, env->a_thr, env->virtual_grps);
+      printf("\nenv->n_thr=%2d env->a_thr=%2d env->virtual_grps=%d\n",
+             env->n_thr, env->a_thr, env->virtual_grps);
       if (env->a_thr > 0) {
         printf("fbase=%d\n", env->frame->base);
         for (int t = 0; t < env->n_thr; t++) {
           printf("mem_base=%d size=%d parent=%lu", env->thr[t]->mem_base,
-                 env->thr[t]->mem->top,(unsigned long)env->thr[t]->parent);
+                 env->thr[t]->mem->top, (unsigned long)env->thr[t]->parent);
           printf("     [");
           for (int i = 0; i < env->thr[t]->op_stack->top; i++)
             printf("%d ", env->thr[t]->op_stack->data[i]);
@@ -1123,13 +1133,14 @@ int execute(virtual_machine_t *env, int limit) {
 #undef _PUSH
 #undef _POP
 
-
 void print_io_vars(writer_t *w, int n, input_layout_item_t *vars) {
   for (int i = 0; i < n; i++) {
     out_text(w, "%010u (%08x) ", vars[i].addr, vars[i].addr);
-    if (vars[i].num_dim > 0) out_text(w,"(%d)",vars[i].num_dim );
-    else out_text(w,"   ");
-    out_text(w," : layout = ");
+    if (vars[i].num_dim > 0)
+      out_text(w, "(%d)", vars[i].num_dim);
+    else
+      out_text(w, "   ");
+    out_text(w, " : layout = ");
     for (int j = 0; j < vars[i].n_elems; j++) switch (vars[i].elems[j]) {
         case TYPE_INT:
           out_text(w, "int ");
@@ -1200,28 +1211,40 @@ int read_var(reader_t *r, uint8_t *base, input_layout_item_t *var) {
   if (var->n_elems > 1)
     for (char c = '0'; c != '{';) {
       in_text(r, res, "%c", &c);
-      if (res != 1) {throw("wrong input");return -1;}
+      if (res != 1) {
+        throw("wrong input");
+        return -1;
+      }
     }
 
   for (int i = 0; i < var->n_elems; i++) switch (var->elems[i]) {
       case TYPE_INT: {
         uint32_t x;
         in_text(r, res, "%d", &x);
-        if (res != 1) {throw("wrong input");return -1;}
+        if (res != 1) {
+          throw("wrong input");
+          return -1;
+        }
         lval(base + offs, uint32_t) = x;
         offs += 4;
       } break;
       case TYPE_FLOAT: {
         float x;
         in_text(r, res, "%f", &x);
-        if (res != 1) {throw("wrong input"); return -1;}
+        if (res != 1) {
+          throw("wrong input");
+          return -1;
+        }
         lval(base + offs, float) = x;
         offs += 4;
       } break;
       case TYPE_CHAR: {
         uint8_t x;
         in_text(r, res, "%c", &x);
-        if (res != 1) {throw("wrong input"); return -1;}
+        if (res != 1) {
+          throw("wrong input");
+          return -1;
+        }
         lval(base + offs, uint8_t) = x;
         offs += 1;
       } break;
@@ -1230,53 +1253,67 @@ int read_var(reader_t *r, uint8_t *base, input_layout_item_t *var) {
   if (var->n_elems > 1)
     for (char c = '0'; c != '}';) {
       in_text(r, res, "%c", &c);
-      if (res != 1) {throw("wrong input");return -1;}
+      if (res != 1) {
+        throw("wrong input");
+        return -1;
+      }
     }
   return 0;
 }
 
-int scan_array(reader_t *r, writer_t *w, input_layout_item_t *var, int *sizes, int current,
-                int first) {
+int scan_array(reader_t *r, writer_t *w, input_layout_item_t *var, int *sizes,
+               int current, int first) {
   int res;
   int elem_size = count_size(var);
 
   for (char c = '0'; c != '[';) {
     in_text(r, res, "%c", &c);
-    if (res != 1) {throw("wrong input");return -1;}
+    if (res != 1) {
+      throw("wrong input");
+      return -1;
+    }
   }
 
   int cnt = 0;
 
   do {
-    if (current<var->num_dim-1) {
-      if (scan_array(r,w,var,sizes,current+1, (first&&cnt==0)?1:0)!=0) return -1;
+    if (current < var->num_dim - 1) {
+      if (scan_array(r, w, var, sizes, current + 1,
+                     (first && cnt == 0) ? 1 : 0) != 0)
+        return -1;
     } else {
-      out_text(w," ");
+      out_text(w, " ");
       uint8_t *buf = malloc(elem_size);
-      if (read_var(r,buf,var)!=0) {
+      if (read_var(r, buf, var) != 0) {
         free(buf);
         return -1;
       }
-      print_var(w,buf,var);
-      out_text(w," ");
+      print_var(w, buf, var);
+      out_text(w, " ");
       free(buf);
     }
 
     cnt++;
-    
-    char c =' ';
-    for (; c == ' ' || c=='\n' || c=='\t';) {
+
+    char c = ' ';
+    for (; c == ' ' || c == '\n' || c == '\t';) {
       in_text(r, res, "%c", &c);
-      if (res != 1) {throw("wrong input");return -1;}
+      if (res != 1) {
+        throw("wrong input");
+        return -1;
+      }
     }
-    if (c==']') {
-      if (first==1) sizes[current]=cnt;
-      else if (sizes[current]!=cnt)
-      {throw("wrong input size");return -1;}
+    if (c == ']') {
+      if (first == 1)
+        sizes[current] = cnt;
+      else if (sizes[current] != cnt) {
+        throw("wrong input size");
+        return -1;
+      }
 
       break;
     }
-    in_ungetc(r,c);
+    in_ungetc(r, c);
   } while (1);
   return 0;
 }
@@ -1291,35 +1328,35 @@ int read_input(reader_t *r, virtual_machine_t *env) {
     if (var->num_dim > 0) {
       int sizes[var->num_dim];
       writer_t *w = writer_t_new(WRITER_STRING);
-      if (scan_array(r, w, var, sizes, 0, 1)!=0) {
+      if (scan_array(r, w, var, sizes, 0, 1) != 0) {
         writer_t_delete(w);
         return -1;
       }
 
       int n_elem = 1;
-      for (int i=0;i<var->num_dim;i++)
-        n_elem*=sizes[i];
+      for (int i = 0; i < var->num_dim; i++) n_elem *= sizes[i];
 
       uint32_t base = env->heap->top;
       stack_t_alloc(env->heap, n_elem * elem_size);
 
       lval(get_addr(tt, env->in_vars[i].addr, 4), uint32_t) = base;
-      lval(get_addr(tt, env->in_vars[i].addr+4, 4), uint32_t) = var->num_dim;
-      for (int j=0;j<var->num_dim;j++)
-        lval(get_addr(tt, env->in_vars[i].addr + 4*(j+2), 4), uint32_t) = (uint32_t)(sizes[j]);
+      lval(get_addr(tt, env->in_vars[i].addr + 4, 4), uint32_t) = var->num_dim;
+      for (int j = 0; j < var->num_dim; j++)
+        lval(get_addr(tt, env->in_vars[i].addr + 4 * (j + 2), 4), uint32_t) =
+            (uint32_t)(sizes[j]);
 
-      reader_t *rw = reader_t_new(READER_STRING,w->str.base);
-      for (int j = 0; j < n_elem; j++) 
-        if (read_var(rw,env->heap->data+j*elem_size,var)!=0) {
+      reader_t *rw = reader_t_new(READER_STRING, w->str.base);
+      for (int j = 0; j < n_elem; j++)
+        if (read_var(rw, env->heap->data + j * elem_size, var) != 0) {
           writer_t_delete(w);
           reader_t_delete(rw);
           return -1;
         }
-      
+
       reader_t_delete(rw);
       writer_t_delete(w);
     } else {
-      if (read_var(r, get_addr(tt, var->addr, elem_size), var)!=0) return -1;
+      if (read_var(r, get_addr(tt, var->addr, elem_size), var) != 0) return -1;
     }
   }
   return 0;
@@ -1354,8 +1391,8 @@ void print_var(writer_t *w, uint8_t *addr, input_layout_item_t *var) {
   // out_text(w," ;");
 }
 
-void print_array(writer_t *w, virtual_machine_t *env, input_layout_item_t *var, int nd,
-                 int *sizes, uint32_t base, int from_dim, int offs) {
+void print_array(writer_t *w, virtual_machine_t *env, input_layout_item_t *var,
+                 int nd, int *sizes, uint32_t base, int from_dim, int offs) {
   out_text(w, "[");
   if (from_dim == nd - 1) {
     int s = count_size(var);
@@ -1391,7 +1428,7 @@ void write_output(writer_t *w, virtual_machine_t *env) {
       free(sizes);
     } else
       print_var(
-          w, 
+          w,
           STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0]->mem->data +
               env->out_vars[i].addr,
           &(env->out_vars[i]));

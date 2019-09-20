@@ -124,6 +124,7 @@ def plot(data):
 
 help_msg = 'upper_hull.py -w <what>\n   what = plot | run'
 
+
 def random_data(n):
     data= list(map(list,np.random.rand(n, 2)))  
     data=list(map(lambda x:[float(1000*x[0]),float(1000*x[1])],data))
@@ -149,8 +150,9 @@ if (__name__ == '__main__'):
         sys.exit(2)
    
     if what=='plot':
-        plot(random_data(80))
-        plt.savefig('upper_hull.png')
+        plot(data)
+        #plot(random_data(80))
+        #plt.savefig('upper_hull.png')
     else:
         Ws=[]
         Ts=[]

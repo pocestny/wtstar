@@ -1363,7 +1363,7 @@ int emit_code(ast_t *_ast, writer_t *out) {
         }
     }
 
-    //emit_debug_section(out,ast,code->pos);
+    emit_debug_section(out,ast,code->pos);
 
     {
       section = SECTION_CODE;
