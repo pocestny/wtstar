@@ -5,6 +5,8 @@ import sys
 import getopt
 import math
 import subprocess as su
+import matplotlib as mp
+mp.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import ConvexHull
@@ -50,10 +52,8 @@ def run_hull_half(input_string,dr):
         o = su.check_output("wtr upper_hull.wtr".split(),input=input_string,encoding='ascii')
     except su.CalledProcessError as e:
         print ('EXEC FAILED')
-        print (input_string)
         print (e.output)
-        print (e.returncode)
-        faults+=1
+        #print (e.returncode)
         return pts
     o = o.split()
     #print(o[len(o)-2],o[len(o)-1])
@@ -71,10 +71,13 @@ def run_hull(data):
 def test(data):
     global faults
     ground = scipy_hull(data)
-    dist =np.linalg.norm(np.array(list(map(lambda p: np.array(p[0])-np.array(p[1]), zip(run_hull(data),ground)))))
-    if dist>0.1:
+    my = run_hull(data)
+    dist =np.linalg.norm(np.array(list(map(lambda p: np.array(p[0])-np.array(p[1]), zip(my,ground)))))
+    if len(ground)!=len(my) or dist>0.1:
         print('TEST FAILED (%f)'%dist)
-        print(data)
+        f = open('upper_hull_fail_%d'%faults,'w')
+        f.write(data)
+        f.close()
         faults+=1
     return 
 
@@ -127,8 +130,6 @@ def random_data(n):
     data = list(map(list, np.unique(np.array(data),axis=0)   ))
     return data
 
-data=[[ 133.359633, 704.533089 ], [ 167.439189, 314.309827 ], [ 512.790171, 385.451808 ], [ 520.050707, 993.017012 ], [ 615.227455 ,150.527229 ], [ 648.000987 ,272.888335 ], [ 830.540102, 228.476275 ] ]
-
 if (__name__ == '__main__'):
     su.Popen('wtc upper_hull.wt -o upper_hull.wtr'.split(), stdout=su.DEVNULL)
     what =''
@@ -148,21 +149,36 @@ if (__name__ == '__main__'):
         sys.exit(2)
    
     if what=='plot':
-        plot(data)
         plot(random_data(80))
+        plt.savefig('upper_hull.png')
     else:
         Ws=[]
         Ts=[]
         Ns=[]
-        for n in range(10,1500,3):
-            print(n)
+        for n in range(10,99,3):
+            print(n,end=' ',flush=True)
             W=T=0
-            cnt=200
+            cnt=80
             for i in range(cnt):
                 test(random_data(n))
+                if i%8==0:
+                    print('.',end='',flush=True)
             Ns.append(n)
             Ws.append(W/cnt)
             Ts.append(T/cnt)
+            print(W/cnt,T/cnt)
+        for n in range(100,1500,50):
+            print(n,end=' ',flush=True)
+            W=T=0
+            cnt=20
+            for i in range(cnt):
+                test(random_data(n))
+                if i%2==0:
+                    print('.',end='',flush=True)
+            Ns.append(n)
+            Ws.append(W/cnt)
+            Ts.append(T/cnt)
+            print(W/cnt,T/cnt)
         fig,(ax1, ax2) = plt.subplots(nrows=2)    
         ax1.plot(Ns,Ts)
         ax1.set_title('time')

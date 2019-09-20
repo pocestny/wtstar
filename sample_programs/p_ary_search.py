@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import subprocess as su
 import random as rand
+import matplotlib as mp
+mp.use('Agg')
 import matplotlib.pyplot as plt
 
 
