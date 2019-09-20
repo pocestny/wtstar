@@ -183,6 +183,7 @@ int compute_hull(int l, int r) {
   }
 }
 
+
 output int q = compute_hull(0, n - 1);
 int ps[n];
 

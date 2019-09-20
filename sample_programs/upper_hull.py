@@ -76,7 +76,7 @@ def test(data):
     if len(ground)!=len(my) or dist>0.1:
         print('TEST FAILED (%f)'%dist)
         f = open('upper_hull_fail_%d'%faults,'w')
-        f.write(data)
+        f.write(str(data))
         f.close()
         faults+=1
     return 
@@ -130,10 +130,6 @@ def random_data(n):
     data = list(map(list, np.unique(np.array(data),axis=0)   ))
     return data
 
-<<<<<<< HEAD
-=======
-
->>>>>>> a7f442d880d9a195bcc5f039a7b9e2a70fa80c65
 if (__name__ == '__main__'):
     su.Popen('wtc upper_hull.wt -o upper_hull.wtr'.split(), stdout=su.DEVNULL)
     what =''
