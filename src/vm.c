@@ -11,8 +11,9 @@
 #include <vm.h>
 
 static int ___pc___;
+static int _tid = 0;
 
-extern int EXEC_DEBUG;
+int vm_print_colors=0;
 
 extern const char *const instr_names[];
 
@@ -139,6 +140,8 @@ CONSTRUCTOR(thread_t) {
   r->parent = NULL;
   r->refcnt = 1;
   r->returned = 0;
+  r->bp_hit = 0;
+  r->tid = _tid++;
   return r;
 }
 
@@ -189,6 +192,7 @@ DESTRUCTOR(frame_t) {
 CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
   ALLOC_VAR(r, virtual_machine_t)
 
+  r->state=VM_READY;
   r->mem_mode = MEM_MODE_CREW;
   r->debug_info = NULL;
 
@@ -196,7 +200,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
   r->threads = stack_t_new();
   r->frames = stack_t_new();
 
-  r->W = r->T = r->pc = r->virtual_grps = 0;
+  r->W = r->T = r->pc = r->stored_pc = r->virtual_grps = 0;
   r->n_thr = r->a_thr = 1;
 
   frame_t *tf = frame_t_new(0);
@@ -332,6 +336,7 @@ static int check_read_mem(virtual_machine_t *env, hash_table_t *mem_used,
     uint64_t key = (uint64_t)addr;
     if (hash_get(mem_used, key)) {
       throw("read memory access violation");
+      env->state=VM_ERROR;
       return 0;
     }
     hash_put(mem_used, key, mem_check_value_t_new(ACCESS_READ, 0));
@@ -347,7 +352,7 @@ static int check_write_mem(virtual_machine_t *env, hash_table_t *mem_used,
       (env->mem_mode != MEM_MODE_CCRCW || data->value_written != value)) {
     printf("%x %d %d\n", env->mem_mode, data->value_written, value);
     throw("write memory access violation (%d).", ___pc___);
-
+    env->state=VM_ERROR;
     return 0;
   }
   hash_put(mem_used, key, mem_check_value_t_new(ACCESS_WRITE, value));
@@ -395,21 +400,15 @@ static void perform_join(virtual_machine_t *env) {
     if (!env->thr[t]->returned) env->a_thr++;
 }
 
-int execute(virtual_machine_t *env, int limit) {
-  if (EXEC_DEBUG) printf("code size: %d\n", env->code_size);
-
+int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp) {
   while (1) {
-    ___pc___ = env->pc;
-    if (limit > 0) limit--;
-    if (limit == 0) return 1;
     uint8_t opcode = lval(env->code + env->pc, uint8_t);
-    if (opcode == ENDVM) break;
-    env->pc++;
-
-    if (EXEC_DEBUG) {
+    if (limit > 0) limit--;
+    if (limit == 0) return 0;
+    if (trace_on) {
       printf("\n");
       if (env->debug_info) {
-        int i = code_map_find(env->debug_info->source_items_map, env->pc - 1);
+        int i = code_map_find(env->debug_info->source_items_map, env->pc);
         if (i > -1) {
           int it = env->debug_info->source_items_map->val[i];
           if (it > -1) {
@@ -419,694 +418,31 @@ int execute(virtual_machine_t *env, int limit) {
           }
         }
       }
-      printf("%3d: %s", env->pc - 1, instr_names[opcode]);
+      printf("%3d: %s", env->pc, instr_names[opcode]);
       switch (opcode) {
         case PUSHC:
         case JMP:
         case JOIN_JMP:
-          printf(" %d", lval(&env->code[env->pc], int32_t));
+          printf(" %d", lval(&env->code[env->pc + 1], int32_t));
           break;
         case CALL:
-          printf(" %d", lval(&env->code[env->pc], uint32_t));
+        case BREAK:
+          printf(" %d", lval(&env->code[env->pc + 1], uint32_t));
           break;
         case PUSHB:
         case IDX:
-          printf(" %d", lval(&env->code[env->pc], uint8_t));
+          printf(" %d", lval(&env->code[env->pc + 1], uint8_t));
+          break;
+        case ENDVM:
+          printf("\n\n");
           break;
       }
     }
-
-    if (opcode == SORT) {
-      int max = 0, sum = 0;
-      for (int t = 0; t < env->n_thr; t++)
-        if (!env->thr[t]->returned) {
-          stack_t *s = env->thr[t]->op_stack;
-          uint32_t a = lval(s->data + (s->top - 4), uint32_t);
-          uint32_t n = lval(get_addr(env->thr[t], a + 8, 4), int32_t);
-          if (n > max) max = n;
-          sum += n * ilog2(n);
-        }
-      env->T += ilog2(max);
-      env->W += sum;
-    }
-
-    switch (opcode) {
-      case MEM_MARK:
-        if (env->a_thr > 0) mem_mark(env->frame, env, env->n_thr, env->thr);
-        break;
-      case MEM_FREE:
-        if (env->a_thr > 0) mem_free(env->frame, env, env->n_thr, env->thr);
-        break;
-      case FORK:
-        if (env->a_thr > 0) {
-          env->W++;
-          env->T++;
-          stack_t *grp = stack_t_new();
-          for (int t = 0; t < env->n_thr; t++)
-            if (!env->thr[t]->returned) {
-              uint32_t a;
-              int32_t n;
-              _POP(a, 4);
-              _POP(n, 4);
-              // is this really needed?
-              /*
-              if (n <= 0) {
-                throw("no threads to  FORK\n");
-                return -1;
-              }
-              */
-              for (int j = 0; j < n; j++) {
-                thread_t *nt = clone_thread(env->thr[t]);
-                lval(get_addr(nt, a, 4), int32_t) = j;
-                stack_t_push(grp, (void *)(&nt), sizeof(thread_t *));
-              }
-            }
-          stack_t_push(env->threads, (void *)(&grp), sizeof(stack_t *));
-          env->thr = STACK(grp, thread_t *);
-          env->n_thr = STACK_SIZE(grp, thread_t *);
-          env->a_thr = env->n_thr;
-
-        } else
-          env->virtual_grps++;
-        break;
-      case SPLIT: {
-        if (env->a_thr > 0) {
-          env->W++;
-          env->T++;
-        }
-        if (env->a_thr > 0) {
-          stack_t *nonzero = stack_t_new();
-          stack_t *zero = stack_t_new();
-          for (int t = 0; t < env->n_thr; t++)
-            if (!env->thr[t]->returned) {
-              int32_t a;
-              _POP(a, 4);
-              env->thr[t]->refcnt++;
-              if (a == 0)
-                stack_t_push(zero, (void *)(&(env->thr[t])),
-                             sizeof(thread_t *));
-              else
-                stack_t_push(nonzero, (void *)(&(env->thr[t])),
-                             sizeof(thread_t *));
-            }
-          stack_t_push(env->threads, (void *)(&nonzero), sizeof(stack_t *));
-          stack_t_push(env->threads, (void *)(&zero), sizeof(stack_t *));
-          env->thr = STACK(zero, thread_t *);
-          env->n_thr = STACK_SIZE(zero, thread_t *);
-          env->a_thr = env->n_thr;
-        } else
-          env->virtual_grps += 2;
-      } break;
-
-      case JOIN: {
-        if (env->a_thr > 0) {
-          env->W++;
-          env->T++;
-        }
-        if (env->virtual_grps > 0)
-          env->virtual_grps--;
-        else
-          perform_join(env);
-      } break;
-
-      case JOIN_JMP: {
-        if (env->a_thr > 0) {
-          env->W++;
-          env->T++;
-        }
-        if (env->virtual_grps > 0)
-          env->virtual_grps--;
-        else
-          perform_join(env);
-        env->pc += lval(env->code + env->pc, int32_t);
-      } break;
-
-      case SETR: {
-        if (env->a_thr > 0) {
-          env->W++;
-          env->T++;
-          for (int t = 0; t < env->n_thr; t++) env->thr[t]->returned = 1;
-          env->a_thr = 0;
-          for (int t = 0; t < env->n_thr; t++)
-            if (!env->thr[t]->returned) env->a_thr++;
-        }
-      } break;
-
-      case JMP:  // jump if nonempty group
-        if (env->a_thr > 0) {
-          env->W++;
-          env->T++;
-        }
-        if (env->a_thr > 0) {
-          env->pc += lval(env->code + env->pc, int32_t);
-        } else
-          env->pc += 4;
-        break;
-
-      case CALL:
-        if (env->a_thr > 0) {
-          env->W++;
-          env->T++;
-          uint32_t ra = env->pc + 4;
-
-          // copy active to new group
-          stack_t *grp = stack_t_new();
-          for (int t = 0; t < env->n_thr; t++)
-            if (!env->thr[t]->returned) {
-              env->thr[t]->refcnt++;
-              stack_t_push(grp, (void *)(&(env->thr[t])), sizeof(thread_t *));
-            }
-          stack_t_push(env->threads, (void *)(&grp), sizeof(stack_t *));
-          env->thr = STACK(grp, thread_t *);
-          env->n_thr = STACK_SIZE(grp, thread_t *);
-          env->a_thr = env->n_thr;
-
-          // create new frame
-          frame_t *nf =
-              frame_t_new(env->thr[0]->mem->top + env->thr[0]->mem_base);
-          nf->ret_addr = ra;
-          mem_mark(env->frame, env, env->n_thr, env->thr);
-
-          stack_t_push(env->frames, (void *)&nf, sizeof(frame_t *));
-          env->frame = nf;
-          nf->op_stack_end =
-              env->thr[0]->op_stack->top +
-              env->fnmap[lval(env->code + env->pc, uint32_t)].out_size;
-
-          // jump
-          env->pc = env->fnmap[lval(env->code + env->pc, uint32_t)].addr;
-        } else
-          env->pc += 4;
-        break;
-
-      case RETURN: {
-        env->W += env->n_thr;
-        env->T++;
-
-        // fix op_stack
-        int should = env->frame->op_stack_end;
-        for (int t = 0; t < env->n_thr; t++) {
-          uint8_t zero = 0;
-          while (env->thr[t]->op_stack->top < should)
-            stack_t_push(env->thr[t]->op_stack, (void *)(&zero), 1);
-          while (env->thr[t]->op_stack->top > should)
-            stack_t_pop(env->thr[t]->op_stack, (void *)(&zero), 1);
-        }
-
-        // clear flag and join
-        for (int t = 0; t < env->n_thr; t++) env->thr[t]->returned = 0;
-        perform_join(env);
-
-        // jump
-        env->pc = env->frame->ret_addr;
-
-        // remove frame
-        frame_t *of;
-        stack_t_pop(env->frames, (void *)&of, sizeof(frame_t *));
-        frame_t_delete(of);
-
-        env->frame = STACK_TOP(env->frames, frame_t *);
-        mem_free(env->frame, env, env->n_thr, env->thr);
-      } break;
-
-      default: {
-        if (env->a_thr > 0) {
-          env->W += env->a_thr;
-          env->T++;
-        }
-
-        hash_table_t *mem_used =
-            hash_table_t_new(env->a_thr, mem_check_value_deleter);
-
-        for (int t = 0; t < env->n_thr; t++)
-          if (!env->thr[t]->returned) switch (opcode) {
-              case PUSHC:
-                _PUSH(env->code[env->pc], 4);
-                break;
-
-              case PUSHB: {
-                uint32_t v = lval(env->code + env->pc, uint8_t);
-                _PUSH(v, 4);
-              } break;
-
-              case FBASE:
-                _PUSH(env->frame->base, 4);
-                break;
-
-              case SIZE: {
-                uint32_t a, d;
-                _POP(a, 4);
-                _POP(d, 4);
-                uint32_t max = lval(get_addr(env->thr[t], a + 4, 4), uint32_t);
-                if (d >= max) {
-                  throw("bad array dimension\n");
-                  return -1;
-                }
-                uint32_t size =
-                    lval(get_addr(env->thr[t], a + 4 * (d + 2), 4), uint32_t);
-                _PUSH(size, 4);
-              } break;
-
-              case LDC: {
-                uint32_t a;
-                _POP(a, 4);
-                void *addr = get_addr(env->thr[t], a, 4);
-                stack_t_push(env->thr[t]->op_stack, addr, 4);
-                if (!check_read_mem(env, mem_used, addr)) return -5;
-              } break;
-
-              case LDB: {
-                uint32_t a;
-                _POP(a, 4);
-                void *addr = get_addr(env->thr[t], a, 1);
-                int32_t w = lval(addr, uint8_t);
-                _PUSH(w, 4);
-                if (!check_read_mem(env, mem_used, addr)) return -5;
-              } break;
-
-              case STC: {
-                uint32_t a;
-                int32_t v;
-                _POP(a, 4);
-                _POP(v, 4);
-                void *addr = get_addr(env->thr[t], a, 4);
-                lval(addr, int32_t) = v;
-                if (!check_write_mem(env, mem_used, addr, v)) return -5;
-              } break;
-
-              case STB: {
-                uint32_t a;
-                int32_t v;
-                _POP(a, 4);
-                _POP(v, 4);
-                void *addr = get_addr(env->thr[t], a, 1);
-                lval(addr, uint8_t) = (uint8_t)v;
-                if (!check_write_mem(env, mem_used, addr, v)) return -5;
-              } break;
-
-              case LDCH: {
-                uint32_t a;
-                _POP(a, 4);
-                void *addr = (void *)(env->heap->data + a);
-                stack_t_push(env->thr[t]->op_stack, addr, 4);
-                if (!check_read_mem(env, mem_used, addr)) return -5;
-              } break;
-
-              case LDBH: {
-                uint32_t a;
-                _POP(a, 4);
-                void *addr = (void *)(env->heap->data + a);
-                int32_t w = lval(addr, uint8_t);
-                _PUSH(w, 4);
-                if (!check_read_mem(env, mem_used, addr)) return -5;
-              } break;
-
-              case STCH: {
-                uint32_t a;
-                int32_t v;
-                _POP(a, 4);
-                _POP(v, 4);
-                void *addr = (void *)(env->heap->data + a);
-                lval(addr, int32_t) = v;
-                if (!check_write_mem(env, mem_used, addr, v)) return -5;
-              } break;
-
-              case STBH: {
-                uint32_t a;
-                int32_t v;
-                uint8_t w;
-                _POP(a, 4);
-                _POP(v, 4);
-                w = v;
-                void *addr = (void *)(env->heap->data + a);
-                lval(addr, int32_t) = w;
-                if (!check_write_mem(env, mem_used, addr, v)) return -5;
-              } break;
-
-              case IDX: {
-                uint8_t nd = lval(&env->code[env->pc], uint8_t);
-                uint32_t addr;
-                _POP(addr, 4);
-                uint32_t nd2 =
-                    lval(get_addr(env->thr[t], addr + 4, 4), uint32_t);
-                if (nd != nd2) {
-                  throw("mismatch in dimensions %d %d (%d)", nd, nd2, ___pc___);
-                  return -3;
-                }
-
-                for (int i = 0; i < nd; i++) {
-                  env->arr_sizes[i] = lval(
-                      get_addr(env->thr[t], addr + 4 * (i + 2), 4), uint32_t);
-                  uint32_t v;
-                  _POP(v, 4);
-                  env->arr_offs[i] = v;
-                  if (v >= env->arr_sizes[i]) {
-                    throw("range check error %d (%d).", addr, ___pc___);
-                    return -2;
-                  }
-                }
-                uint32_t res = 0;
-                for (int i = 0; i < nd; i++)
-                  res = res * env->arr_sizes[i] + env->arr_offs[i];
-                _PUSH(res, 4);
-              } break;
-
-              case SWS: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                _PUSH(a, 4);
-                _PUSH(b, 4);
-              } break;
-
-              case POP: {
-                uint32_t tmp;
-                _POP(tmp, 4);
-              } break;
-
-              case A2S: {
-                _PUSH(STACK_TOP(env->thr[t]->acc_stack, int32_t), 4);
-              } break;
-
-              case POPA: {
-                int32_t val;
-                stack_t_pop(env->thr[t]->acc_stack, &val, 4);
-              } break;
-
-              case S2A:
-                stack_t_push(
-                    env->thr[t]->acc_stack,
-                    (void *)(&STACK_TOP(env->thr[t]->op_stack, int32_t)), 4);
-                break;
-
-              case RVA: {
-                int n = env->thr[t]->acc_stack->top / 4;
-                for (int i = 0; i < (int)(n / 2); i++) {
-                  int32_t a =
-                      lval(env->thr[t]->acc_stack->data + 4 * i, int32_t);
-                  lval(env->thr[t]->acc_stack->data + 4 * i, int32_t) = lval(
-                      env->thr[t]->acc_stack->data + 4 * (n - i - 1), int32_t);
-                  lval(env->thr[t]->acc_stack->data + 4 * (n - i - 1),
-                       int32_t) = a;
-                }
-              } break;
-
-              case SWA: {
-                int n = env->thr[t]->acc_stack->top / 4;
-                int32_t a =
-                    lval(env->thr[t]->acc_stack->data + 4 * (n - 2), int32_t);
-                lval(env->thr[t]->acc_stack->data + 4 * (n - 2), int32_t) =
-                    lval(env->thr[t]->acc_stack->data + 4 * (n - 1), int32_t);
-                lval(env->thr[t]->acc_stack->data + 4 * (n - 1), int32_t) = a;
-              } break;
-
-              case ADD_INT: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a += b;
-                _PUSH(a, 4);
-              } break;
-
-              case SUB_INT: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a -= b;
-                _PUSH(a, 4);
-              } break;
-
-              case MULT_INT: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                b *= a;
-                _PUSH(b, 4);
-              } break;
-
-              case DIV_INT: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a /= b;
-                _PUSH(a, 4);
-              } break;
-
-              case MOD_INT: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a %= b;
-                _PUSH(a, 4);
-              } break;
-
-              case ADD_FLOAT: {
-                float a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a += b;
-                _PUSH(a, 4);
-              } break;
-
-              case SUB_FLOAT: {
-                float a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a -= b;
-                _PUSH(a, 4);
-              } break;
-
-              case MULT_FLOAT: {
-                float a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                b *= a;
-                _PUSH(b, 4);
-              } break;
-
-              case DIV_FLOAT: {
-                float a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a /= b;
-                _PUSH(a, 4);
-              } break;
-
-              case POW_INT: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                b = ipow(a, b);
-                _PUSH(b, 4);
-              } break;
-
-              case POW_FLOAT: {
-                float a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                b = pow(a, b);
-                _PUSH(b, 4);
-              } break;
-
-              case NOT: {
-                int32_t a;
-                _POP(a, 4);
-                a = !a;
-                _PUSH(a, 4);
-              } break;
-
-              case OR: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a = (a || b);
-                _PUSH(a, 4);
-              } break;
-
-              case AND: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a = a && b;
-                _PUSH(a, 4);
-              } break;
-
-              case EQ_INT: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a = (a == b);
-                _PUSH(a, 4);
-              } break;
-
-              case EQ_FLOAT: {
-                float a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                int32_t c = (a == b);
-                _PUSH(c, 4);
-              } break;
-
-              case GT_INT: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a = (a > b);
-                _PUSH(a, 4);
-              } break;
-
-              case GT_FLOAT: {
-                float a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                int32_t c = (a > b);
-                _PUSH(c, 4);
-              } break;
-
-              case GEQ_INT: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a = (a >= b);
-                _PUSH(a, 4);
-              } break;
-
-              case GEQ_FLOAT: {
-                float a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                int32_t c = (a >= b);
-                _PUSH(c, 4);
-              } break;
-
-              case LT_INT: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a = (a < b);
-                _PUSH(a, 4);
-              } break;
-
-              case LT_FLOAT: {
-                float a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                int32_t c = (a < b);
-                _PUSH(c, 4);
-              } break;
-
-              case LEQ_INT: {
-                int32_t a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                a = (a <= b);
-                _PUSH(a, 4);
-              } break;
-
-              case LEQ_FLOAT: {
-                float a, b;
-                _POP(a, 4);
-                _POP(b, 4);
-                int32_t c = (a <= b);
-                _PUSH(c, 4);
-              } break;
-
-              case ALLOC: {
-                uint32_t c;
-                _POP(c, 4);
-                _PUSH(env->heap->top, 4);
-                stack_t_alloc(env->heap, c);
-              } break;
-
-              case INT2FLOAT: {
-                int32_t a;
-                float b;
-                _POP(a, 4);
-                b = a;
-                _PUSH(b, 4);
-              } break;
-
-              case FLOAT2INT: {
-                int32_t a;
-                float b;
-                _POP(b, 4);
-                a = b;
-                _PUSH(a, 4);
-              } break;
-
-              case LAST_BIT: {
-                int32_t a, b = 0;
-                _POP(a, 4);
-                while (a % 2 == 0) {
-                  b++;
-                  a >>= 1;
-                }
-                _PUSH(b, 4);
-              } break;
-
-              case LOGF: {
-                float a;
-                _POP(a, 4);
-                a = logf(a) / logf(2);
-                _PUSH(a, 4);
-              } break;
-
-              case LOG: {
-                int32_t a;
-                _POP(a, 4);
-                a = ilog2(a);
-                _PUSH(a, 4);
-              } break;
-
-              case SQRT: {
-                int32_t a;
-                _POP(a, 4);
-                int32_t b = isqrt(a);
-                if (b * b != a) b++;
-                _PUSH(b, 4);
-              } break;
-
-              case SQRTF: {
-                float a;
-                _POP(a, 4);
-                a = sqrtf(a);
-                _PUSH(a, 4);
-              } break;
-
-              case SORT: {
-                uint32_t a, size, offs, type;
-                _POP(a, 4);
-                _POP(size, 4);
-                _POP(offs, 4);
-                _POP(type, 4);
-                sort_param.offs = offs;
-                sort_param.type = type;
-                uint32_t n = lval(get_addr(env->thr[t], a + 8, 4), uint32_t);
-                uint32_t addr = lval(get_addr(env->thr[t], a, 4), uint32_t);
-                void *base = (void *)(env->heap->data + addr);
-                if (!check_write_mem(env, mem_used, base, 1)) return -5;
-                qsort(base, n, size, sort_compare);
-              } break;
-
-              default:
-                throw("unknown instruction %s (opcode %0x) at %u\n",
-                      instr_names[opcode], opcode, env->pc - 1);
-                return -3;
-            }  // end switch opcode for each thread
-        hash_table_t_delete(mem_used);
-      }  // end case per-thread instruction
-        switch (opcode) {
-          case PUSHC:
-            env->pc += 4;
-            break;
-          case PUSHB:
-          case IDX:
-            env->pc++;
-            break;
-        }
-    }  // end process operation
-
-    if (EXEC_DEBUG) {
+    int res = instruction(env, stop_on_bp);
+    if (res < 0) return res;  // error/ENDVM
+    if (res >0 ) return res;  // breakpoint
+
+    if (trace_on) {
       printf("\nthread groups: ");
       for (int i = 0; i < STACK_SIZE(env->threads, stack_t *); i++)
         printf(" %lu ",
@@ -1127,31 +463,785 @@ int execute(virtual_machine_t *env, int limit) {
       } else
         printf("\n");
     }
-  }  // end main loop
+  }  // end of while
+}
+
+int instruction(virtual_machine_t *env, int stop_on_bp) {
+  ___pc___ = env->pc;
+  env->stored_pc=env->pc;
+  env->state=VM_RUNNING;
+  for (int t = 0; t < env->n_thr; t++) env->thr[t]->bp_hit = 0;
+  uint8_t opcode = lval(env->code + env->pc, uint8_t);
+  if (opcode == ENDVM) {
+    env->state=VM_OK;
+    return -1;
+  }
+  env->pc++;
+
+  if (opcode == SORT) {
+    int max = 0, sum = 0;
+    for (int t = 0; t < env->n_thr; t++)
+      if (!env->thr[t]->returned) {
+        stack_t *s = env->thr[t]->op_stack;
+        uint32_t a = lval(s->data + (s->top - 4), uint32_t);
+        uint32_t n = lval(get_addr(env->thr[t], a + 8, 4), int32_t);
+        if (n > max) max = n;
+        sum += n * ilog2(n);
+      }
+    env->T += ilog2(max);
+    env->W += sum;
+  }
+
+  switch (opcode) {
+    case MEM_MARK:
+      if (env->a_thr > 0) mem_mark(env->frame, env, env->n_thr, env->thr);
+      break;
+    case MEM_FREE:
+      if (env->a_thr > 0) mem_free(env->frame, env, env->n_thr, env->thr);
+      break;
+    case FORK:
+      if (env->a_thr > 0) {
+        env->W++;
+        env->T++;
+        stack_t *grp = stack_t_new();
+        for (int t = 0; t < env->n_thr; t++)
+          if (!env->thr[t]->returned) {
+            uint32_t a;
+            int32_t n;
+            _POP(a, 4);
+            _POP(n, 4);
+            // is this really needed?
+            /*
+            if (n <= 0) {
+              throw("no threads to  FORK\n");
+              return -1;
+            }
+            */
+            for (int j = 0; j < n; j++) {
+              thread_t *nt = clone_thread(env->thr[t]);
+              lval(get_addr(nt, a, 4), int32_t) = j;
+              stack_t_push(grp, (void *)(&nt), sizeof(thread_t *));
+            }
+          }
+        stack_t_push(env->threads, (void *)(&grp), sizeof(stack_t *));
+        env->thr = STACK(grp, thread_t *);
+        env->n_thr = STACK_SIZE(grp, thread_t *);
+        env->a_thr = env->n_thr;
+
+      } else
+        env->virtual_grps++;
+      break;
+    case SPLIT: {
+      if (env->a_thr > 0) {
+        env->W++;
+        env->T++;
+      }
+      if (env->a_thr > 0) {
+        stack_t *nonzero = stack_t_new();
+        stack_t *zero = stack_t_new();
+        for (int t = 0; t < env->n_thr; t++)
+          if (!env->thr[t]->returned) {
+            int32_t a;
+            _POP(a, 4);
+            env->thr[t]->refcnt++;
+            if (a == 0)
+              stack_t_push(zero, (void *)(&(env->thr[t])), sizeof(thread_t *));
+            else
+              stack_t_push(nonzero, (void *)(&(env->thr[t])),
+                           sizeof(thread_t *));
+          }
+        stack_t_push(env->threads, (void *)(&nonzero), sizeof(stack_t *));
+        stack_t_push(env->threads, (void *)(&zero), sizeof(stack_t *));
+        env->thr = STACK(zero, thread_t *);
+        env->n_thr = STACK_SIZE(zero, thread_t *);
+        env->a_thr = env->n_thr;
+      } else
+        env->virtual_grps += 2;
+    } break;
+
+    case JOIN: {
+      if (env->a_thr > 0) {
+        env->W++;
+        env->T++;
+      }
+      if (env->virtual_grps > 0)
+        env->virtual_grps--;
+      else
+        perform_join(env);
+    } break;
+
+    case JOIN_JMP: {
+      if (env->a_thr > 0) {
+        env->W++;
+        env->T++;
+      }
+      if (env->virtual_grps > 0)
+        env->virtual_grps--;
+      else
+        perform_join(env);
+      env->pc += lval(env->code + env->pc, int32_t);
+    } break;
+
+    case SETR: {
+      if (env->a_thr > 0) {
+        env->W++;
+        env->T++;
+        for (int t = 0; t < env->n_thr; t++) env->thr[t]->returned = 1;
+        env->a_thr = 0;
+        for (int t = 0; t < env->n_thr; t++)
+          if (!env->thr[t]->returned) env->a_thr++;
+      }
+    } break;
+
+    case JMP:  // jump if nonempty group
+      if (env->a_thr > 0) {
+        env->W++;
+        env->T++;
+      }
+      if (env->a_thr > 0) {
+        env->pc += lval(env->code + env->pc, int32_t);
+      } else
+        env->pc += 4;
+      break;
+
+    case CALL:
+      if (env->a_thr > 0) {
+        env->W++;
+        env->T++;
+        uint32_t ra = env->pc + 4;
+
+        // copy active to new group
+        stack_t *grp = stack_t_new();
+        for (int t = 0; t < env->n_thr; t++)
+          if (!env->thr[t]->returned) {
+            env->thr[t]->refcnt++;
+            stack_t_push(grp, (void *)(&(env->thr[t])), sizeof(thread_t *));
+          }
+        stack_t_push(env->threads, (void *)(&grp), sizeof(stack_t *));
+        env->thr = STACK(grp, thread_t *);
+        env->n_thr = STACK_SIZE(grp, thread_t *);
+        env->a_thr = env->n_thr;
+
+        // create new frame
+        frame_t *nf =
+            frame_t_new(env->thr[0]->mem->top + env->thr[0]->mem_base);
+        nf->ret_addr = ra;
+        mem_mark(env->frame, env, env->n_thr, env->thr);
+
+        stack_t_push(env->frames, (void *)&nf, sizeof(frame_t *));
+        env->frame = nf;
+        nf->op_stack_end =
+            env->thr[0]->op_stack->top +
+            env->fnmap[lval(env->code + env->pc, uint32_t)].out_size;
+
+        // jump
+        env->pc = env->fnmap[lval(env->code + env->pc, uint32_t)].addr;
+      } else
+        env->pc += 4;
+      break;
+
+    case BREAK: {
+      int hits = 0;
+      for (int t = 0; t < env->n_thr; t++)
+        if (!env->thr[t]->returned) {
+          uint32_t f;
+          _POP(f, 4);
+          if (f && stop_on_bp) {
+            /*printf("breakpoint %d hit in thread %d\n",
+                   lval(env->code + env->pc, uint32_t), env->thr[t]->tid);*/
+            env->thr[t]->bp_hit = 1;
+            hits++;
+          }
+        }
+      env->pc += 4;
+      if (hits > 0 && stop_on_bp) return lval(env->code + (env->pc-4), uint32_t);
+    } break;
+
+    case RETURN: {
+      env->W += env->n_thr;
+      env->T++;
+
+      // fix op_stack
+      int should = env->frame->op_stack_end;
+      for (int t = 0; t < env->n_thr; t++) {
+        uint8_t zero = 0;
+        while (env->thr[t]->op_stack->top < should)
+          stack_t_push(env->thr[t]->op_stack, (void *)(&zero), 1);
+        while (env->thr[t]->op_stack->top > should)
+          stack_t_pop(env->thr[t]->op_stack, (void *)(&zero), 1);
+      }
+
+      // clear flag and join
+      for (int t = 0; t < env->n_thr; t++) env->thr[t]->returned = 0;
+      perform_join(env);
+
+      // jump
+      env->pc = env->frame->ret_addr;
+
+      // remove frame
+      frame_t *of;
+      stack_t_pop(env->frames, (void *)&of, sizeof(frame_t *));
+      frame_t_delete(of);
+
+      env->frame = STACK_TOP(env->frames, frame_t *);
+      mem_free(env->frame, env, env->n_thr, env->thr);
+    } break;
+
+    default: {
+      if (env->a_thr > 0) {
+        env->W += env->a_thr;
+        env->T++;
+      }
+
+      hash_table_t *mem_used =
+          hash_table_t_new(env->a_thr, mem_check_value_deleter);
+
+      for (int t = 0; t < env->n_thr; t++)
+        if (!env->thr[t]->returned) switch (opcode) {
+            case PUSHC:
+              _PUSH(env->code[env->pc], 4);
+              break;
+
+            case PUSHB: {
+              uint32_t v = lval(env->code + env->pc, uint8_t);
+              _PUSH(v, 4);
+            } break;
+
+            case FBASE: {
+              uint32_t a;
+              _POP(a, 4);
+              a += env->frame->base;
+              _PUSH(a, 4);
+            } break;
+
+            case SIZE: {
+              uint32_t a, d;
+              _POP(a, 4);
+              _POP(d, 4);
+              uint32_t max = lval(get_addr(env->thr[t], a + 4, 4), uint32_t);
+              if (d >= max) {
+                throw("bad array dimension\n");
+                env->state=VM_ERROR;
+                return -2;
+              }
+              uint32_t size =
+                  lval(get_addr(env->thr[t], a + 4 * (d + 2), 4), uint32_t);
+              _PUSH(size, 4);
+            } break;
+
+            case LDC: {
+              uint32_t a;
+              _POP(a, 4);
+              void *addr = get_addr(env->thr[t], a, 4);
+              stack_t_push(env->thr[t]->op_stack, addr, 4);
+              if (!check_read_mem(env, mem_used, addr)) return -5;
+            } break;
+
+            case LDB: {
+              uint32_t a;
+              _POP(a, 4);
+              void *addr = get_addr(env->thr[t], a, 1);
+              int32_t w = lval(addr, uint8_t);
+              _PUSH(w, 4);
+              if (!check_read_mem(env, mem_used, addr)) return -5;
+            } break;
+
+            case STC: {
+              uint32_t a;
+              int32_t v;
+              _POP(a, 4);
+              _POP(v, 4);
+              void *addr = get_addr(env->thr[t], a, 4);
+              lval(addr, int32_t) = v;
+              if (!check_write_mem(env, mem_used, addr, v)) return -5;
+            } break;
+
+            case STB: {
+              uint32_t a;
+              int32_t v;
+              _POP(a, 4);
+              _POP(v, 4);
+              void *addr = get_addr(env->thr[t], a, 1);
+              lval(addr, uint8_t) = (uint8_t)v;
+              if (!check_write_mem(env, mem_used, addr, v)) return -5;
+            } break;
+
+            case LDCH: {
+              uint32_t a;
+              _POP(a, 4);
+              void *addr = (void *)(env->heap->data + a);
+              stack_t_push(env->thr[t]->op_stack, addr, 4);
+              if (!check_read_mem(env, mem_used, addr)) return -5;
+            } break;
+
+            case LDBH: {
+              uint32_t a;
+              _POP(a, 4);
+              void *addr = (void *)(env->heap->data + a);
+              int32_t w = lval(addr, uint8_t);
+              _PUSH(w, 4);
+              if (!check_read_mem(env, mem_used, addr)) return -5;
+            } break;
+
+            case STCH: {
+              uint32_t a;
+              int32_t v;
+              _POP(a, 4);
+              _POP(v, 4);
+              void *addr = (void *)(env->heap->data + a);
+              lval(addr, int32_t) = v;
+              if (!check_write_mem(env, mem_used, addr, v)) return -5;
+            } break;
+
+            case STBH: {
+              uint32_t a;
+              int32_t v;
+              uint8_t w;
+              _POP(a, 4);
+              _POP(v, 4);
+              w = v;
+              void *addr = (void *)(env->heap->data + a);
+              lval(addr, int32_t) = w;
+              if (!check_write_mem(env, mem_used, addr, v)) return -5;
+            } break;
+
+            case IDX: {
+              uint8_t nd = lval(&env->code[env->pc], uint8_t);
+              uint32_t addr;
+              _POP(addr, 4);
+              uint32_t nd2 = lval(get_addr(env->thr[t], addr + 4, 4), uint32_t);
+              if (nd != nd2) {
+                throw("mismatch in dimensions %d %d (%d)", nd, nd2, ___pc___);
+                env->state=VM_ERROR;
+                return -3;
+              }
+
+              for (int i = 0; i < nd; i++) {
+                env->arr_sizes[i] = lval(
+                    get_addr(env->thr[t], addr + 4 * (i + 2), 4), uint32_t);
+                uint32_t v;
+                _POP(v, 4);
+                env->arr_offs[i] = v;
+                if (v >= env->arr_sizes[i]) {
+                  throw("range check error %d (%d).", addr, ___pc___);
+                  env->state=VM_ERROR;
+                  return -2;
+                }
+              }
+              uint32_t res = 0;
+              for (int i = 0; i < nd; i++)
+                res = res * env->arr_sizes[i] + env->arr_offs[i];
+              _PUSH(res, 4);
+            } break;
+
+            case SWS: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              _PUSH(a, 4);
+              _PUSH(b, 4);
+            } break;
+
+            case POP: {
+              uint32_t tmp;
+              _POP(tmp, 4);
+            } break;
+
+            case A2S: {
+              _PUSH(STACK_TOP(env->thr[t]->acc_stack, int32_t), 4);
+            } break;
+
+            case POPA: {
+              int32_t val;
+              stack_t_pop(env->thr[t]->acc_stack, &val, 4);
+            } break;
+
+            case S2A:
+              stack_t_push(env->thr[t]->acc_stack,
+                           (void *)(&STACK_TOP(env->thr[t]->op_stack, int32_t)),
+                           4);
+              break;
+
+            case RVA: {
+              int n = env->thr[t]->acc_stack->top / 4;
+              for (int i = 0; i < (int)(n / 2); i++) {
+                int32_t a = lval(env->thr[t]->acc_stack->data + 4 * i, int32_t);
+                lval(env->thr[t]->acc_stack->data + 4 * i, int32_t) = lval(
+                    env->thr[t]->acc_stack->data + 4 * (n - i - 1), int32_t);
+                lval(env->thr[t]->acc_stack->data + 4 * (n - i - 1), int32_t) =
+                    a;
+              }
+            } break;
+
+            case SWA: {
+              int n = env->thr[t]->acc_stack->top / 4;
+              int32_t a =
+                  lval(env->thr[t]->acc_stack->data + 4 * (n - 2), int32_t);
+              lval(env->thr[t]->acc_stack->data + 4 * (n - 2), int32_t) =
+                  lval(env->thr[t]->acc_stack->data + 4 * (n - 1), int32_t);
+              lval(env->thr[t]->acc_stack->data + 4 * (n - 1), int32_t) = a;
+            } break;
+
+            case ADD_INT: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a += b;
+              _PUSH(a, 4);
+            } break;
+
+            case SUB_INT: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a -= b;
+              _PUSH(a, 4);
+            } break;
+
+            case MULT_INT: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              b *= a;
+              _PUSH(b, 4);
+            } break;
+
+            case DIV_INT: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a /= b;
+              _PUSH(a, 4);
+            } break;
+
+            case MOD_INT: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a %= b;
+              _PUSH(a, 4);
+            } break;
+
+            case ADD_FLOAT: {
+              float a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a += b;
+              _PUSH(a, 4);
+            } break;
+
+            case SUB_FLOAT: {
+              float a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a -= b;
+              _PUSH(a, 4);
+            } break;
+
+            case MULT_FLOAT: {
+              float a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              b *= a;
+              _PUSH(b, 4);
+            } break;
+
+            case DIV_FLOAT: {
+              float a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a /= b;
+              _PUSH(a, 4);
+            } break;
+
+            case POW_INT: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              b = ipow(a, b);
+              _PUSH(b, 4);
+            } break;
+
+            case POW_FLOAT: {
+              float a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              b = pow(a, b);
+              _PUSH(b, 4);
+            } break;
+
+            case NOT: {
+              int32_t a;
+              _POP(a, 4);
+              a = !a;
+              _PUSH(a, 4);
+            } break;
+
+            case OR: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a = (a || b);
+              _PUSH(a, 4);
+            } break;
+
+            case AND: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a = a && b;
+              _PUSH(a, 4);
+            } break;
+
+            case EQ_INT: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a = (a == b);
+              _PUSH(a, 4);
+            } break;
+
+            case EQ_FLOAT: {
+              float a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              int32_t c = (a == b);
+              _PUSH(c, 4);
+            } break;
+
+            case GT_INT: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a = (a > b);
+              _PUSH(a, 4);
+            } break;
+
+            case GT_FLOAT: {
+              float a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              int32_t c = (a > b);
+              _PUSH(c, 4);
+            } break;
+
+            case GEQ_INT: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a = (a >= b);
+              _PUSH(a, 4);
+            } break;
+
+            case GEQ_FLOAT: {
+              float a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              int32_t c = (a >= b);
+              _PUSH(c, 4);
+            } break;
+
+            case LT_INT: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a = (a < b);
+              _PUSH(a, 4);
+            } break;
+
+            case LT_FLOAT: {
+              float a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              int32_t c = (a < b);
+              _PUSH(c, 4);
+            } break;
+
+            case LEQ_INT: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a = (a <= b);
+              _PUSH(a, 4);
+            } break;
+
+            case LEQ_FLOAT: {
+              float a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              int32_t c = (a <= b);
+              _PUSH(c, 4);
+            } break;
+
+            case ALLOC: {
+              uint32_t c;
+              _POP(c, 4);
+              _PUSH(env->heap->top, 4);
+              stack_t_alloc(env->heap, c);
+            } break;
+
+            case INT2FLOAT: {
+              int32_t a;
+              float b;
+              _POP(a, 4);
+              b = a;
+              _PUSH(b, 4);
+            } break;
+
+            case FLOAT2INT: {
+              int32_t a;
+              float b;
+              _POP(b, 4);
+              a = b;
+              _PUSH(a, 4);
+            } break;
+
+            case LAST_BIT: {
+              int32_t a, b = 0;
+              _POP(a, 4);
+              while (a % 2 == 0) {
+                b++;
+                a >>= 1;
+              }
+              _PUSH(b, 4);
+            } break;
+
+            case LOGF: {
+              float a;
+              _POP(a, 4);
+              a = logf(a) / logf(2);
+              _PUSH(a, 4);
+            } break;
+
+            case LOG: {
+              int32_t a;
+              _POP(a, 4);
+              a = ilog2(a);
+              _PUSH(a, 4);
+            } break;
+
+            case SQRT: {
+              int32_t a;
+              _POP(a, 4);
+              int32_t b = isqrt(a);
+              if (b * b != a) b++;
+              _PUSH(b, 4);
+            } break;
+
+            case SQRTF: {
+              float a;
+              _POP(a, 4);
+              a = sqrtf(a);
+              _PUSH(a, 4);
+            } break;
+
+            case SORT: {
+              uint32_t a, size, offs, type;
+              _POP(a, 4);
+              _POP(size, 4);
+              _POP(offs, 4);
+              _POP(type, 4);
+              sort_param.offs = offs;
+              sort_param.type = type;
+              uint32_t n = lval(get_addr(env->thr[t], a + 8, 4), uint32_t);
+              uint32_t addr = lval(get_addr(env->thr[t], a, 4), uint32_t);
+              void *base = (void *)(env->heap->data + addr);
+              if (!check_write_mem(env, mem_used, base, 1)) return -5;
+              qsort(base, n, size, sort_compare);
+            } break;
+
+            default:
+              throw("unknown instruction %s (opcode %0x) at %u\n",
+                    instr_names[opcode], opcode, env->pc - 1);
+              env->state=VM_ERROR;
+              return -3;
+          }  // end switch opcode for each thread
+      hash_table_t_delete(mem_used);
+    }  // end case per-thread instruction
+      switch (opcode) {
+        case PUSHC:
+          env->pc += 4;
+          break;
+        case PUSHB:
+        case IDX:
+          env->pc++;
+          break;
+      }
+  }  // end process operation
+
   return 0;
 }
 #undef _PUSH
 #undef _POP
 
-void print_io_vars(writer_t *w, int n, input_layout_item_t *vars) {
+void print_types(writer_t *w, virtual_machine_t *env) {
+  if (!env->debug_info) return;
+  if (env->debug_info->n_types <= 4) return;
+  out_text(w, "types:\n");
+  for (int i = 0; i < env->debug_info->n_types; i++) {
+    int nm = env->debug_info->types[i].n_members;
+    if (nm == 0) continue;  // don't write basic types (?)
+    out_text(w, "  %s ", env->debug_info->types[i].name);
+    if (nm > 0) out_text(w, " : {");
+    for (int j = 0; j < nm; j++)
+      out_text(w, "%c %s %s", (j == 0) ? ' ' : ',',
+               env->debug_info->types[env->debug_info->types[i].member_types[j]]
+                   .name,
+               env->debug_info->types[i].member_names[j]);
+    if (nm > 0) out_text(w, " }");
+    out_text(w, "\n");
+  }
+}
+
+void print_var_name(writer_t *w, virtual_machine_t *env, int addr) {
+  if (!env->debug_info) return;
+  for (int j = 0; j < env->debug_info->scopes[0].n_vars; j++)
+    if (env->debug_info->scopes[0].vars[j].addr == addr) {
+      out_text(
+          w, "  %s %s",
+          env->debug_info->types[env->debug_info->scopes[0].vars[j].type].name,
+          env->debug_info->scopes[0].vars[j].name);
+      int nd = env->debug_info->scopes[0].vars[j].num_dim;
+      if (nd > 0) {
+        out_text(w, "[");
+        for (int i = 0; i < nd; i++) {
+          if (i > 0) out_text(w, ",");
+          out_text(w, "_");
+        }
+        out_text(w, "]");
+      }
+      break;
+    }
+}
+
+void print_var_layout(writer_t *w, input_layout_item_t *it) {
+  for (int j = 0; j < it->n_elems; j++) switch (it->elems[j]) {
+      case TYPE_INT:
+        out_text(w, "int ");
+        break;
+      case TYPE_FLOAT:
+        out_text(w, "float ");
+        break;
+      case TYPE_CHAR:
+        out_text(w, "char ");
+        break;
+    }
+}
+
+void print_io_vars(writer_t *w, virtual_machine_t *env, int n,
+                   input_layout_item_t *vars) {
   for (int i = 0; i < n; i++) {
     out_text(w, "%010u (%08x) ", vars[i].addr, vars[i].addr);
-    if (vars[i].num_dim > 0)
-      out_text(w, "(%d)", vars[i].num_dim);
-    else
-      out_text(w, "   ");
-    out_text(w, " : layout = ");
-    for (int j = 0; j < vars[i].n_elems; j++) switch (vars[i].elems[j]) {
-        case TYPE_INT:
-          out_text(w, "int ");
-          break;
-        case TYPE_FLOAT:
-          out_text(w, "float ");
-          break;
-        case TYPE_CHAR:
-          out_text(w, "char ");
-          break;
-      }
+    if (env->debug_info)
+      print_var_name(w, env, vars[i].addr);
+    else {
+      if (vars[i].num_dim > 0)
+        out_text(w, "(%d)", vars[i].num_dim);
+      else
+        out_text(w, "   ");
+    }
+    out_text(w, " : ");
+    print_var_layout(w, &vars[i]);
     out_text(w, "\n");
   }
 }
@@ -1182,7 +1272,7 @@ void print_code(writer_t *w, uint8_t *code, int size) {
       out_text(w, "???\n");
       continue;
     }
-    out_text(w, "%04d (%04x) %s", i, i, instr_names[instr]);
+    out_text(w, "%010d (%08x) %s", i, i, instr_names[instr]);
     switch (instr) {
       case PUSHC:
       case JMP:
@@ -1191,6 +1281,7 @@ void print_code(writer_t *w, uint8_t *code, int size) {
         i += 4;
         break;
       case CALL:
+      case BREAK:
         out_text(w, " %d", lval(&code[i + 1], uint32_t));
         i += 4;
         break;
@@ -1411,34 +1502,86 @@ void print_array(writer_t *w, virtual_machine_t *env, input_layout_item_t *var,
   out_text(w, "]");
 }
 
-void write_output(writer_t *w, virtual_machine_t *env) {
-  for (int i = 0; i < env->n_out_vars; i++) {
-    if (env->out_vars[i].num_dim > 0) {
-      int elem_size = count_size(&(env->out_vars[i]));
-      uint8_t *global_mem =
-          STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0]->mem->data;
-      uint32_t base = lval(global_mem + env->out_vars[i].addr, uint32_t);
+void write_output(writer_t *w, virtual_machine_t *env, int i) {
+  if (env->out_vars[i].num_dim > 0) {
+    int elem_size = count_size(&(env->out_vars[i]));
+    uint8_t *global_mem =
+        STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0]->mem->data;
+    uint32_t base = lval(global_mem + env->out_vars[i].addr, uint32_t);
 
-      uint8_t nd = env->out_vars[i].num_dim;
-      int *sizes = (int *)malloc(nd * sizeof(int));
-      for (int j = 0; j < nd; j++)
-        sizes[j] =
-            lval(global_mem + env->out_vars[i].addr + 4 * (j + 2), uint32_t);
-      print_array(w, env, &(env->out_vars[i]), nd, sizes, base, 0, 0);
-      free(sizes);
-    } else
-      print_var(
-          w,
-          STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0]->mem->data +
-              env->out_vars[i].addr,
-          &(env->out_vars[i]));
+    uint8_t nd = env->out_vars[i].num_dim;
+    int *sizes = (int *)malloc(nd * sizeof(int));
+    for (int j = 0; j < nd; j++)
+      sizes[j] =
+          lval(global_mem + env->out_vars[i].addr + 4 * (j + 2), uint32_t);
+    print_array(w, env, &(env->out_vars[i]), nd, sizes, base, 0, 0);
+    free(sizes);
+  } else
+    print_var(
+        w,
+        STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0]->mem->data +
+            env->out_vars[i].addr,
+        &(env->out_vars[i]));
+  out_text(w, "\n");
+}
+
+void dump_header(writer_t *w, virtual_machine_t *env) {
+  out_text(w, "data segment:       %d B\n", env->global_size);
+  out_text(w, "memory mode:        %s\n", mode_name(env->mem_mode));
+  out_text(w, "input variables:\n");
+  print_io_vars(w, env, env->n_in_vars, env->in_vars);
+  out_text(w, "output variables:\n");
+  print_io_vars(w, env, env->n_out_vars, env->out_vars);
+  out_text(w, "function addresses:\n");
+  for (uint32_t i = 0; i < env->fcnt; i++) {
+    out_text(w, "%03d %010u (%08x)", i, env->fnmap[i], env->fnmap[i]);
+    if (env->debug_info) {
+      out_text(w, " %s (%s:%d.%d)", env->debug_info->fn_names[i],
+               env->debug_info
+                   ->files[env->debug_info->items[env->debug_info->fn_items[i]]
+                               .fileid],
+               env->debug_info->items[env->debug_info->fn_items[i]].fl,
+               env->debug_info->items[env->debug_info->fn_items[i]].fc);
+    }
     out_text(w, "\n");
   }
 }
 
-void dump_memory(writer_t *w, virtual_machine_t *env) {
-  out_text(w, "mem (size=%d): ", env->heap->size);
-  for (int i = 0; i < env->heap->size; i++)
-    out_text(w, "%02u ", env->heap->data[i]);
-  out_text(w, "\n");
+void dump_debug_info(writer_t *w, virtual_machine_t *env) {
+  if (!env->debug_info) return;
+  out_text(w, "source files:\n");
+  for (int i = 0; i < env->debug_info->n_files; i++)
+    out_text(w, "  %s\n", env->debug_info->files[i]);
+  print_types(w, env);
+  out_text(w, "root variables:\n");
+  for (int j = 0; j < env->debug_info->scopes[0].n_vars; j++) {
+    int addr = env->debug_info->scopes[0].vars[j].addr;
+    char c = ' ';
+    for (int i = 0; i < env->n_in_vars; i++)
+      if (env->in_vars[i].addr == addr) c = 'i';
+    for (int i = 0; i < env->n_out_vars; i++)
+      if (env->out_vars[i].addr == addr) c = 'o';
+    out_text(w, " %010u (%08x) %c", addr, addr, c);
+    print_var_name(w, env, addr);
+    out_text(w, "\n");
+  }
 }
+
+char *mode_name(int mode) {
+  static char *erew = "EREW";
+  static char *crew = "CREW";
+  static char *ccrcw = "cCRCW";
+
+  switch (mode) {
+    case MEM_MODE_EREW:
+      return erew;
+    case MEM_MODE_CREW:
+      return crew;
+    case MEM_MODE_CCRCW:
+      return ccrcw;
+    default:
+      return NULL;
+  }
+}
+
+

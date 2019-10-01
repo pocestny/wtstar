@@ -41,7 +41,7 @@ The structure of this document is as follows:
     * [Expressions](#expressions)
     * [Statements](#statements)
     * [Functions](#functions)
-    * [Memory modes](#modes)
+    * [Directives](#directives)
 3. [Demos](#demos)    
     * [Factorial](#demo-factorial)
     * [Sum](#demo-sum)
@@ -57,7 +57,9 @@ The simplest way to use the framework is via the [live web frontend](./frontend.
 ### CLI tools <a name="cli"></a>
 
 * `wtc` is a compiler from the WT\* language to a binary format (`wtc demo.wt -o demo.wtr`)
-* `wtr` runs the binary (reads input from stdin) 
+* `wtrun` runs the binary (reads input from stdin) 
+* `wtdb`
+* `wtdump`
 
 ### Building from source <a name="building"></a>
 
@@ -318,10 +320,35 @@ on an input `[ {8 1 4} {3 4 6} {9 6 10} {1 7 5} ]` produces
 `[{ 1.000000 7.000000 5 } { 3.000000 4.000000 6 } { 8.000000 1.000000 4 } 
 { 9.000000 6.000000 10 }]`
 
-### Memory modes <a name="modes"></a>
+### Directives <a name="directives"></a>
 
 One can use `#mode <mode>` to switch memory mode to one of `EREW`, `CREW` (default),
 `cCRCW`.
+
+A file can be included (i.e. directly inserted) by `#include "<filename>"`. The filename 
+is considered relative to the file from which the `#include` directive is used.
+
+A version `#include once "<filename>"` includes the file only if it has not
+been included yet. Imagine a file `filefoo` with a definition of function
+`foo`, and another file `filegoo` that defines function `goo` that uses `foo`,
+so `filegoo` contains `#include "filefoo"`. Now a file `main` that uses both
+`foo` and `goo` cannot contain
+
+    #include "filegoo"
+    #include "filefoo"
+
+since function `foo` would be redefined. Calling
+
+    #include "filegoo"
+    #include once "filefoo"
+
+solves the problem.
+
+For debugging, one can use statement `@<tag>(<condition>)`. When running in
+`wtrun` the condition is evaluated and discarded. When running in `wtdb`, 
+if the condition is evaluated to `true` in at least one thread, the execution
+is stopped.
+
 
 [--toc--](#toc)
 

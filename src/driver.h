@@ -13,10 +13,6 @@
  * The filenames input to #driver_push_file and #driver_parse are normalized relative
  * to currently active path.
  *
- * @todo The language should also support (if not a proper preprocessor) at least some
- * directive `#include_once <file>` to include a file only if it hasn't already been 
- * included (for the same reasons `#ifdef` guards are used)
- *
  */
 #ifndef __DRIVER_H__
 #define __DRIVER_H__
@@ -48,10 +44,12 @@ ast_t *driver_parse(const char *filename);
 /**
  * @brief Switch to a new file
  *
+ * if `only_once` is set, the file will not be pushed if it was already included
+ *
  * @todo When in web mode, and the content of a file is not preloaded, it should
  * not try to open the file (there is no filesystem present)
  */
-void driver_push_file(const char *filename);
+void driver_push_file(const char *filename, int only_once);
 
 /**
  * @brief Remove current file from the stack of included files.

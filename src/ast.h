@@ -49,6 +49,7 @@ typedef struct {
   uint32_t size;
   char *name;                             // owned
   struct _static_type_member_t *members;  // owned
+  uint32_t id; // for generating debug info
 } static_type_t;
 
 CONSTRUCTOR(static_type_t, char *name);
@@ -56,9 +57,6 @@ DESTRUCTOR(static_type_t);
 
 // return the TYPE_* descriptor (see code.h) of a basic type
 // (for non-basic type assert fails)
-/*!
- * stuff
- */
 int static_type_basic(static_type_t *t);
 
 /*
@@ -321,10 +319,12 @@ int expr_int(expression_t *e);
 #define STMT_FOR 72
 #define STMT_PARDO 73
 #define STMT_RETURN 75
+#define STMT_BREAKPOINT 76
 
 typedef struct _statement_t {
   int variant;
   struct _ast_node_t *par[2];  // owned
+  int tag; // used for breakpoints
   function_t *ret_fn; // external, only used for return
 } statement_t;
 

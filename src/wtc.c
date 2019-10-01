@@ -6,11 +6,13 @@
  *      option   | meaning
  *  -------------|-------------
  *   -o file     | write output to file (default is a.out)
+ *   -x          | don't write debug info
  *   -D          | print intermediate AST instead of code
  *
  * @deprecated The -D option uses ast_debug_print.h which is terribly outdated
  * and incoplete. Not intended for use.
  */
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,6 +30,7 @@ char *outf,  //!< name of output file
     *inf;    //!< name of input file
 
 int ast_debug = 0,  //!< flag: -D option enabled
+    no_debug  = 0,  //!< flag: -x option enabled
     outf_spec = 0;  //!< flag: -o option enabled
 
 //! Print usage options.
@@ -36,6 +39,7 @@ void print_help(int argc, char **argv) {
   printf("options:\n");
   printf("-h,-?         print this screen and exit\n");
   printf("-o file       write output to file \n");
+  printf("-x            don't write debug info \n");
   printf("-D            print intermediate AST instead of code \n");
   exit(0);
 }
@@ -55,6 +59,8 @@ void parse_options(int argc, char **argv) {
       outf_spec = 1;
     } else if (!strcmp(argv[i], "-D")) {
       ast_debug = 1;
+    } else if (!strcmp(argv[i], "-x")) {
+      no_debug = 1;
     } else
       inf = argv[i];
 }
@@ -115,7 +121,7 @@ int main(int argc, char **argv) {
     emit_error(err);
   } else if (ast_debug)
     ast_debug_print(r, out);
-  else if (emit_code(r, out)) {
+  else if (emit_code(r, out, no_debug)) {
     was_error = 1;
     error_t *err = error_t_new();
     append_error_msg(err, "there were errors");

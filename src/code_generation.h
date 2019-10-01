@@ -30,7 +30,7 @@ void add_code_block(code_block_t *dst, code_block_t *src);
 // add one instruction with parameters to code block
 void add_instr(code_block_t *out, int code, ...);
 
-//! this is the main interface
-int emit_code(ast_t *_ast, writer_t *out) ;
+//! this is the main interface (if `no_debug` is set, no debug info is written)
+int emit_code(ast_t *_ast, writer_t *out, int no_debug) ;
 
 #endif

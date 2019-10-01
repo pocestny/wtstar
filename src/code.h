@@ -1,211 +1,274 @@
-/*
- * instruction set of the virtual machine
+/**
+ * @file code.h
+ * @brief Instruction set and helpers
+ *
+ * ### Structure of the binary file ###
+ *
+ * The file consists of sections. The first section is HEADER
+ *
+ *  type    | meaning
+ *  --------|-------
+ *   uint8  | `SECTION_HEADER`
+ *   uint8  | version byte
+ *   uint32 | size of static memory
+ *   uint8  | memory mode
+ *
+ * Following the header are in arbitrary order sections INPUT, OUTPUT, CODE, and optionally
+ * DEBUG.
+ *
+ * The INPUT and OUTPUT sections describe the input/output variables and
+ * have the same structure:
+ *
+ *  type    | meaning
+ *  --------|-------
+ *   uint8  | `SECTION_INPUT` or `SECTION_OUTPUT`
+ *   uint32 | `n_var` - number of input/output variables
+ *
+ * followed by `n_var` descriptions of variables. A descriptor is:
+ *
+ *  type    | meaning
+ *  --------|-------
+ *   uint32 | address in the static memory
+ *   uint8  | number of dimensions
+ *   uint8  | `type_layout_size`
+ *
+ * followed by a sequence of `type_layout_size` bytes from #type_descriptor_t
+ *
+ * @note The restriction means that there are at most 256 dimensions in an array, and at 
+ * most 256 subtypes in a type.
+ *
+ * The FNMAP section maps functions to addresses:
+ *
+ *  type    | meaning
+ *  --------|-------
+ *   uint8  | `SECTION_FNMAP`
+ *   uint32 | `n_fn` - number of functions
+ *
+ * followed by `n_fn` function descriptors:
+ *
+ *  type    | meaning
+ *  --------|-------
+ *   uint32 | address in the code segment
+ *   int32  | `stack_change`: how should the `op_stack` change after the call
+ *  
+ * `stack_change` = `out_type_size` - `overall_size_of_parameters`
+ *
+ * The DEBUG section is optional, and has the following structure:
+ *
+ *  type                                | meaning
+ *  ------------------------------------|-------
+ *  uint8                               | `SECTION_DEBUG`
+ *  uint32                              | `n_files`
+ *  `n_files` 0-terminated strings      | names of the included files
+ *  uint32                              | `n_fn`
+ *  `n_fn` pairs uint32, string         | references to items, and names of functions
+ *  uint32                              | `n_src_items`
+ *  `n_src_items` descriptors           | descriptors of source entities that generated code
+ *  uint32                              | `n_src_map`: source item map size
+ *  `n_scr_map` pairs of uint32,int32   | each pair is (breakpoint,item_id) 
+ *  uint32                              | `n_types`
+ *  `n_types` type descriptors          | name, n_members, for each member name, id
+ *  uint32                              | `n_scope_map` : scope map size
+ *  `n_scope_map` pairs of uint32,int32 |  each pair is (breakpoint,scope_id)
+ *  uint32_t                            | `n_scopes`
+ *  `n_scopes` scope_info               | for each scope its descriptor
+ *
+ *
+ *  The source item descriptor consist of 5 `uint32` numbers: `fileid` (index to the
+ *  `files` table), `first_line`, `first_column`, `last_line`, `last_column` 
+ *
+ *  The scope descriptor contains parent, n_vars, and for each variable
+ *  name, type, num_dim, start_code, address
+ *
+ *  For a pair `(bp,item)` in the source map, the code starting from `bp` up to
+ *  the next breakpoint was generated from the entity `item`
+ *
+ *  ### Storage ###
+ *
+ *  `int`, `float`, `char` are stored directly in memory as `int32_t`, `float`, `uint8_t`.
+ *
+ *  Arrays have header in static memory, and the contents is allocated on heap
+ *  when the array is created. The header has the following structure
+ *
+ *  type                   | meaning
+ *  -----------------------|-------
+ *  uint32                 |  base address (relative to heap)
+ *  uint32                 |  `n_dim`
+ *  `n_dim`  uint32 ranges |  size in i-th dimension
+ *
+ * ### Function calls ###
+ *
+ * on `call x`
+ * :  copy non_returned threads from the active group to newly created group
+ *
+ * on `return x`
+ * :   `push x`, `ret_join` which sets `returned` flag and joins the current group
+ *
+ * on end of function
+ * :   call `return` clear `returned` flag, join current group, set ret_addr
  */
+
 
 #ifndef __CODE__H__
 #define __CODE__H__
 #include <utils.h>
 
-// stack has 4 B values, memory int/float 4 B, char 1B
+/**
+ * @brief instruction set
+ *
+ * Stack stores 4B values (`int32_t`, `uint32_t`, or `float`).
+ * Memory has `int` and `float` values of 4B and  `unit8_t` chars
+ */
+typedef enum {
+NOOP        =0x0U, //!< empty instruction
 
-#define NOOP        0x0U
+PUSHC,  //!<  followed by c  : push c (4 B) to stack 
+PUSHB,  //!<  followed by b  : push b (1 B) to stack (it will be 4B on stack) 
+FBASE,  //!<  add the `FBASE` register (uint32) to top of stack 
+SIZE,   /*!<  ` a , d  ... -> s,...`
+              where `a` = array address, `d` = dim number, `s` = size in dimension `d`
+        */
+LDC,    //!<  `a,... -> val(a),...`  where `a`, `val(a)` are 4B
+LDB,    //!<  same as `LDC`, `val(a)` is 1B converted to 4B on stack
+STC,    //!<  `a,val,.. -> ...` `a` is 4B in memory
+STB,    //!<  same as `STC`, `val` 4B on stack converted to 1B in memory
 
-// operand stack
-#define PUSHC       0x1U  //  PUSHC(c)  : ...   -> c,...  c: 4B 
-#define PUSHB       0x2U  //  PUSHB(b)  : ...   -> c,...  b: 1B, c:4B
-#define FBASE       0x3U  //  FBASE     : ...   -> frame_base,... (uint32_t)
+LDCH,   //!< same as `LDC`,  but address is relative to heap
+LDBH,   //!< same as `LDB`,  but address is relative to heap 
+STCH,   //!< same as `STC`,  but address is relative to heap
+STBH,   //!< same as `STB`,  but address is relative to heap
 
-#define SIZE        0x04  //  SIZE      : a , d  ... -> s,...
-                          //            a = array address, d = dim number
+IDX,   /*!< followed by 1B `n`, makes `addr,i1,...,in,... -> hoffs ...` where
+        `addr`      = address of the header block of array variable, 
+        `i1`..`in`  = indices in dimensions,
+        `hoffs`     = offset (in number of elements)
+        */
 
-#define LDC         0x5U  //  LDC       : a,... -> val(a),... (a, val(a)=4 B)
-#define LDB         0x6U  //  same as LDC, val(a) : 1 B converted to 4 B
-#define STC         0x7U  //  STC       : a,val,.. -> ... 4 B
-#define STB         0x8U  //  same as STC, a,val : val 4 B converted to 1
+SWS,    //!< swap `op_stack`: `a,b,...  -> b,a,...`    
+POP,    //!<discard top stack
 
-#define LDCH        0x9U  // same as above,  but addresses are relative to heap
-#define LDBH        0xAU 
-#define STCH        0xBU 
-#define STBH        0xCU 
+A2S,     //!< copy top acc to top stack
+POPA,    //!< discard top accumulator
+S2A,     //!< top stack copy to acc
+RVA,     //!< reverse acc
+SWA,     //!< swap two top elements of acc
 
-#define IDX         0xDU  // IDX(n)  addr,i1,...,in,... -> hoffs
-                          // addr - address of array variable, 
-                          //    i1..in indices of active dimensions
-                          // hoffs - offset (in # of elements)
+ADD_INT,      //!<  `a,b,... -> a+b,...` (int32_t)
+SUB_INT,      //!<  `a,b,... -> a-b,...` (int32_t)
+MULT_INT,     //!<  `a,b,... -> a*b...` (int32_t)
+DIV_INT,      //!<  `a,b,... -> a/b...` (int32_t)
+MOD_INT,      //!<  `a,b,... -> a%b...` (int32_t)
+ADD_FLOAT,    //!<  `a,b,... -> a+b...` (float)
+SUB_FLOAT,    //!<  `a,b,... -> a-b...` (float)
+MULT_FLOAT,   //!<  `a,b,... -> a*b...` (float)
+DIV_FLOAT,    //!<  `a,b,... -> a/b...` (float)
+POW_INT,      //!<  `a,b,... -> a^b...` (int32_t)
+POW_FLOAT,    //!<  `a,b,... -> a^b...` (float)
 
-#define SWS         0xEU  //  SWS      : a,b,...  -> b,a,...    
-#define POP         0xFU  //  POP      : discard top stack
+NOT,          //!< `a,... -> 1-a,...`
+OR,           //!< `a,b,... -> x,...`  x = a OR b
+AND,          //!< `a,b,... -> x,...`  x = a AND b
 
-// accumulator  stack
-#define A2S         0x10U  //  A2S      : copy top acc to top stack
-#define POPA        0x11U  //  POPA     : discard top accumulator
-#define S2A         0x12U  //  S2A      : top stack copy to acc
-#define RVA         0x13U  //  RVA      : reverse acc
-#define SWA         0x14U  //  SWA      : swap two top elements of acc
+EQ_INT,       //!< `a,b.... -> x,....` x=1 if a=b (int32_t)
+EQ_FLOAT,     //!< `a,b.... -> x,....` x=1 if a=b (float)
+GT_INT,       //!< `a,b.... -> x,....` x=1 if a>b (int32_t)
+GT_FLOAT,     //!< `a,b.... -> x,....` x=1 if a>b (float)
+GEQ_INT,      //!< `a,b.... -> x,....` x=1 if a>=b (int32_t)
+GEQ_FLOAT,    //!< `a,b.... -> x,....` x=1 if a>=b (float)
+LT_INT,       //!< `a,b.... -> x,....` x=1 if a<b (int32_t)
+LT_FLOAT,     //!< `a,b.... -> x,....` x=1 if a<b (float)
+LEQ_INT,      //!< `a,b.... -> x,....` x=1 if a<=b (int32_t)
+LEQ_FLOAT,    //!< `a,b.... -> x,....` x=1 if a<=b (float)
 
-#define ADD_INT     0x15U  //  ADD_INT  : a,b,... -> a+b,... (int32_t)
-#define SUB_INT     0x16U  //  SUB_INT  : a,b,... -> a-b,... (int32_t)
-#define MULT_INT    0x17U
-#define DIV_INT     0x18U
-#define MOD_INT     0x19U
-#define ADD_FLOAT   0x1AU
-#define SUB_FLOAT   0x1BU
-#define MULT_FLOAT  0x1CU
-#define DIV_FLOAT   0x1DU
-#define POW_INT     0x1FU
-#define POW_FLOAT   0x20U
+JMP,          //!<  followed by `x` (4B)   : jump to addr x (relative, x int32_t)
 
-// a,b:int32_t
-#define NOT         0x21U  // 
-#define OR          0x22U  // a,b,... -> x,...  x = a OR b
-#define AND         0x23U  // a,b,... -> x,...  x = a AND b
+CALL,         /*!<  followed by `n` (4B)  : call function n (from ftable) :
+               Cretes new callframe, and jumps to the address.
+               The function code transfers parameters from stack
+                          `p1,p2,...,pn,s... -> s,...`
+              */            
+RETURN,       //!<  removes the callframe (top of stack is return value) and jumps
 
-#define EQ_INT     0x24U   // a,b.... -> x,.... x=1 if a=b (int32_t)
-#define EQ_FLOAT   0x25U   // a,b.... -> x,.... x=1 if a=b (float)
-#define GT_INT     0x26U   // a,b.... -> x,.... x=1 if a>b (int32_t)
-#define GT_FLOAT   0x27U   // a,b.... -> x,.... x=1 if a>b (float)
-#define GEQ_INT    0x28U   // a,b.... -> x,.... x=1 if a>=b (int32_t)
-#define GEQ_FLOAT  0x29U   // a,b.... -> x,.... x=1 if a>=b (float)
-#define LT_INT     0x2AU   // a,b.... -> x,.... x=1 if a<b (int32_t)
-#define LT_FLOAT   0x2BU   // a,b.... -> x,.... x=1 if a<b (float)
-#define LEQ_INT    0x2CU   // a,b.... -> x,.... x=1 if a<=b (int32_t)
-#define LEQ_FLOAT  0x2DU   // a,b.... -> x,.... x=1 if a<=b (float)
+FLOAT2INT,    //!<  cast top of stack
+INT2FLOAT,    //!<  cast top of stack
 
-#define JMP         0x2EU  //  JMP(x)   : jump to addr x (relative, x int32_t)
+FORK,         /*!<  `a,n,... -> ....` forks n new processes,
+                  `a` is the address of the driving variable 
+              */    
+SPLIT,        /*!<  `c,... -> ...` split current group based on stack top: 
+                Ccreates two new groups (first for nonzero, second for zero),
+                each continues until join.
+                Empty group causes the PC to move to the next join
+                */
+JOIN,         //!<  remove active group 
+JOIN_JMP,     //!<  followed by `a` (4B): remove active group and add `a` to pc (default 4)
+SETR,         //!<  set the "returned" flag in current group
 
-#define CALL        0x2FU  //  CALL(n)  : call function n (from ftable) 
-                           //  cretes new callframe, and jumps to the address
-                           //  the function code transfers parameters from stack
-                           //             p1,p2,...,pn,s... -> s,...
-#define RETURN      0x30U  //  removes the callframe (top of stack is return value)    
-                           //  and jumps
+MEM_MARK,    //!< mark both static memory and heap
+MEM_FREE,    //!< deallocate heap from last mark
 
-#define FLOAT2INT   0x31U  //  cast top of stack
-#define INT2FLOAT   0x32U  //  cast top of stack
+ALLOC,        /*!<  `c,... -> addr,....` (c,addr:uint32_t):
+               give address (relative to heap) to block of size `c`
+               */
 
-#define FORK        0x33U  //  FORK: a,n,... -> .... forks n new processes
-                           //        a is the address of the driving variable 
-#define SPLIT       0x34U  //  SPLIT    : c,... -> ... split current group based on stack top 
-                           //  create two new groups (first for nonzero, second for zero)
-                           //  each continues until join
-                           //  empty group causes the PC to move to the next join
-#define JOIN        0x35U  //  JOIN remove active group 
-#define JOIN_JMP    0x36U  //  JOIN_JMP(a) remove active group and add a to pc (default 4)
-#define SETR        0x37U  //  set the "returned" flag in current group
+ENDVM,      //!< halt the machine
 
-// these instructions do not count, and are executed only by the machine
+LAST_BIT,     /*!< `c,... -> d,...` (int32):
+             d : position (from right) of the last non-zero bit
+             */
 
-// mark both static mem and heap
-#define MEM_MARK   0x38U  
-#define MEM_FREE   0x39U
+SORT,       /*!< `addr, size, offs, type, ... -> ...` :
+              `addr` is a 1-dimensional array of elements of `size`, 
+               sort it based on a key of `type`, located at `offs` in
+               the record; 
+               type = `TYPE_INT`, `TYPE_FLOAT`, or `TYPE_CHAR`
+             */  
 
-// give address (relative to heap) to block of size c
-#define ALLOC       0x3aU  //  ALLOC    : c,... -> addr,.... (c,addr:uint32_t)
-#define ENDVM       0x3bU
-
-#define LAST_BIT    0x3cU  // LAST_BIT: c,... -> d,... (int32)
-                           // d : position (from right) of the last non-zero bit
-#define SORT        0x3dU  // SORT addr, size, offs, type, ... -> ...
-                           // addr is a 1-dimensional array of elements of size
-                           // sort it based on a key of type, located at offs in
-                           //    the record
-                           // type = TYPE_INT, TYPE_FLOAT, TYPE_CHAR
-
-#define LOGF        0x3eU  //  LOGF      : a... -> b... (a,b:float) b=log2
-#define LOG         0x3fU  //  LOG       : a... -> b... (a,b:int) b = ceiling log2
-#define SQRT        0x40U  //  SQRT      : a... -> b... (a,b:int) b = ceiling(sqrt(a))
-#define SQRTF       0x41U  //  SQRTF     : a... -> b... (a,b:float) b = sqrt(a)
-
-
-#define SECTION_HEADER  0x77U
-#define SECTION_INPUT   0x88U
-#define SECTION_OUTPUT  0x99U
-#define SECTION_FNMAP   0xaaU
-#define SECTION_CODE    0xbbU
-#define SECTION_DEBUG   0xccU
-
-/*
- 
-header: 
-version     byte (1)
-global_size uint32 
-memory_mode uint8
-
-input/output section:
-
-n_vars uint32
-<var1> ... <varn>
-
-var: 
-addr    uint32
-num_dim uint8
-n_items uint8 (element description)
-item1 .. itemn (elem = uint8 - type )
-
-the restriction means that there are at most 256 dimensions in an array, and at most
-256 subtypes in a type
-
-fnmap section: 
-uint32_t n
-addr_1,type_size 1, ... addr_n, type_size 2   
-      addr = address in the code segment 
-      type_size = how much the op_stack size should change after call 
-      (out_type size - parameters size)
+LOGF,         //!<  `a... -> b...` (a,b:float) b=log2
+LOG,          //!<  `a... -> b...` (a,b:int) b = ceiling log2
+SQRT,         //!<  `a... -> b...` (a,b:int) b = ceiling(sqrt(a))
+SQRTF,        //!<  `a... -> b...` (a,b:float) b = sqrt(a)
+BREAK        //!<  followed by x (4B)  : `a ... -> ....` if `(a)`, fire breakpoint number `x`  
+} instruction_t;
 
 
-debug section:
-n_files uint32_t
-n 0-terminated strings
+//! section headers
+typedef enum {
+SECTION_HEADER  =0x77U, //!< HEADER
+SECTION_INPUT   =0x88U, //!< INPUT
+SECTION_OUTPUT  =0x99U, //!< OUTPUT
+SECTION_FNMAP   =0xaaU, //!< FNMAP
+SECTION_CODE    =0xbbU, //!< CODE
+SECTION_DEBUG   =0xccU  //!< DEBUG
+} section_header_t;
 
-n_functions uint32_t
-fn_names 0-terminated strings
+//! type descriptors
+typedef enum {
+TYPE_INT   =0U, //!< `int`
+TYPE_FLOAT,     //!< `float`
+TYPE_CHAR       //!< `char`
+} type_descriptor_t;
 
-n_items uint32_t - ast nodes that own some code
-uint32_t fileid, line, col, line, col
-
-code_map_size uint32_t
-items: break_point 
-
-*/
-
-#define TYPE_INT   0U
-#define TYPE_FLOAT 1U
-#define TYPE_CHAR  2U
-
-#define MEM_MODE_EREW 0x75U
-#define MEM_MODE_CREW 0x76U
-#define MEM_MODE_CCRCW 0x77U
+//! supported memory modes
+typedef enum {
+MEM_MODE_EREW=0x75U,//!< EREW 
+MEM_MODE_CREW,      //!< CREW (default)
+MEM_MODE_CCRCW      //!< common CRCW
+} memory_mode_t;
 
 
-/* storage 
- 
-  int   = int32_t (4 bytes)
-  float = float (4 bytes) -> unfortunately, not portable
-  char  = int8_t
-
-  array:
-    uint32:  base address (relative to heap)
-    uint32:  nd
-    dim_1 ... dim_nd  uint32 range n (0..n-1) of dimensions 1..nd
-*/
-
-/* function calls
- 
-  call: copy non_returned from the active group to new group
-  return x:  push x, ret_join (set returned flag + join current group)
-  end_of_function: call return (clear flag, join group, set ret addr)
-
-*/
-
+//! returns true if `oper` (token value) is assignment operator
 #define assign_oper(oper) ( \
       (oper) == '=' || (oper) == TOK_PLUS_ASSIGN || (oper) == TOK_MINUS_ASSIGN || \
       (oper) == TOK_TIMES_ASSIGN || (oper) == TOK_DIV_ASSIGN ||\
       (oper) == TOK_MOD_ASSIGN)
 
+//! returns true if `oper` (token value) is numeric operator
 #define numeric_oper(oper) (\
       (oper) == '+' || (oper) == '-' || (oper) == '*' || (oper) == '^' || (oper) == '/' ||\
       (oper) == '%')
 
+//! returns true if `oper` (token value) is comparison operator
 #define comparison_oper(oper) (\
       (oper) == TOK_EQ || (oper) == TOK_NEQ || (oper) == TOK_GEQ || (oper) == TOK_LEQ || \
       (oper) == '<' || (oper) == '>')

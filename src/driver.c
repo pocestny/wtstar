@@ -33,15 +33,16 @@ static void driver_error_handler(const char *s, ...) {
 
 //! structure to store included files
 typedef struct _include_file_t {
-  char *name;     //!< normalized name
-  char *content;  //!< content, if preloaded by #driver_set_file
-  FILE *f;        //!< if there is no content, open this file
-  YY_BUFFER_STATE buf; //!< if the parsing was interupted by inseting a new file, save
-                       //!< the state here
-  int lineno,   //!< current line
-      col;      //!< current column
-  struct _include_file_t *next, //!< next file in the linked list
-                         *included_from; //!< pointer to where this file was included from
+  char *name;           //!< normalized name
+  char *content;        //!< content, if preloaded by #driver_set_file
+  FILE *f;              //!< if there is no content, open this file
+  YY_BUFFER_STATE buf;  //!< if the parsing was interupted by inseting a new
+                        //!< file, save the state here
+  int lineno,           //!< current line
+      col;              //!< current column
+  int included;  //!< if the file was already included using #driver_push_file
+  struct _include_file_t *next,  //!< next file in the linked list
+      *included_from;  //!< pointer to where this file was included from
 } include_file_t;
 
 static CONSTRUCTOR(include_file_t, const char *name) {
@@ -55,6 +56,7 @@ static CONSTRUCTOR(include_file_t, const char *name) {
   r->name = strdup(name);
   r->next = NULL;
   r->content = NULL;
+  r->included = 0;
   return r;
 }
 
@@ -103,7 +105,7 @@ void driver_set_file(const char *filename, const char *content) {
     file->content = NULL;
 }
 
-//! use the \ref ptah_t from path.h to resolve `.` and `..`, and add relative
+//! use the \ref path_t from path.h to resolve `.` and `..`, and add relative
 //! path
 static char *normalize_filename(include_file_t *prefix, const char *f) {
   path_t *p;
@@ -128,8 +130,11 @@ static char *normalize_filename(include_file_t *prefix, const char *f) {
 ast_t *driver_parse(const char *filename) {
   ast_t *ast = ast_t_new();
 
+  for (include_file_t *file = files; file; file = file->next)
+    file->included = 0;
+
   char *name = normalize_filename(NULL, filename);
-  driver_push_file(name);
+  driver_push_file(name, 1);
   free(name);
 
   yylineno = 1;
@@ -139,7 +144,7 @@ ast_t *driver_parse(const char *filename) {
 }
 
 /* switch to a new file */
-void driver_push_file(const char *filename) {
+void driver_push_file(const char *filename, int only_once) {
   char *name = normalize_filename(current, filename);
 
   include_file_t *file;
@@ -147,6 +152,11 @@ void driver_push_file(const char *filename) {
     ;
 
   if (file == NULL) file = insert_file(name);
+  if (file->included && only_once) {
+    free(name);
+    return;
+  }
+  file->included = 1;
 
   if (file->buf) {
     driver_error_handler("circular includes not allowed (%s)", name);

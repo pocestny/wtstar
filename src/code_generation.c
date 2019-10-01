@@ -4,11 +4,11 @@
 
 #include <code.h>
 #include <code_generation.h>
+#include <debug.h>
 #include <errors.h>
 #include <parser.h>
-#include <debug.h>
 
-// #define NODEBUG
+#define NODEBUG
 
 #ifdef NODEBUG
 #define DEBUG(...) /* */
@@ -84,6 +84,7 @@ void add_instr(code_block_t *out, int code, ...) {
       case JMP:
       case CALL:
       case JOIN_JMP:
+      case BREAK:  
         lval(buf + len, int32_t) = va_arg(args, int);
         len += 4;
         break;
@@ -130,9 +131,7 @@ static int assign_node_variable_addresses(uint32_t base, ast_node_t *node) {
           node->val.s->variant == STMT_PARDO)
         base = assign_node_variable_addresses(base, node->val.s->par[0]);
       if (node->val.s->variant == STMT_COND ||
-          node->val.s->variant == STMT_WHILE ||
-          node->val.s->variant == STMT_DO
-          )
+          node->val.s->variant == STMT_WHILE || node->val.s->variant == STMT_DO)
         base = assign_node_variable_addresses(base, node->val.s->par[1]);
       break;
   }
@@ -204,7 +203,7 @@ static int expr_on_heap(expression_t *ex) {
  */
 static void emit_code_var_addr(code_block_t *code, variable_t *var) {
   add_instr(code, PUSHC, var->addr, 0);
-  if (var->scope->fn) add_instr(code, FBASE, ADD_INT, 0);
+  if (var->scope->fn) add_instr(code, FBASE,  0);
 }
 
 /* ----------------------------------------------------------------------------
@@ -481,7 +480,7 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
     // --------------------------------------
     case EXPR_ARRAY_ELEMENT: {
       int n = ex->val.v->var->num_dim;
-      if (n==0) {
+      if (n == 0) {
         error(&(exn->loc), "%s is not an array", ex->val.v->var->name);
         return;
       }
@@ -1005,18 +1004,17 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
         } else {
           error(&(node->loc), "initializers are not supported for arrays");
         }
-      } else if (node->val.v->num_dim==0 && node->val.v->need_init) {
+      } else if (node->val.v->num_dim == 0 && node->val.v->need_init) {
         // variables are zero-initialized
         // (internal: important for thread memory allcoation)
         uint8_t *layout;
-        int n = static_type_layout(node->val.v->base_type,&layout);
-        for (int i=0,offs=0;i<n;i++) {
-          add_instr(code,PUSHB,0,0);
+        int n = static_type_layout(node->val.v->base_type, &layout);
+        for (int i = 0, offs = 0; i < n; i++) {
+          add_instr(code, PUSHB, 0, 0);
           emit_code_var_addr(code, node->val.v);
-          if (offs>0) add_instr(code,PUSHC,offs,ADD_INT,0);
-          add_instr(code, (layout[i]==TYPE_CHAR)?STB:STC,0);
-          offs+=(layout[i]==TYPE_CHAR)?1:4;
-
+          if (offs > 0) add_instr(code, PUSHC, offs, ADD_INT, 0);
+          add_instr(code, (layout[i] == TYPE_CHAR) ? STB : STC, 0);
+          offs += (layout[i] == TYPE_CHAR) ? 1 : 4;
         }
         free(layout);
       }
@@ -1029,7 +1027,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
     case AST_NODE_STATEMENT:
       switch (node->val.s->variant) {
         case STMT_FOR: {
-          if (!node->val.s->par[0] ) return;                
+          if (!node->val.s->par[0]) return;
           add_instr(code, MEM_MARK, 0);
           ast_node_t *A = node->val.s->par[0]->val.sc->items;
           ast_node_t *B = A->next;
@@ -1050,7 +1048,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, JOIN_JMP, ret - code->pos - 1, MEM_FREE, 0);
         } break;
         case STMT_WHILE: {
-          if (!node->val.s->par[0] || !node->val.s->par[1]) return;                
+          if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           int ret = code->pos;
           if (node->val.s->par[0]->val.e->type->compound ||
               node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
@@ -1064,7 +1062,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, JOIN_JMP, ret - code->pos - 1, 0);
         }; break;
         case STMT_DO: {
-          if (!node->val.s->par[0] || !node->val.s->par[1]) return;                
+          if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           int ret = code->pos;
           if (node->val.s->par[0]->val.e->type->compound ||
               node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
@@ -1078,7 +1076,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, JOIN_JMP, ret - code->pos - 1, 0);
         }; break;
         case STMT_PARDO: {
-          if (!node->val.s->par[0] || !node->val.s->par[1]) return;                
+          if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           if (node->val.s->par[1]->val.e->type->compound ||
               node->val.s->par[1]->val.e->type->type != __type__int->val.t) {
             error(&(node->loc), "condition must be of integral type");
@@ -1087,11 +1085,11 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           emit_code_expression(code, node->val.s->par[1], 0, 0);
           emit_code_var_addr(code, node->val.s->par[0]->val.sc->items->val.v);
           add_instr(code, FORK, 0);
-          emit_code_scope(code, node->val.s->par[0]->val.sc);
+          emit_code_node(code, node->val.s->par[0]);
           add_instr(code, JOIN, 0);
         } break;
         case STMT_COND: {
-          if (!node->val.s->par[0] || !node->val.s->par[1]) return;                
+          if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           if (node->val.s->par[0]->val.e->type->compound ||
               node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
             error(&(node->loc), "condition must be of integral type");
@@ -1134,6 +1132,15 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           }
           add_instr(code, SETR, 0);
         } break;
+        case STMT_BREAKPOINT: {
+          expression_t *ex = node->val.s->par[0]->val.e;                      
+          if (ex->type->compound || ex->type->type!=__type__int->val.t) {
+            error(&(node->loc),"breakpoint condition must be of integral type");
+            return;
+          }  
+          emit_code_expression(code,node->val.s->par[0],0,0);
+          add_instr(code,BREAK,node->val.s->tag,0);
+        } break;
       }
       break;
     // ................................
@@ -1143,7 +1150,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
     default:
       break;
   }
-  node->code_to = code->pos-1;
+  node->code_to = code->pos - 1;
 }
 
 /* ----------------------------------------------------------------------------
@@ -1197,7 +1204,7 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
   DEBUG("emit_code_function %s (addr: %d)\n", fn->val.f->name, code->pos);
   for (ast_node_t *p = fn->val.f->params; p; p = p->next) {
     if (p->val.v->num_dim == 0) {
-      add_instr(code, PUSHC, p->val.v->addr, FBASE, ADD_INT, 0);
+      add_instr(code, PUSHC, p->val.v->addr, FBASE,  0);
       int *casts, n_casts;
       static_type_compatible(p->val.v->base_type, p->val.v->base_type, &casts,
                              &n_casts);
@@ -1205,7 +1212,7 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
       if (casts) free(casts);
     } else {
       for (int i = 0; i < p->val.v->num_dim + 2; i++)
-        add_instr(code, PUSHC, p->val.v->addr + 4 * i, FBASE, ADD_INT, STC, 0);
+        add_instr(code, PUSHC, p->val.v->addr + 4 * i, FBASE,  STC, 0);
     }
   }
 
@@ -1243,7 +1250,7 @@ static void write_io_variables(writer_t *out, int flag) {
 
 /* ----------------------------------------------------------------------------
  */
-int emit_code(ast_t *_ast, writer_t *out) {
+int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
   ast = _ast;
 
   DEBUG("types\n");
@@ -1363,7 +1370,7 @@ int emit_code(ast_t *_ast, writer_t *out) {
         }
     }
 
-    emit_debug_section(out,ast,code->pos);
+    if (!no_debug) emit_debug_section(out, ast, code->pos);
 
     {
       section = SECTION_CODE;
@@ -1373,9 +1380,6 @@ int emit_code(ast_t *_ast, writer_t *out) {
   }
 
   code_block_t_delete(code);
-
-  if (was_error) DEBUG(" there were errors\n");
-  else DEBUG("emit_code done\n");
   return was_error;
 }
 

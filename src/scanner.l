@@ -47,6 +47,7 @@ SYMBOL2  [^a-zA-Z0-9 \t_'";]
 
 %x include
 %x comment
+%x include_once
 %option noyywrap
 %option bison-bridge bison-locations
 
@@ -58,7 +59,18 @@ SYMBOL2  [^a-zA-Z0-9 \t_'";]
 <include>[^\"]*\" {  
     yytext[yyleng-1]=0;
     driver_set_current_pos(yylineno,yycolumn);
-    driver_push_file(yytext);
+    driver_push_file(yytext,0);
+    yylineno=driver_current_line();
+    yycolumn=driver_current_column();
+    BEGIN(INITIAL);
+  } 
+
+#include{SPACE}*once{SPACE}*\"   {BEGIN(include_once);}
+
+<include_once>[^\"]*\" {  
+    yytext[yyleng-1]=0;
+    driver_set_current_pos(yylineno,yycolumn);
+    driver_push_file(yytext,1);
     yylineno=driver_current_line();
     yycolumn=driver_current_column();
     BEGIN(INITIAL);
@@ -73,6 +85,11 @@ SYMBOL2  [^a-zA-Z0-9 \t_'";]
 
   /* single line comment */
 "//".*\n             yylineno++;yycolumn=1;
+
+@[1-9]{DIGIT}* {
+  yylval->int_val = atoi(yytext+1);
+  return TOK_BREAKPOINT;
+}
 
 {DIGIT}+ { 
     yylval->int_val = atoi(yytext); 

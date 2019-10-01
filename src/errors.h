@@ -33,11 +33,11 @@ CONSTRUCTOR(error_t);
 //! Free the error_t object.
 DESTRUCTOR(error_t);
 
-//! Apppend printf-like formatted string to the error message.
+//! Apppend `printf`-like formatted string to the error message.
 void append_error_msg(error_t *err, const char *format, ...);
 
 /**
- * @brief Append vprintf-like string to the error message.
+ * @brief Append `vprintf`-like string to the error message.
  * @note Needs also to know the length of the printed message. Use the macro
  * #get_printed_length from utils.h to find it.
  */

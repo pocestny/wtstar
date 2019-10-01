@@ -8,6 +8,7 @@
 #include <reader.h>
 #include <writer.h>
 #include <debug.h>
+#include <code.h>
 
 typedef struct {
   uint32_t addr;
@@ -40,6 +41,8 @@ typedef struct _thread_t {
   struct _thread_t *parent;
   int refcnt;
   int returned; // flag if return was called within a function
+  int bp_hit;
+  int tid;
 } thread_t;
 
 CONSTRUCTOR(thread_t);
@@ -79,7 +82,7 @@ typedef struct {
   stack_t *frames;         // stack of frame_t *
 
   int W,T;
-  int pc,virtual_grps,n_thr,a_thr; // a_thr -> active (non-returned threads)
+  int pc,stored_pc,virtual_grps,n_thr,a_thr; // a_thr -> active (non-returned threads)
 
   uint32_t arr_sizes[257], arr_offs[257];
 
@@ -88,6 +91,14 @@ typedef struct {
    int mem_mode;
 
    debug_info_t *debug_info;
+
+   enum {
+     VM_READY,
+     VM_RUNNING,
+     VM_OK,
+     VM_ERROR
+   } state;
+
 } virtual_machine_t;
 
 
@@ -95,25 +106,40 @@ typedef struct {
 CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len);
 DESTRUCTOR(virtual_machine_t);
 
-int execute(virtual_machine_t *env, int limit);
+// TODO execute status: <-1 error, -1 endvm, 0 limit exceeded, >0 breakpoint hit
 
+int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp);
+
+// return:
+// endvm = -1
+// breakpoint x = x (>0)
+// error <-1
+// ok = 0
+int instruction(virtual_machine_t *env,int stop_on_bp);
 // io support
 
+
+void print_types(writer_t *w,virtual_machine_t *env);
+void print_var_name(writer_t *w, virtual_machine_t *env, int addr) ;
+void print_var_layout(writer_t *w, input_layout_item_t *it) ;
 
 int read_var(reader_t *r, uint8_t *base, input_layout_item_t *var);
 int read_input(reader_t *r, virtual_machine_t *env);
 
 int scan_array(reader_t *r, writer_t *w, input_layout_item_t *var, int *sizes, int current,
                 int first);
-void print_io_vars(writer_t *w, int n, input_layout_item_t *vars);
+void print_io_vars(writer_t *w, virtual_machine_t *env, int n, input_layout_item_t *vars);
+
 void print_code(writer_t *w, uint8_t *code, int size);
 void print_var(writer_t *w, uint8_t *addr, input_layout_item_t *var);
 void print_array(writer_t *w, virtual_machine_t *env, input_layout_item_t *var, int nd, int *sizes,
                  uint32_t base, int from_dim, int offs);
-void write_output(writer_t *w, virtual_machine_t *env);
-void dump_memory(writer_t *w, virtual_machine_t *env);
+void write_output(writer_t *w, virtual_machine_t *env, int i);
 
 int count_size(input_layout_item_t *var);
 
+void dump_debug_info(writer_t *w, virtual_machine_t *env);
+void dump_header(writer_t *w, virtual_machine_t *env);
 
+char *mode_name(int mode);
 #endif

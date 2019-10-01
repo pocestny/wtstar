@@ -12,8 +12,8 @@ CFLAGS+=-O3
 BISONFLAGS=
 endif
 
-.PHONY:	wtc wtr wtdump
-all: wtc wtr wtdump
+.PHONY:	wtc wtrun wtdump wtdb
+all: wtc wtrun wtdump wtdb
 
 ##################################################################
 ########  build wtc
@@ -29,14 +29,23 @@ WTC_DEPS=${WTC_SRC} ${WTC_HDRS} parser_utils.c
 
 
 ##################################################################
-########  build wtr
-WTR_SRC = wtr.c vm.c instr_names.c reader.c writer.c  \
+########  build wtrun
+WTR_SRC = wtrun.c vm.c instr_names.c reader.c writer.c  \
 					errors.c hash.c debug.c
 
 WTR_HDRS= code.h vm.h reader.h writer.h  errors.h hash.h debug.h
 
 WTR_DEPS=${WTR_SRC} ${WTR_HDRS} 
 
+##################################################################
+########  build wtdb
+WTDB_SRC = wtdb.c vm.c instr_names.c reader.c writer.c  \
+					errors.c hash.c debug.c linenoise.c
+
+WTDB_HDRS= code.h vm.h reader.h writer.h  errors.h hash.h debug.h \
+					 linenoise.h
+
+WTDB_DEPS=${WTDB_SRC} ${WTDB_HDRS} 
 
 ##################################################################
 ########  build wtdump
@@ -48,8 +57,11 @@ WTDUMP_HDRS= code.h reader.h writer.h  vm.h errors.h hash.h \
 
 WTDUMP_DEPS=${WTDUMP_SRC} ${WTDUMP_HDRS} 
 
+##################################################################
+
 wtc: ${BUILD_DIR}/cli/wtc
-wtr: ${BUILD_DIR}/cli/wtr
+wtrun: ${BUILD_DIR}/cli/wtrun
+wtdb: ${BUILD_DIR}/cli/wtdb
 wtdump: ${BUILD_DIR}/cli/wtdump
 
 
@@ -57,13 +69,17 @@ ${BUILD_DIR}/cli/wtc: ${WTC_DEPS}
 	mkdir -p ${BUILD_DIR}/cli
 	${CC} ${CFLAGS} ${WTC_SRC} -o ${BUILD_DIR}/cli/wtc
 
-${BUILD_DIR}/cli/wtr: ${WTR_DEPS}
+${BUILD_DIR}/cli/wtrun: ${WTR_DEPS}
 	mkdir -p ${BUILD_DIR}/cli
-	${CC} ${CFLAGS} ${WTR_SRC} -o ${BUILD_DIR}/cli/wtr -lm
+	${CC} ${CFLAGS} ${WTR_SRC} -o ${BUILD_DIR}/cli/wtrun -lm
+
+${BUILD_DIR}/cli/wtdb: ${WTDB_DEPS}
+	mkdir -p ${BUILD_DIR}/cli
+	${CC} ${CFLAGS} ${WTDB_SRC} -o ${BUILD_DIR}/cli/wtdb -lm 
 
 ${BUILD_DIR}/cli/wtdump: ${WTDUMP_DEPS}
 	mkdir -p ${BUILD_DIR}/cli
-	${CC} ${CFLAGS} ${WTDUMP_SRC} -o ${BUILD_DIR}/cli/wtdump -lm
+	${CC} ${CFLAGS} ${WTDUMP_SRC} -o ${BUILD_DIR}/cli/wtdump -lm 
 
 %.c: %.y
 	bison ${BISONFLAGS} -o $@ $<

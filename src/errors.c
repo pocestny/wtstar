@@ -1,6 +1,6 @@
 /**
  * @file errors.c
- * @brief implementation of the error handling routines
+ * @brief implementation of the error handling routines from errors.h
  */
 #include <errors.h>
 #include <utils.h>

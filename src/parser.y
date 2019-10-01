@@ -47,7 +47,7 @@
   static_type_t *         static_type_val;
 }
 
-%token <int_val>          INT_LITERAL    
+%token <int_val>          INT_LITERAL  BREAKPOINT  
 %token <float_val>        FLOAT_LITERAL  
 %token <char_val>         CHAR_LITERAL   
 %token <string_val>       STRING_LITERAL IDENT 
@@ -886,6 +886,9 @@ expr_list:
   STMT_RETURN:
     par[0] = expression
 
+  STMT_BREAKPOINT
+    par[0] = expression
+
   */
 
 stmt: stmt_scope {ignore($1);}| stmt_expr  | stmt_cond | stmt_iter | stmt_jump ';' | error ';';
@@ -1033,6 +1036,20 @@ stmt_jump
             n->val.s->par[0]=$2;
             append(ast_node_t,&ast->current_scope->items,n);
             n->val.s->ret_fn=ast->current_scope->fn;
+          }
+          |
+          BREAKPOINT {
+            ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_BREAKPOINT);
+            n->val.s->tag=$1;
+            n->val.s->par[0]=expression_int_val(1);
+            append(ast_node_t,&ast->current_scope->items,n);
+          }
+          |
+          BREAKPOINT '(' expr ')' {
+            ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_BREAKPOINT);
+            n->val.s->tag=$1;
+            n->val.s->par[0]=$3;
+            append(ast_node_t,&ast->current_scope->items,n);
           }
          ;
 
