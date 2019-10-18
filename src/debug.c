@@ -97,6 +97,7 @@ DESTRUCTOR(code_map_t) {
 }
 
 int code_map_find(code_map_t *m, uint32_t pos) {
+  //printf("code_map_find %d\n",pos);
   if (m->n == 0) return -1;
   if (pos >= m->bp[m->n - 1]) return m->n - 1;
   if (pos < m->bp[0]) return -1;
@@ -128,6 +129,7 @@ int code_map_find(code_map_t *m, uint32_t pos) {
   }
 
 CONSTRUCTOR(debug_info_t, const uint8_t *in, int *pos, const int len) {
+  //printf("debug info constructor\n");
   ALLOC_VAR(r, debug_info_t);
 
   r->files = NULL;
@@ -142,6 +144,7 @@ CONSTRUCTOR(debug_info_t, const uint8_t *in, int *pos, const int len) {
   r->scopes = NULL;
 
   GET(uint32_t, r->n_files, 4);
+  //printf("%d files\n",r->n_files);
   r->files = malloc(r->n_files * sizeof(char *));
   for (int i = 0; i < r->n_files; i++) r->files[i] = NULL;
   for (int i = 0; i < r->n_files; i++) {
@@ -156,6 +159,7 @@ CONSTRUCTOR(debug_info_t, const uint8_t *in, int *pos, const int len) {
   }
 
   GET(uint32_t, r->n_fn, 4);
+  //printf("%d functions\n",r->n_fn);
   r->fn_names = malloc(r->n_fn * sizeof(char *));
   r->fn_items = malloc(r->n_fn * 4);
   for (int i = 0; i < r->n_fn; i++) r->fn_names[i] = NULL;
@@ -172,6 +176,7 @@ CONSTRUCTOR(debug_info_t, const uint8_t *in, int *pos, const int len) {
   }
 
   GET(uint32_t, r->n_items, 4);
+  //printf("%d items\n",r->n_items);
   r->items = malloc(r->n_items * sizeof(debug_info_t));
   for (int i = 0; i < r->n_items; i++) {
     GET(uint32_t, r->items[i].fileid, 4);
@@ -181,6 +186,7 @@ CONSTRUCTOR(debug_info_t, const uint8_t *in, int *pos, const int len) {
     GET(uint32_t, r->items[i].lc, 4);
   }
 
+  //printf("source map\n");
   r->source_items_map = code_map_t_new(in, pos, len);
   if (!r->source_items_map) {
     debug_info_t_delete(r);
@@ -188,6 +194,7 @@ CONSTRUCTOR(debug_info_t, const uint8_t *in, int *pos, const int len) {
   }
 
   GET(uint32_t, r->n_types, 4);
+  //printf("%d types\n",r->n_types);
   r->types = malloc(r->n_types * sizeof(type_info_t));
   for (int i = 0; i < r->n_types; i++) {
     r->types[i].name = NULL;
@@ -201,6 +208,7 @@ CONSTRUCTOR(debug_info_t, const uint8_t *in, int *pos, const int len) {
       return NULL;
     }
 
+  //printf("scope map\n");
   r->scope_map = code_map_t_new(in, pos, len);
   if (!r->scope_map) {
     debug_info_t_delete(r);
@@ -208,6 +216,7 @@ CONSTRUCTOR(debug_info_t, const uint8_t *in, int *pos, const int len) {
   }
 
   GET(uint32_t, r->n_scopes, 4);
+  //printf("%d scopes\n",r->n_scopes);
   r->scopes = malloc(r->n_scopes * sizeof(scope_info_t));
   for (int i = 0; i < r->n_scopes; i++) r->scopes[i].n_vars = 0;
 
@@ -233,6 +242,7 @@ CONSTRUCTOR(debug_info_t, const uint8_t *in, int *pos, const int len) {
     }
   }
 
+  //printf("debug info ready\n");
   return r;
 }
 #undef GET
@@ -427,8 +437,10 @@ static void emit_variable(writer_t *out, ast_t *ast, int j) {
       type = t->val.t->id;
       break;
     }
+
   out_raw(out, &type, 4);
   out_raw(out, &(variables[j]->val.v->num_dim), 4);
+  
   if (variables[j]->code_from<0) variables[j]->code_from=0;
   out_raw(out, &(variables[j]->code_from), 4);
   out_raw(out, &(variables[j]->val.v->addr), 4);
@@ -503,6 +515,7 @@ void emit_debug_section(writer_t *out, ast_t *ast, int _code_size) {
     uint32_t n = 0;
     for (ast_node_t *t = ast->types; t; t = t->next) t->val.t->id = n++;
     out_raw(out, &n, 4);
+    //printf("write types: %d\n",n);
     for (ast_node_t *t = ast->types; t; t = t->next) {
       out_raw(out, t->val.t->name, strlen(t->val.t->name) + 1);
       uint32_t nm = 0;

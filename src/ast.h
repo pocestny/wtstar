@@ -98,7 +98,7 @@ typedef struct _variable_t {
   uint32_t addr;                    // address (set during code generation)
   struct _ast_node_t *initializer;  // owned AST_NODE_EXPRESSION
 
-  uint8_t num_dim;  // >0 = array
+  uint32_t num_dim;  // >0 = array
   int need_init;    // arrays,parameters and pardo driving variables don't
 
   // following is defined only for arrays

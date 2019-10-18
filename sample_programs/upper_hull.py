@@ -6,7 +6,7 @@ import getopt
 import math
 import subprocess as su
 import matplotlib as mp
-mp.use('Agg')
+#mp.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import ConvexHull
@@ -34,7 +34,7 @@ def scipy_hull(inp):
         pts.append(pt[1].tolist())
     return normalize(pts)
 
-# format input string for wtr
+# format input string for wtrun
 def make_input_string(data):
     return '['+' '.join(['%s']*len(data))%tuple(map(lambda x: "{ %f %f }" % tuple(x),data))+']'
 
@@ -49,7 +49,7 @@ def run_hull_half(input_string,dr):
     global W,T,faults
     pts=[]
     try:    
-        o = su.check_output("wtr upper_hull.wtr".split(),input=input_string,encoding='ascii')
+        o = su.check_output("wtrun upper_hull.wtr".split(),input=input_string,encoding='ascii')
     except su.CalledProcessError as e:
         print ('EXEC FAILED')
         print (e.output)
@@ -67,7 +67,7 @@ def run_hull_half(input_string,dr):
 def run_hull(data):
     return  normalize(run_hull_half(make_input_string(data),1) + run_hull_half(make_input_string(neg_pts(data)),-1))
 
-# compare the baseline with wtr solution composed of two half-hulls
+# compare the baseline with wtrun solution composed of two half-hulls
 def test(data):
     global faults
     ground = scipy_hull(data)
@@ -150,8 +150,8 @@ if (__name__ == '__main__'):
         sys.exit(2)
    
     if what=='plot':
-        plot(data)
-        #plot(random_data(80))
+        #plot(data)
+        plot(random_data(80))
         #plt.savefig('upper_hull.png')
     else:
         Ws=[]

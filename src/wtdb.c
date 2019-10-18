@@ -30,31 +30,6 @@ int binary_length;
 int input_needed = 0;
 int focused_thread = -1;
 
-void include_layout_type(input_layout_item_t *it,  virtual_machine_t *env, int type) {
-  type_info_t *t = &(env->debug_info->types[type]);
-
-  if (t->n_members==0) {
-    it->n_elems++;
-    it->elems=realloc(it->elems,it->n_elems);
-    if (!strcmp(t->name,"int")) it->elems[it->n_elems-1]=TYPE_INT;
-    else if (!strcmp(t->name,"float")) it->elems[it->n_elems-1]=TYPE_FLOAT;
-    else if (!strcmp(t->name,"char")) it->elems[it->n_elems-1]=TYPE_CHAR;
-    else exit(123);
-  } else
-    for (int m=0;m<t->n_members;m++)
-      include_layout_type(it,env,t->member_types[m]);
-}
-
-input_layout_item_t get_layout(variable_info_t *var, virtual_machine_t *env) {
-  input_layout_item_t r;
-  r.addr=var->addr;
-  r.num_dim = var->num_dim;
-  r.n_elems=0;
-  r.elems=NULL;
-  include_layout_type(&r,env,var->type);
-  return r;
-}
-
 
 void describe() {
   printf("loaded file:  %s%s%s\n", CYAN_BOLD, binary_file_name, TERM_RESET);
@@ -89,7 +64,7 @@ void show_threads() {
   }
   for (int t = 0; t < env->n_thr; t++)
     if (!env->thr[t]->returned) {
-      printf("id %3d ", env->thr[t]->tid);
+      printf("id %3lu ", env->thr[t]->tid);
 
       if (env->n_thr > 1) {
         // find index var
@@ -109,7 +84,7 @@ void show_threads() {
             if (var) name = var->name;
           }
         }
-        printf("parent %3d : %s=%d ",
+        printf("parent %3lu : %s=%d ",
                (env->thr[t]->parent) ? env->thr[t]->parent->tid : -1, name,
                lval(env->thr[t]->mem->data, int32_t));
       }
@@ -302,18 +277,13 @@ void variable_list() {
 
 void print_variable_in_thread(char *name) {
   if (!env || !env->debug_info) return;
-  int t = -1;
-  for (int i = 0; i < env->n_thr; i++)
-    if (!env->thr[i]->returned)
-      if (env->thr[i]->tid == focused_thread) {
-        t = i;
-        break;
-      }
+  thread_t *t=get_thread(focused_thread);
+
   if (focused_thread > -1) printf("focused thread %d\n", focused_thread);
-  if (t == -1) {
-    printf("%sfocused thread not active, assuming id %d%s\n", YELLOW_BOLD,
+  if (t == NULL) {
+    printf("%sfocused thread not active, assuming id %lu%s\n", YELLOW_BOLD,
            env->thr[0]->tid,TERM_RESET);
-    t = 0;
+    t = env->thr[0];
   }
 
   int s = code_map_find(env->debug_info->scope_map, env->stored_pc);
@@ -333,7 +303,7 @@ void print_variable_in_thread(char *name) {
 
   int addr = var->addr;
   if (!global) addr += env->frame->base;
-  if (addr < env->thr[t]->mem_base)
+  if (addr < t->mem_base)
     printf(WHITE_BOLD);
   else
     printf(WHITE);
@@ -342,7 +312,7 @@ void print_variable_in_thread(char *name) {
     printf("[");
     for (int d = 0; d < var->num_dim; d++) {
       if (d > 0) printf(",");
-      uint32_t size = lval(get_addr(env->thr[t],(addr+4*(2+d)),4),uint32_t);
+      uint32_t size = lval(get_addr(t,(addr+4*(2+d)),4),uint32_t);
       printf("%d",size);
     }
     printf("]");
@@ -350,13 +320,13 @@ void print_variable_in_thread(char *name) {
   printf(" = ");
   input_layout_item_t it = get_layout(var, env);
   if (var->num_dim==0) 
-   print_var(outw,get_addr(env->thr[t],addr,4),&it);
+   print_var(outw,get_addr(t,addr,4),&it);
   else {
     int *sizes = (int *)malloc(var->num_dim*sizeof(int));
     for(int i=0;i<var->num_dim;i++) 
-      sizes[i]=lval(get_addr(env->thr[t],(addr+4*(2+i)),4),uint32_t);
+      sizes[i]=lval(get_addr(t,(addr+4*(2+i)),4),uint32_t);
    print_array(outw,env,&it,var->num_dim, sizes, 
-       lval(get_addr(env->thr[t],addr,4),uint32_t),0,0);
+       lval(get_addr(t,addr,4),uint32_t),0,0);
    free(sizes);
   }
   printf("%s\n", TERM_RESET);

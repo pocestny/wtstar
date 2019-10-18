@@ -1,8 +1,3 @@
-/*!
- * @file editor.js
- *
- * huh
- */
 export default (function (){
   var elem = $("<div style='width:100%;height:calc( 100% - 10px );'></div>");
   var editor = ace.edit(elem[0], {
@@ -16,10 +11,11 @@ export default (function (){
   var sessions = {}
   var _currentSession;
 
-  var _addSession = function(tab,caption,text){
+  var _addSession = function(tab,caption,text,onChange){
     sessions[tab] = {}
     sessions[tab].caption = caption;
     sessions[tab].session = ace.createEditSession(text,"ace/mode/dummy");
+    sessions[tab].session.on('change',onChange);
   }
 
 

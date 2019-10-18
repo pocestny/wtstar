@@ -111,6 +111,7 @@ int main(int argc, char **argv) {
       for (int i = 0; i < env->n_out_vars; i++) write_output(w, env, i);
     }
     if (wt_stat) out_text(w, "W/T: %d %d\n", env->W, env->T);
+    return 0;
   }
   exit(err);
 }

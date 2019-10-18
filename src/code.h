@@ -29,12 +29,12 @@
  *  type    | meaning
  *  --------|-------
  *   uint32 | address in the static memory
- *   uint8  | number of dimensions
+ *   uint32 | number of dimensions
  *   uint8  | `type_layout_size`
  *
  * followed by a sequence of `type_layout_size` bytes from #type_descriptor_t
  *
- * @note The restriction means that there are at most 256 dimensions in an array, and at 
+ * @note The restriction means that there are at 
  * most 256 subtypes in a type.
  *
  * The FNMAP section maps functions to addresses:

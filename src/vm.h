@@ -42,13 +42,14 @@ typedef struct _thread_t {
   int refcnt;
   int returned; // flag if return was called within a function
   int bp_hit;
-  int tid;
+  uint64_t tid;
 } thread_t;
 
 CONSTRUCTOR(thread_t);
 DESTRUCTOR(thread_t);
 
 void *get_addr(thread_t *thr, uint32_t addr, uint32_t len);
+thread_t *get_thread(uint64_t tid);
 
 // create a child copy  
 thread_t *clone_thread(thread_t *src);
@@ -93,7 +94,7 @@ typedef struct {
    debug_info_t *debug_info;
 
    enum {
-     VM_READY,
+     VM_READY=0,
      VM_RUNNING,
      VM_OK,
      VM_ERROR
@@ -116,9 +117,11 @@ int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp);
 // error <-1
 // ok = 0
 int instruction(virtual_machine_t *env,int stop_on_bp);
+
+// if there is debug info about types, get layout
+input_layout_item_t get_layout(variable_info_t *var, virtual_machine_t *env);
+
 // io support
-
-
 void print_types(writer_t *w,virtual_machine_t *env);
 void print_var_name(writer_t *w, virtual_machine_t *env, int addr) ;
 void print_var_layout(writer_t *w, input_layout_item_t *it) ;

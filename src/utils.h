@@ -3,6 +3,7 @@
  */
 #ifndef __UTILS_H__
 #define __UTILS_H__
+#include <inttypes.h>
 
 // lvalue of given type at given address
 #define ptr(pntr, type) ((type *)(pntr))
@@ -34,7 +35,7 @@
 
 #define YYLTYPE YYLTYPE
 typedef struct YYLTYPE {
-  int fl, fc, ll, lc;
+  uint32_t fl, fc, ll, lc;
   const char *fn, *ln;
 } YYLTYPE;
 

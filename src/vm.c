@@ -11,9 +11,10 @@
 #include <vm.h>
 
 static int ___pc___;
-static int _tid = 0;
 
-int vm_print_colors=0;
+static int _tid = 1;
+static hash_table_t *_tid2thread = NULL;
+int vm_print_colors = 0;
 
 extern const char *const instr_names[];
 
@@ -142,6 +143,8 @@ CONSTRUCTOR(thread_t) {
   r->returned = 0;
   r->bp_hit = 0;
   r->tid = _tid++;
+  if (!_tid2thread) _tid2thread = hash_table_t_new(64, NULL);
+  hash_put(_tid2thread, r->tid, r);
   return r;
 }
 
@@ -154,10 +157,17 @@ thread_t *clone_thread(thread_t *src) {
   return r;
 }
 
+thread_t *get_thread(uint64_t tid) {
+  if (!_tid2thread) return NULL;
+  return hash_get(_tid2thread, tid);
+}
+
 DESTRUCTOR(thread_t) {
   if (r == NULL) return;
   r->refcnt--;
   if (r->refcnt <= 0) {
+    if (!_tid2thread) _tid2thread = hash_table_t_new(64, NULL);
+    hash_remove(_tid2thread, r->tid);
     stack_t_delete(r->op_stack);
     stack_t_delete(r->acc_stack);
     stack_t_delete(r->mem);
@@ -190,9 +200,10 @@ DESTRUCTOR(frame_t) {
   }
 
 CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
+  //printf("machine constructor\n");
   ALLOC_VAR(r, virtual_machine_t)
 
-  r->state=VM_READY;
+  r->state = VM_READY;
   r->mem_mode = MEM_MODE_CREW;
   r->debug_info = NULL;
 
@@ -222,6 +233,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
     GET(uint8_t, section, 1);
     switch (section) {
       case SECTION_HEADER: {
+        //printf(">> section header\n");
         uint8_t version;
         GET(uint8_t, version, 1)
         GET(uint32_t, r->global_size, 4)
@@ -229,12 +241,13 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
         GET(uint8_t, r->mem_mode, 1)
       } break;
       case SECTION_INPUT:
+        //printf(">> section input\n");
         GET(uint32_t, r->n_in_vars, 4)
         r->in_vars = (input_layout_item_t *)malloc(r->n_in_vars *
                                                    sizeof(input_layout_item_t));
         for (int i = 0; i < r->n_in_vars; i++) {
           GET(uint32_t, r->in_vars[i].addr, 4)
-          GET(uint8_t, r->in_vars[i].num_dim, 1)
+          GET(uint8_t, r->in_vars[i].num_dim, 4)
           GET(uint8_t, r->in_vars[i].n_elems, 1)
           r->in_vars[i].elems = (uint8_t *)malloc(r->in_vars[i].n_elems);
           for (int j = 0; j < r->in_vars[i].n_elems; j++)
@@ -242,12 +255,13 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
         }
         break;
       case SECTION_OUTPUT:
+        //printf(">> section output\n");
         GET(uint32_t, r->n_out_vars, 4)
         r->out_vars = (input_layout_item_t *)malloc(
             r->n_out_vars * sizeof(input_layout_item_t));
         for (int i = 0; i < r->n_out_vars; i++) {
           GET(uint32_t, r->out_vars[i].addr, 4)
-          GET(uint8_t, r->out_vars[i].num_dim, 1)
+          GET(uint8_t, r->out_vars[i].num_dim, 4)
           GET(uint8_t, r->out_vars[i].n_elems, 1)
           r->out_vars[i].elems = (uint8_t *)malloc(r->out_vars[i].n_elems);
           for (int j = 0; j < r->out_vars[i].n_elems; j++)
@@ -255,6 +269,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
         }
         break;
       case SECTION_FNMAP: {
+        //printf(">> section fnmap\n");
         GET(uint32_t, r->fcnt, 4);
         if (r->fcnt > 0)
           r->fnmap = (fnmap_t *)malloc(r->fcnt * sizeof(fnmap_t));
@@ -267,17 +282,23 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
 
       } break;
       case SECTION_CODE:
+        //printf(">> section code\n");
         r->code_size = len - pos;
         r->code = (uint8_t *)malloc(len - pos);
         memcpy(r->code, in + pos, len - pos);
         pos = len;
         break;
       case SECTION_DEBUG:
+        //printf(">> section debug\n");
         r->debug_info = debug_info_t_new(in, &pos, len);
-        if (!r->debug_info) exit(-1);
+        if (!r->debug_info) {
+          virtual_machine_t_delete(r);
+          return NULL;
+        }
         break;
     }
   }
+
   return r;
 }
 
@@ -336,7 +357,7 @@ static int check_read_mem(virtual_machine_t *env, hash_table_t *mem_used,
     uint64_t key = (uint64_t)addr;
     if (hash_get(mem_used, key)) {
       throw("read memory access violation");
-      env->state=VM_ERROR;
+      env->state = VM_ERROR;
       return 0;
     }
     hash_put(mem_used, key, mem_check_value_t_new(ACCESS_READ, 0));
@@ -352,7 +373,7 @@ static int check_write_mem(virtual_machine_t *env, hash_table_t *mem_used,
       (env->mem_mode != MEM_MODE_CCRCW || data->value_written != value)) {
     printf("%x %d %d\n", env->mem_mode, data->value_written, value);
     throw("write memory access violation (%d).", ___pc___);
-    env->state=VM_ERROR;
+    env->state = VM_ERROR;
     return 0;
   }
   hash_put(mem_used, key, mem_check_value_t_new(ACCESS_WRITE, value));
@@ -440,7 +461,7 @@ int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp) {
     }
     int res = instruction(env, stop_on_bp);
     if (res < 0) return res;  // error/ENDVM
-    if (res >0 ) return res;  // breakpoint
+    if (res > 0) return res;  // breakpoint
 
     if (trace_on) {
       printf("\nthread groups: ");
@@ -468,12 +489,12 @@ int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp) {
 
 int instruction(virtual_machine_t *env, int stop_on_bp) {
   ___pc___ = env->pc;
-  env->stored_pc=env->pc;
-  env->state=VM_RUNNING;
+  env->stored_pc = env->pc;
+  env->state = VM_RUNNING;
   for (int t = 0; t < env->n_thr; t++) env->thr[t]->bp_hit = 0;
   uint8_t opcode = lval(env->code + env->pc, uint8_t);
   if (opcode == ENDVM) {
-    env->state=VM_OK;
+    env->state = VM_OK;
     return -1;
   }
   env->pc++;
@@ -654,7 +675,8 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
           }
         }
       env->pc += 4;
-      if (hits > 0 && stop_on_bp) return lval(env->code + (env->pc-4), uint32_t);
+      if (hits > 0 && stop_on_bp)
+        return lval(env->code + (env->pc - 4), uint32_t);
     } break;
 
     case RETURN: {
@@ -721,7 +743,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
               uint32_t max = lval(get_addr(env->thr[t], a + 4, 4), uint32_t);
               if (d >= max) {
                 throw("bad array dimension\n");
-                env->state=VM_ERROR;
+                env->state = VM_ERROR;
                 return -2;
               }
               uint32_t size =
@@ -812,7 +834,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
               uint32_t nd2 = lval(get_addr(env->thr[t], addr + 4, 4), uint32_t);
               if (nd != nd2) {
                 throw("mismatch in dimensions %d %d (%d)", nd, nd2, ___pc___);
-                env->state=VM_ERROR;
+                env->state = VM_ERROR;
                 return -3;
               }
 
@@ -824,7 +846,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
                 env->arr_offs[i] = v;
                 if (v >= env->arr_sizes[i]) {
                   throw("range check error %d (%d).", addr, ___pc___);
-                  env->state=VM_ERROR;
+                  env->state = VM_ERROR;
                   return -2;
                 }
               }
@@ -1153,7 +1175,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
             default:
               throw("unknown instruction %s (opcode %0x) at %u\n",
                     instr_names[opcode], opcode, env->pc - 1);
-              env->state=VM_ERROR;
+              env->state = VM_ERROR;
               return -3;
           }  // end switch opcode for each thread
       hash_table_t_delete(mem_used);
@@ -1584,4 +1606,32 @@ char *mode_name(int mode) {
   }
 }
 
+void include_layout_type(input_layout_item_t *it, virtual_machine_t *env,
+                         int type) {
+  type_info_t *t = &(env->debug_info->types[type]);
 
+  if (t->n_members == 0) {
+    it->n_elems++;
+    it->elems = realloc(it->elems, it->n_elems);
+    if (!strcmp(t->name, "int"))
+      it->elems[it->n_elems - 1] = TYPE_INT;
+    else if (!strcmp(t->name, "float"))
+      it->elems[it->n_elems - 1] = TYPE_FLOAT;
+    else if (!strcmp(t->name, "char"))
+      it->elems[it->n_elems - 1] = TYPE_CHAR;
+    else
+      exit(123);
+  } else
+    for (int m = 0; m < t->n_members; m++)
+      include_layout_type(it, env, t->member_types[m]);
+}
+
+input_layout_item_t get_layout(variable_info_t *var, virtual_machine_t *env) {
+  input_layout_item_t r;
+  r.addr = var->addr;
+  r.num_dim = var->num_dim;
+  r.n_elems = 0;
+  r.elems = NULL;
+  include_layout_type(&r, env, var->type);
+  return r;
+}

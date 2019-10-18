@@ -1237,7 +1237,7 @@ static void write_io_variables(writer_t *out, int flag) {
   for (ast_node_t *x = ast->root_scope->items; x; x = x->next)
     if (x->node_type == AST_NODE_VARIABLE && x->val.v->io_flag == flag) {
       out_raw(out, &(x->val.v->addr), 4);
-      out_raw(out, &(x->val.v->num_dim), 1);
+      out_raw(out, &(x->val.v->num_dim), 4);
       uint8_t *layout;
       uint8_t ts = static_type_layout(x->val.v->base_type, &layout);
       out_raw(out, &ts, 1);

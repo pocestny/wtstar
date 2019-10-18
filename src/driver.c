@@ -70,8 +70,8 @@ static DESTRUCTOR(include_file_t) {
   free(r);
 }
 
-static include_file_t *files,  //!< the list of known included files
-    *current;                  //!< pointer to the list of included files
+static include_file_t *files=NULL,  //!< the list of known included files
+    *current=NULL;                  //!< pointer to the list of included files
 
 writer_t *driver_error_writer = NULL;
 
@@ -84,7 +84,7 @@ static include_file_t *insert_file(const char *filename) {
 }
 
 /* initialize the driver */
-void driver_init() { files = current = NULL; }
+void driver_init() {  files = current = NULL; }
 
 /* preload / unload the given file */
 void driver_set_file(const char *filename, const char *content) {
