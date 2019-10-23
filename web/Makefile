@@ -1,10 +1,10 @@
 all:
-	make -C ide
-	make -C home
-	make -C service
+	${MAKE} -C ide
+	${MAKE} -C home
+	${MAKE} -C service
 	cp -r ./static/* ../_build/web
 
 clean:
-	make -C ide clean
-	make -C home clean
-	make -C service clean
+	${MAKE} -C ide clean
+	${MAKE} -C home clean
+	${MAKE} -C service clean

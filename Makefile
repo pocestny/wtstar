@@ -1,16 +1,25 @@
+UNAME_S=$(shell uname -s)
+UNAME_N=$(shell uname -n)
+
+$(info system is [${UNAME_S}] [${UNAME_N}])
+
+ifeq ($(UNAME_S),FreeBSD)
+export MAKE=gmake
+endif
+
 all: cli-tools web documentation
 
 .PHONY:	cli-tools web documentation
 
 cli-tools:
-	make -C src
+	${MAKE} -C src
 
 web:
-	make -C web
+	${MAKE} -C web
 
 documentation:
-	make -C src documentation
+	${MAKE} -C src documentation
 
 clean:
-	make -C src clean
-	make -C web clean
+	${MAKE} -C src clean
+	${MAKE} -C web clean
