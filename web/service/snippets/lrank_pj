@@ -1,0 +1,17 @@
+input int S[_];
+int n = S.size;
+
+output int R[n];
+
+pardo(i : n) {
+  R[i] = 1;
+  if (S[i] == i) R[i] = 0;
+}
+
+for (int t = 0; 2 ^ t < n; t++)
+    pardo(i : n) {
+        R[i] += R[S[i]];
+        S[i] = S[S[i]];
+    }
+
+

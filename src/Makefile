@@ -12,8 +12,12 @@ CFLAGS+=-O3
 BISONFLAGS=
 endif
 
-.PHONY:	wtc wtrun wtdump wtdb
-all: wtc wtrun wtdump wtdb
+.PHONY:	wtc wtrun wtdump wtdb documentation
+all: wtc wtrun wtdump wtdb 
+
+documentation:
+	mkdir -p ${BUILD_DIR}/documentation
+	doxygen
 
 ##################################################################
 ########  build wtc
@@ -59,27 +63,27 @@ WTDUMP_DEPS=${WTDUMP_SRC} ${WTDUMP_HDRS}
 
 ##################################################################
 
-wtc: ${BUILD_DIR}/cli/wtc
-wtrun: ${BUILD_DIR}/cli/wtrun
-wtdb: ${BUILD_DIR}/cli/wtdb
-wtdump: ${BUILD_DIR}/cli/wtdump
+wtc: ${BUILD_DIR}/cli_tools/wtc
+wtrun: ${BUILD_DIR}/cli_tools/wtrun
+wtdb: ${BUILD_DIR}/cli_tools/wtdb
+wtdump: ${BUILD_DIR}/cli_tools/wtdump
 
 
-${BUILD_DIR}/cli/wtc: ${WTC_DEPS}
-	mkdir -p ${BUILD_DIR}/cli
-	${CC} ${CFLAGS} ${WTC_SRC} -o ${BUILD_DIR}/cli/wtc
+${BUILD_DIR}/cli_tools/wtc: ${WTC_DEPS}
+	mkdir -p ${BUILD_DIR}/cli_tools
+	${CC} ${CFLAGS} ${WTC_SRC} -o ${BUILD_DIR}/cli_tools/wtc
 
-${BUILD_DIR}/cli/wtrun: ${WTR_DEPS}
-	mkdir -p ${BUILD_DIR}/cli
-	${CC} ${CFLAGS} ${WTR_SRC} -o ${BUILD_DIR}/cli/wtrun -lm
+${BUILD_DIR}/cli_tools/wtrun: ${WTR_DEPS}
+	mkdir -p ${BUILD_DIR}/cli_tools
+	${CC} ${CFLAGS} ${WTR_SRC} -o ${BUILD_DIR}/cli_tools/wtrun -lm
 
-${BUILD_DIR}/cli/wtdb: ${WTDB_DEPS}
-	mkdir -p ${BUILD_DIR}/cli
-	${CC} ${CFLAGS} ${WTDB_SRC} -o ${BUILD_DIR}/cli/wtdb -lm 
+${BUILD_DIR}/cli_tools/wtdb: ${WTDB_DEPS}
+	mkdir -p ${BUILD_DIR}/cli_tools
+	${CC} ${CFLAGS} ${WTDB_SRC} -o ${BUILD_DIR}/cli_tools/wtdb -lm 
 
-${BUILD_DIR}/cli/wtdump: ${WTDUMP_DEPS}
-	mkdir -p ${BUILD_DIR}/cli
-	${CC} ${CFLAGS} ${WTDUMP_SRC} -o ${BUILD_DIR}/cli/wtdump -lm 
+${BUILD_DIR}/cli_tools/wtdump: ${WTDUMP_DEPS}
+	mkdir -p ${BUILD_DIR}/cli_tools
+	${CC} ${CFLAGS} ${WTDUMP_SRC} -o ${BUILD_DIR}/cli_tools/wtdump -lm 
 
 %.c: %.y
 	bison ${BISONFLAGS} -o $@ $<

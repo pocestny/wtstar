@@ -1,0 +1,22 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view ide uses content::ide extends master %>  
+
+<% template add_to_head() %> 
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Montserrat:300,400">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono" rel="stylesheet">
+
+ <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/w2ui/1.4.3/w2ui.min.css" />
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/w2ui/1.4.3/w2ui.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.5/ace.js"></script> 
+<% end %>
+
+<% template add_after_body() %> <% end %>
+<% template body() %> 
+<div id="app-layout"><%= snippet | raw %></div>
+<% end %>
+
+
+<% end view %>  
+<% end skin %>  

@@ -1,0 +1,50 @@
+/*
+
+  find the index of the first '1' in an array on common CRCW
+
+  T = O(1)
+  W = O(n)
+
+*/
+#mode cCRCW
+input int A[_];
+int n = A.size;
+output int x=-1;
+
+int first_one_simple(int A[_]) {
+  int n = A.size;
+  int B[n];
+  int result;
+
+  pardo(i : n) {
+    B[i] = A[i];
+    if (i > 0) pardo(j : i) if (A[j] == 1) B[i] = 0;
+    if (B[i] == 1) result = i;
+  }
+  return result;
+}
+
+// make the input square
+int sn = sqrt(n);
+int nn = sn ^ 2;
+int B[nn];
+pardo(i : nn) B[i] = 0;
+pardo(i : n) B[i] = A[i];
+
+// buckets
+int Box[sn];
+
+// which buckets are empty
+pardo(i : sn) {
+  Box[i] = 0;
+  pardo(j : sn) if (B[i * sn + j] == 1) Box[i] = 1;
+}
+
+// first non-empty bucket
+int fb = first_one_simple(Box);
+
+int C[sn];
+pardo(i : sn) C[i] = B[fb * sn + i];
+
+// first one of first non-empty bucket
+x = first_one_simple(C) + fb * sn;

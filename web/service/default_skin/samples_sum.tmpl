@@ -1,0 +1,58 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view samples_sum uses content::samples_sum extends samples %>  
+
+<% template stuff() %>
+  <p class="subtitle is-3 section-title">Computing sum</p>
+  <p class="has-text-justified">
+  
+  <article class="message is-warning">
+  <div class="message-body">
+  Given is an array of <i>n</i> integers, such that <i>n</i> is power of two. The
+  task is to compute the sum of all elements.
+  </div>
+</article>
+
+  </p><p class="has-text-justified" style="padding-top:5px">
+  The simplest sequential way is as follows:
+<pre class="codepre" data-id="sum_seq"><code class="wt">input int A[_];
+output int sum = 0;
+
+for (int i = 0; i < A.size; i++)
+  sum += A[i];
+</code></pre>
+
+Note that the time and work are equal, and linear in <i>n</i>.  We can do better using parallelism:
+<pre class="codepre" data-id="sum_log"><code class="wt">input int A[_];
+int n = A.size;
+int Y[n];
+
+output int sum;
+
+pardo(i : n) Y[i] = A[i];
+
+for (int t = 0; 2 ^ t < n; t++)
+  pardo(i : n / 2 ^ (t + 1))
+    Y[i] = Y[2 * i] + Y[2 * i + 1];
+
+sum = Y[0];
+</code></pre>
+
+The program first copies the input array <code>A</code> 
+to an auxiliary array <code>Y</code>. Then it proceeds in
+<i>log n</i> iterations; in each iteration the pairs of consecutive elements are added in 
+parallel as follows:
+
+  <div class="diagram">
+  <img src="<%= static_prefix %>/img/sum.png"/>
+  </div>
+
+
+Hence, the work is still linear, but the time is only logarithmic.
+
+  </p>
+
+<% end %>
+
+<% end view %>  
+<% end skin %>  

@@ -1,0 +1,59 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view home uses content::home extends master %>  
+
+<% template add_to_head() %> 
+<link href="https://fonts.googleapis.com/css?family=Special+Elite&display=swap" rel="stylesheet">
+<% end %>
+
+<% template add_after_body() %> <% end %>
+<% template body() %> 
+
+<section class="hero is-fullheight">
+  <div class="hero-head">
+  <% include navbar() %>
+  </div>
+
+  <div class="hero-body">
+  <div class="container">
+  <div class="columns">
+
+  <div class="column is-4">
+  <div style="display:flex;justify-content: center;">
+      <img src="<%= static_prefix %>/img/logo.png" />
+  </div>
+  </div><!-- /column -->
+
+  <div class="column">
+  <div class="title home-title">WT*</div>
+  <p class="home-blurb" >
+  is a framework to study and teach the design of SIMD parallel algorithms
+  </p>
+  <p class="home-blurb" >
+provides a hardware-independent programmer-friendly language which
+captures the essential properties of parallel programs
+</p>
+  <p class="home-blurb" >
+consists of a language, a virtual machine, and a set of tools to write and
+  execute SIMD programs in an emulated environment
+</p>
+  </div> <!-- /column -->
+
+  </div><!-- /columns -->
+  </div><!-- /container -->
+  </div><!-- /hero-body -->
+
+  <div class="hero-foot">
+  <div class="container">
+  <span class="is-pulled-right is-size-7">version RC 1.0</span>
+  </div>
+  </div>
+</section>
+
+
+
+<% end %>
+
+
+<% end view %>  
+<% end skin %>  

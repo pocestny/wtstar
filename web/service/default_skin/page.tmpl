@@ -1,0 +1,12 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view page  uses content::page extends master %>  
+
+<% template add_to_head() %> 
+<link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.10/styles/railscasts.min.css">
+<script src="<%= static_prefix %>/highlight.pack.js"></script>
+<% end %>
+
+<% end view %>  
+<% end skin %>  

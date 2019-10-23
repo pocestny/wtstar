@@ -1,0 +1,44 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view samples uses content::samples extends page %>  
+
+<% template item(std::string id, std::string title) %>
+  <a class='panel-block <% if (content.active==id)%> is-active <% end %>' 
+    href="./samples_<%= id %>"
+  >
+     <span class="panel-icon has-icon" 
+     data-icon-name='book<% if (content.active==id)%>-open<% end %>' 
+     data-icon-size="18">
+     </span>
+    <%= title %>
+  </a>
+<% end %>
+
+<% template stuff() %>
+<% end %>
+
+<% template body() %> 
+  <% include navbar() %>
+
+  <div class="container is-fluid">
+  <div class="columns">
+  <div class="column is-one-third-tablet is-one-quarter-desktop is-2-fullhd">
+  <nav class="panel is-info">
+  <% include item("sum","Sums") %>
+  <% include item("psum","Prefix sums") %>
+  <% include item("first1","First non-zero index") %>
+  <% include item("lrank","List ranking") %>
+  </nav>
+  </div> <!-- /column -->
+  
+  <div class="column">
+  <% include stuff() %>
+  </div>
+  
+
+  </div><!-- /columns -->
+  </div>
+<% end %>
+
+<% end view %>  
+<% end skin %>  

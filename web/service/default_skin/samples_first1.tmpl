@@ -1,0 +1,77 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view samples_first1 uses content::samples_first1 extends samples %>  
+
+<% template stuff() %>
+  <p class="subtitle is-3 section-title">First non-zero index</p>
+  <p class="has-text-justified">
+
+  <article class="message is-warning">
+  <div class="message-body">
+  Given is a binary array of <code>A</code>, the task is to find
+  the first occurence of <code>1</code>.
+  </div>
+  </article>
+
+  </p><p class="has-text-justified" style="padding-top:5px">
+  We could use the same technique as for computing the sum to get logarithmic time and linear
+work. However, we want to show the advantages of the cCRCW mode. Consider the following
+program:
+
+<pre class="codepre" data-id="first1_quad"><code class="wt">#mode cCRCW
+input int A[_];
+int n = A.size;
+int B[n];
+output int x = -1;
+
+pardo(i : n) {
+  B[i] = A[i];
+  if (i > 0) pardo(j : i) if (A[j] == 1) B[i] = 0;
+  if (B[i] == 1) x = i;
+}
+</code></pre>
+
+The outer <code>pardo</code> 
+is used to separately consider each position in the input array. Each
+thread than spawns a number of threads to check whether it is actually the first one
+(effectively, the inner <code>pardo</code> 
+computed an unbounded-fan-in <code>AND</code> function in constant time).
+Note that several threads may try to write to the same variable <code>B[i]</code>, 
+but all of them
+are writing the same value so the cCRCW mode allows it. The subsequent write is
+performed by at most one thread. This program runs in constant time and quadratic work.
+We can improve on it:
+
+<pre class="codepre" data-id="first1_lin"><code class="wt">#mode cCRCW
+input int A[_];
+int n = A.size;
+output int x = -1;
+
+int sn = sqrt(n);
+
+int Box[sn];
+
+pardo(i : sn) {
+  Box[i] = 0;
+  pardo(j : sn) if (A[i * sn + j] == 1) Box[i] = 1;
+}
+
+int fb = first_one_simple(Box);
+
+int C[sn];
+pardo(i : sn) C[i] = A[fb * sn + i];
+
+x = first_one_simple(C) + fb * sn;
+</code></pre>    
+
+We first cut the input into boxes of size <code>sqrt(n)</code>. 
+For each box, use the <code>parallel-AND</code>
+technique to find out if it is empty or not. Using the previous algorithm we find the
+first non-empty box. Then again using the previous algorithm we find the first 
+<code>1</code> in
+this box. The time is still constant, and the work is linear.
+
+<% end %>
+
+<% end view %>  
+<% end skin %>  

@@ -1,0 +1,19 @@
+{
+	"service" : {
+		"api" : "http",
+    "port" : 12345
+	},
+  "http" : {
+        "script_names" : [ "/service/wtstar" ]
+   },
+
+"file_server" : {
+  "enable": true,
+  "document_root" : "./web",
+  "alias" : [
+    { "url" : "/static", "path" : "./web" }
+  ],
+ }
+
+}
+

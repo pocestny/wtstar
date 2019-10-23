@@ -1,0 +1,63 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view usage uses content::usage extends page %>  
+
+<% template body() %> 
+  <% include navbar() %>
+
+<div class="container" style="padding:10px">
+<p class="subtitle is-3 section-title">Description</p>
+<p class="has-text-justified">
+WT* is a framework to study and teach the design of SIMD (ingle instruction flow,
+multiple data) parallel algorithms.
+Its design follows the general idea that in order to develop a solid theory of
+parallel algorithmics, one needs  a hardware-independent, programmer-friendly
+language which captures the essential properties of parallel programs, yet can
+be relatively easily mapped to existing hardware-supported languages. 
+The WT* syntax follows the presentation model from the textbook
+<span class="is-italic">JáJá: Introduction to Parallel Algorithms</span>.
+The WT* framework consists of a language, a virtual machine, and a set of tools to write and
+execute SIMD programs in an emulated environment.
+</p>
+
+<p class="subtitle is-3 section-title">Quick start</p>
+<p class="has-text-justified">
+The quickest way is to use the web live IDE. Load the following program into the editor,
+and compile it.
+<pre class="codepre" data-id="hello"><code class="wt">input int n;
+output int sum = 0;
+int A[n];
+
+#mode cCRCW
+
+pardo(i:n) 
+  A[i] = i*i;
+
+for (int i = 0; i < n; i++) 
+  sum += A[i];
+</code></pre>
+Write an integer <i>n</i> in the input area, and run. The sum of the first
+<i>n</i> squares will be displayed in the output area. The work and time
+values are displayed in the notification area.
+For more information consider the <a href="./language">language description</a>,
+and the <a href="./samples">sample programs</a>.
+</p>
+
+
+<p class="subtitle is-3 section-title">CLI tools</p>
+<div class="content">
+<ul>
+<li> <code>wtc</code> is a compiler from the WT* language to a binary format.
+Usage: <code>wtc demo.wt -o demo.wtr</code>
+<li> <code>wtrun</code> runs a binary (reads input from stdin)
+<li> <code>wtdb</code> runs a binary in debug mode
+<li> <code>wtdump</code> displays information about binary file
+</div>
+
+
+
+</div>
+<% end %>
+
+<% end view %>  
+<% end skin %>  

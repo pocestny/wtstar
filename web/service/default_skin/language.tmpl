@@ -1,0 +1,393 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view language uses content::language extends page %>  
+
+<% template body() %> 
+  <% include navbar() %>
+  <div class="container" style="padding:10px">
+   <p class="subtitle is-3 section-title">Programming model</p>
+  <p class="has-text-justified">
+  The WT* programming model consists of a number of threads. The program is started with
+one thread, and other threads can be dynamically created and terminated, forming a tree-like
+structure of parent-child threads. All threads operate synchronously: they share
+a common code with a single PC (program counter) register. At each instant some group
+of threads is <em>active</em> and they perform the current operation.
+Each thread can have its own local variables, and can also access all variables of its
+ancestors.
+The complexity
+is measured in terms of <em>time</em> (the number of consecutive steps) and 
+<em>work</em> (the overall number of instructions performed by all active threads).
+  The WT* framework provides a simple imperative strongly typed language, with a C-like syntax.
+  </p>
+  <p class="has-text-justified" style="padding-top:5px">
+<strong>Program</strong> 
+is a sequence of type definitions, variable definitions, function definitions,
+and statements;
+  <div class="diagram">
+  <img src="<%= static_prefix %>/img/program.png"/>
+  </div>
+  </p>
+
+   <p class="subtitle is-3 section-title">Types</p>
+  <p class="has-text-justified">
+  There are four basic types: <code>int</code>, <code>float</code>, 
+  <code>char</code> (the support for <code>char</code> is not yet ready),
+and <code>void</code>. User defined types
+(a.k.a. structs, or records) can be created with the <code>type</code> keyword by combining
+basic and user defined types:
+  <div class="diagram">
+  <img src="<%= static_prefix %>/img/type_definition.png"/>
+  </div>
+  so e.g. this is a valid code:
+<pre class="codepre"><code class="wt">type point {
+  float x,y;
+}
+
+type my_type {
+  point p;
+  int tag;
+}
+</code></pre>
+</p>
+
+  <p class="subtitle is-3 section-title">Variables and arrays</p>
+  <p class="has-text-justified">
+  Variables are declared by specifying the type:
+  <div class="diagram">
+  <img src="<%= static_prefix %>/img/variable_declaration.png"/>
+  </div>
+The <i>variable declarator</i> is in the simplest form the name of the variable, e.g.
+<code>my_type quak;</code>.
+With several active threads, the variable declaration creates a separate copy of
+the variable in each active thread. Members of he type are accessed via the dot-notation
+<code>a.p.x</code>.
+</p>
+<p class="has-text-justified">
+The language supports multidimensional arrays. The number of dimensions
+is fixed. The size of each
+dimension
+must be specified in the declaration. So, e.g. <code>int B[n,n*n];</code> 
+declares a 2-dimensional
+array <code>B</code>.
+For arrays, the keyword <code>dim</code> gives the number of dimensions, e.g.
+
+<pre class="codepre"><code class="wt">int A[10,20,30], z = A.dim;</code></pre>
+
+
+results in <code>z == 3</code>. The size of the array in a given dimension can be obtained by
+<code>A.size(d)</code>; <code>A.size</code> is equivalent to <code>A.size(0)</code>.
+</p>
+<p class="has-text-justified">
+Finally, a scalar variable (assignment to arrays is not supported) that is not
+designated as input, can be
+assigned to during the declaration. The full variable declarator
+syntax is as follows:
+  <div class="diagram">
+  <img src="<%= static_prefix %>/img/variable_declarator.png"/>
+  </div>
+The initializer can be any expression of compatible type (conversions
+among <code>int</code> and <code>float</code> are performed). Compound types use the bracket
+format, so e.g.,
+
+<pre class="codepre"><code class="wt">type point {
+  float x,y;
+}
+
+type goo {
+  point p;
+  int a;
+}
+
+goo gle = { {3.14, -9.6} , 47 };
+
+type ipoint {
+  int a,b;
+}
+
+ipoint p = gle.p;
+</code></pre>
+
+results in <code>p == {3, -9}</code>.
+
+  </p>
+
+  <p class="subtitle is-3 section-title">Input and output</p>
+  <p class="has-text-justified">
+The input and output is handled by input/output variables. Any variable definition can be 
+preceded by the keyword <code>output</code> 
+which means the variable is meant to be part of the output. 
+The runtime environment is responsible for displaying the output variables. 
+  </p><p class="has-text-justified">
+Similarly, the input of data is handled by prefixing a variable definition by a keyword 
+<code>input</code> (at most one of the <code>input</code> <code>output</code> 
+keywords may be present). Again, the runtime 
+environment is responsible for reading the data and initializing the variables. For
+obvious reasons, input variables don't support initializers.
+  </p><p class="has-text-justified">
+
+A caveat with input arrays is that the size of the array is not known in compile time 
+(only the number of dimensions is).
+Instead of the size expression, the input arrays use the <i>don't care</i> symbol 
+(<code>_</code>)
+in definition.
+Following is a simple program that reads a 1-dimensional array, and returns its size:
+
+<pre class="codepre"><code class="wt">input int A[_];
+output int x = A.size;
+</code></pre>
+
+The format of input/output variables used by both the cli tools, and the web frontend is
+as follows: the static variables of simple types are the respective literals, the
+variables of compound types are represented as a flattened list of members enclosed 
+in braces, e.g. <code>output  goo gle = { {3.14, -9.6} , 47 }</code> would produce
+<code>{ 3.140000 -9.600000 47 }</code>. Arrays are row-wise bracketed lists of elements,
+e.g. the following program
+
+<pre class="codepre"><code class="wt">input int A[_,_];
+int n=A.size(0),m=A.size(1);
+</code></pre>
+
+on input <code>[ [ 1 2 3 ]  [ 1 2 3 ] ]</code> has <code>n==2</code> and 
+<code>m==3</code>. Whitespace may be added 
+arbitrarily.
+  </p>
+
+  <p class="subtitle is-3 section-title">Assignment</p>
+  <p class="has-text-justified">
+Like initializers, assignment is supported only for scalar variables. Unlike initializers,
+type checking is more strict: the conversion between <code>float</code> and 
+<code>int</code> is not performed
+in compound types. E.g. consider
+
+<pre class="codepre"><code class="wt">type t1 {int x,y;}
+type t2 {float a,b;}
+
+t1 var1 = {4,5};
+t2 var2 = {0.1,0.4};
+</code></pre>
+
+Then <code>t1 var3 = var2;</code> is okay, 
+but <code>var1 = var2</code> is not; you need to cast the value explicitly
+with <code>var1 = (t1)var2</code>. 
+Also when assigning literals of compound types, these must be
+typecasted, e.g. <code>var1 = {9,10};</code> is wrong, 
+it should be <code>var1 = (t1){9,10}</code>.
+
+  </p><p class="has-text-justified">
+As expected, assignment is left associative, so <code>int z = x = y = 4</code> works.
+
+  </p>
+  
+  <p class="subtitle is-3 section-title">Expressions</p>
+  <p class="has-text-justified">
+  Apart from assignment, which is also an expression, there are the usual operators
+which act only on numeric types. The binary operators are
+
+  </p><p class="has-text-justified">
+<table class="table is-bordered is-striped">
+<tbody>
+<tr>
+<td>combined assignment </td>
+<td><code>+=</code> <code>-=</code> <code>*=</code> <code>/=</code> <code>%=</code></td>
+<td><code>%=</code>  works only on integers
+</tr>
+<tr>
+<td>  relational operators</td>
+<td> <code>==</code> <code>&lt;=</code> 
+<code>&gt;=</code> <code>!=</code> <code>&lt;</code> <code>&gt;</code> </td>
+<td></td>
+</tr>
+<tr>
+<td> logical operators </td>
+<td>  <code>||</code> <code>&amp;&amp;</code>  </td>
+<td>  work on integers only </td>
+</tr>
+<tr>
+<td>  numerical operatos </td>
+<td> <code>+</code> <code>-</code> <code>*</code> 
+<code>/</code> <code>%</code> <code>^</code> </td>
+<td> <code>^</code> is exponentiation </td>
+</tbody>
+</table>
+
+Unary increment and decrement <code>++</code> <code>--</code> are 
+supported both as prefix and as suffix.
+Unary <code>-</code> and logical <code>!</code> are present. 
+Unary postfix operator <code>~|</code> works on
+integers an gives the least significant bit that is set, i.e. <code>12~|==2</code>.
+
+Note that logical operators are evaluated in full, i.e.
+<code>0 &amp;&amp; &lt;bad stuff&gt;</code> produces
+error.
+
+  </p>
+  
+  <p class="subtitle is-3 section-title">Statements</p>
+  <p class="has-text-justified">
+  </p>
+Most of the statements have the usual semantics. The only statement not
+found in sequential languages is the <code>pardo</code>
+statement. <code>pardo(&lt;var&gt;:&lt;range&gt;) &lt;statement&gy;</code> creates <code>&lt;range&gt;</code> new threads
+numbered <code>0...&lt;range&gt;-1</code>. The number is stored in a local variable <code>&lt;var&gt;</code>, and
+all threads continue to execute <code>&lt;statement&gt;</code>. After finishing, the threads are joined.
+  </p><p class="has-text-justified">
+
+The SIMD mode of operation gives also a special semantics to the conditional statement:
+the <code>if (&lt;condition&gt;) &lt;statement1&gt;; else &lt;statement2&gt;;</code> construct splits the currently
+active threads into two groups based on the condition. The first group becomes active,
+and executes <code>&lt;statement1&gt;</code>, then the second group becomes active, and executes
+<code>&lt;statement2&gt;</code>. So the following code:
+
+<pre class="codepre"><code class="wt">pardo (i:2)
+  if (i==0) do_someting(42);
+  else do_something(47);
+</code></pre>
+
+executes the two calls sequentially, whereas
+    
+<pre class="codepre"><code class="wt"> pardo(i:2) {
+  int p;
+  if (i==0) p=42; else p=47;
+  do_something(p);
+}
+</code></pre>
+
+executes them in parallel.
+
+  <div class="diagram">
+  <img src="<%= static_prefix %>/img/statement.png"/>
+  </div>
+
+  <p class="subtitle is-3 section-title">Functions</p>
+  <p class="has-text-justified">
+The language supports C-like functions. The return type must be static (i.e. returning
+arrays is not allowed). Parameters are passed by value, with the caveat that the 'value'
+of an array is the value of the control block (basically, a pointer to the allocated memory).
+When passing an array as parameter, the same syntax as with input arrays is used, e.g.
+instead of sizes, the <i>don't care</i> symbol is used as a placeholder. E.g. a function that
+returns the length of an array would be 
+
+<pre class="codepre"><code class="wt">int length ( int A[_] ) {
+  return A.size;
+}
+</code></pre>
+
+It is also possible to have separate definition and declaration (e.g. for mutual
+recursion). The full syntax of function definitions is 
+
+  <div class="diagram">
+  <img src="<%= static_prefix %>/img/function_definition.png"/>
+  </div>
+
+where the <code>parameter_declarator</code> is
+
+  <div class="diagram">
+  <img src="<%= static_prefix %>/img/parameter_declarator.png"/>
+  </div>
+
+The <code>return</code> (for a function returning <code>void</code>) or <code>return &lt;statement&gt;</code> 
+statement is
+used to return from the function.
+There are two points concerning returning values: first, if a <code>return</code> is issued from
+a <code>pardo</code> statement, there would be no way to join the threads. Hence, <code>return</code> cannot
+appear within a pardo statement in a function body. Calling a function from a <code>pardo</code>
+statement, or having (possibly nested) <code>pardo</code> statements in a function 
+is perfectly fine, though. The other point is that if the control flow reaches the
+end of a function (other than returning <code>void</code>) without proper <code>return</code> statement,
+it
+will end up in having the stack filled with some default values, which you probably (surely)
+don't want.
+  </p><p class="has-text-justified">
+
+There are some built-in functions:
+
+<table class="table is-bordered is-striped">
+<thead>
+<tr>
+<td>name</td><td>parameter</td><td>output type</td><td>value</td>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sqrt(x)</code>  </td><td> <code>int</code>     </td><td> <code>int</code>       </td><td> <code>ceiling(sqrt(x))</code></td>
+</tr>
+<tr>
+<td><code>sqrtf(x)</code> </td><td> <code>float</code>   </td><td> <code>float</code>     </td><td> <code>sqrt(x)</code></td>
+</tr>
+<tr>
+<td><code>log(x)</code>   </td><td> <code>int</code>     </td><td> <code>int</code>       </td><td> <code>ceiling(log2(x))</code></td>
+</tr>
+<tr>
+<td><code>logf(x)</code>  </td><td> <code>float</code>   </td><td> <code>float</code>     </td><td> <code>ceiling(log2(x))</code></td>
+</tr>
+</tbody>
+</table>
+
+Also, technically not a function, there is a way to sort an array (incurring <code>log n</code> time
+and <code>n log n</code> work, where <code>n</code> is the size of the array) using a function-like syntax
+<code>sort(&lt;array&gt;,&lt;key_specifier&gt;)</code> where <code>key_specifier</code> refers to the type member that 
+serves as key, so e.g.
+
+<pre class="codepre"><code class="wt">type point {float x,y;}
+type pair {point key;int val;}
+
+input pair A[_];
+output pair B[A.size];
+
+pardo(i:A.size)B[i]=A[i];
+sort(B,pair.key.x);
+</code></pre>
+
+on an input <code>[ {8 1 4} {3 4 6} {9 6 10} {1 7 5} ]</code> produces
+<code>[{ 1.000000 7.000000 5 } { 3.000000 4.000000 6 } { 8.000000 1.000000 4 } 
+{ 9.000000 6.000000 10 }]</code>
+  </p>
+  
+  <p class="subtitle is-3 section-title">Directives</p>
+  <p class="has-text-justified">
+One can use <code>#mode &lt;mode&gt;</code> to switch memory mode to one of <code>EREW</code>, <code>CREW</code> (default),
+<code>cCRCW</code>.
+
+  </p><p class="has-text-justified">
+
+A file can be included (i.e. directly inserted) by <code>#include "&lt;filename&gt;"</code>. The filename 
+is considered relative to the file from which the <code>#include</code> directive is used. (The include support is so far only in the cli tools).
+
+  </p><p class="has-text-justified">
+
+A version <code>#include once "&lt;filename&gt;"</code> includes the file only if it has not
+been included yet. Imagine a file <code>filefoo</code> with a definition of function
+<code>foo</code>, and another file <code>filegoo</code> that defines function <code>goo</code> that uses <code>foo</code>,
+so <code>filegoo</code> contains <code>#include "filefoo"</code>. Now a file <code>main</code> that uses both
+<code>foo</code> and <code>goo</code> cannot contain
+
+<pre class="codepre"><code class="wt">#include "filegoo"
+#include "filefoo"
+</code></pre>
+
+since function <code>foo</code> would be redefined. Calling
+
+<pre class="codepre"><code class="wt">#include "filegoo"
+#include once "filefoo"
+</code></pre>
+
+solves the problem.
+  </p><p class="has-text-justified">
+
+For debugging, one can use statement <code>@&lt;tag&gt;(&lt;condition&gt;)</code>. 
+When running in the standard mode
+(in <code>wtrun</code>, or using the <code>Run</code> command in the web IDE), 
+the condition is evaluated and discarded. When running in <code>wtdb</code> or the 
+<code>Debug</code> command, 
+if the condition is evaluated to <code>true</code> in at least one thread, the execution
+is stopped. Some rudimentary facilities are provided to view the values of variables in
+various threads, and to continue the execution.
+
+  </p>
+
+
+  </div>
+<% end %>
+
+<% end view %>  
+<% end skin %>  

@@ -1,0 +1,27 @@
+input int A[_];
+output int B[A.size];
+
+int prefix_sums(int A[_], int B[_]) {
+    if (A.size == 1) {
+      B[0] = A[0];
+      return 1;
+    }
+
+    int n = A.size / 2;
+    int AA[n], BB[n];
+
+    pardo(i : n) AA[i] = A[2 * i] + A[2 * i + 1];
+
+    prefix_sums(AA, BB);
+
+    pardo(i : n) {
+        B[2 * i] = BB[i] - A[2 * i + 1];
+        B[2 * i + 1] = BB[i];
+    }
+
+    return 1;
+}
+
+prefix_sums(A, B);
+
+

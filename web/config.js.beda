@@ -1,0 +1,10 @@
+{
+	"service" : {
+		"api" : "fastcgi",
+		"socket": "/tmp/service_rasto.sock",
+    "user" : "rasto",
+    "group": "www",
+    "perms": "770"
+	}
+}
+

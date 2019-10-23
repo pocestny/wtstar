@@ -1,0 +1,86 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view master uses content::master %>  
+
+<% template page_title() %>WT*<%end %>
+<% template add_to_head() %> <% end %>
+<% template add_after_body() %> <% end %>
+<% template body() %> <% end %>
+<% template navbar() %>
+    <nav class="navbar is-transparent" role="navigation">
+      <div class="container">
+        <div class="navbar-brand">
+             <a class="navbar-item" href="./ide/ ">
+             <span class="banner">live IDE</span>
+             </a>
+          <a role="button" class="navbar-burger burger" data-target="navbarMenui">
+            <span></span>
+            <span></span>
+            <span></span>
+          </a>
+        </div>
+        <div id="navbarMenui" class="navbar-menu">
+          <div class="navbar-end">
+            <a class="navbar-item" href="./home">
+              Home
+            </a>
+            <a class="navbar-item" href="./usage">
+              About
+            </a>
+            <a class="navbar-item" href="./language">
+              Language
+            </a>
+            <a class="navbar-item" href="./samples_sum">
+              Sample programs
+            </a>
+          </div>
+        </div>
+        </div>
+    </nav>
+<% end %>
+
+
+<% template render() %>  
+<!DOCTYPE HTML//EN" "http://www.w3.org/TR/REC-html40/strict.dtd">
+<html lang="sk" >
+<head><meta charset="utf-8"  />
+<meta http-equiv="X-UA-Compatible" content="IE=edge"  />
+<meta name="viewport" content="width=device-width initial-scale=1 maximum-scale=1 minimum-scale=1 user-scalable=no"  />
+<meta http-equiv="content-type" content="text/html; charset=utf-8"  />
+<meta name="author" content="Rasťo Královič"  />
+<meta name="description" content="WT* project page"  />
+
+<!-- /icons -->
+<link rel="apple-touch-icon" sizes="180x180" href="<%= static_prefix %>/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="<%= static_prefix %>/icons/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="<%= static_prefix %>/icons/favicon-16x16.png">
+<link rel="manifest" href="<%= static_prefix %>/icons/site.webmanifest">
+<link rel="shortcut icon" href="<%= static_prefix %>/icons/favicon.ico">
+<meta name="msapplication-TileColor" content="#da532c">
+<meta name="msapplication-config" content="<%= static_prefix %>/icons/browserconfig.xml">
+<meta name="theme-color" content="#ffffff">
+
+<link href="https://fonts.googleapis.com/css?family=Roboto&display=swap" rel="stylesheet">
+  
+  <% foreach style in styles %>
+     <% item %> 
+       <link rel="stylesheet" href="<%= static_prefix %>/<%= style %>.css">
+     <% end %>  
+  <% end %>
+
+<% include add_to_head() %>
+<title><% include page_title() %></title>
+</head>
+  <body>  
+  <% include body() %>
+  </body>
+  <% include add_after_body() %>
+  <% foreach script in scripts %>
+     <% item %> 
+        <script type="text/javascript" src="<%= static_prefix %>/<%= script %>.js"></script>
+     <% end %>  
+  <% end %>
+</html>  
+<% end template %>  
+<% end view %>  
+<% end skin %>  
