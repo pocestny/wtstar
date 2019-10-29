@@ -35,7 +35,7 @@ ${DSTDIR}:
 	mkdir -p ${DSTDIR}
 
 ${DSTDIR}/backend.js:  ${DSTDIR} ${CSRC} $(foreach file,${BACKENDHDR},${CLIDIR}/${file})
-	source /home/kralovic/SW/emsdk/emsdk_env.sh; export EMCC_WASM_BACKEND=1;\
+	export EMCC_WASM_BACKEND=1;\
 		emcc  ${CFLAGS} ${EMCCFLAGS} -s EXPORTED_FUNCTIONS="${EXPORTS}"  ${CSRC}\
 		-o $@
 

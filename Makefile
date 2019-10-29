@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 UNAME_S=$(shell uname -s)
 UNAME_N=$(shell uname -n)
 
@@ -15,7 +17,7 @@ cli-tools:
 	${MAKE} -C src
 
 web:
-	${MAKE} -C web
+	 source /home/kralovic/SW/emsdk/emsdk_env.sh; ${MAKE} -C web
 
 documentation:
 	${MAKE} -C src documentation
