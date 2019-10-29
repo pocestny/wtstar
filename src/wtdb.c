@@ -1,3 +1,8 @@
+/**
+ * @file wtdb.c
+ * @brief simple ncurses-based debugger
+ *  @todo write documentation
+ */
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -30,7 +35,6 @@ int binary_length;
 int input_needed = 0;
 int focused_thread = -1;
 
-
 void describe() {
   printf("loaded file:  %s%s%s\n", CYAN_BOLD, binary_file_name, TERM_RESET);
   virtual_machine_t *tmp = virtual_machine_t_new(binary_file, binary_length);
@@ -56,7 +60,7 @@ void describe() {
 }
 
 void show_threads() {
-  static char *index_var = "<var>";
+  static char *index_var = "[index]";
 
   if (!env || (env->state != VM_RUNNING && env->state != VM_OK)) {
     printf("%sno program running%s\n", YELLOW_BOLD, TERM_RESET);
@@ -78,8 +82,9 @@ void show_threads() {
                  sid = env->debug_info->scopes[sid].parent)
               for (int i = 0; !var && i < env->debug_info->scopes[sid].n_vars;
                    i++)
-                if (env->debug_info->scopes[sid].vars[i].addr ==
-                    env->thr[t]->mem_base - env->frame->base)
+                if (env->thr[t]->mem_base >= env->frame->base &&
+                    env->debug_info->scopes[sid].vars[i].addr ==
+                        env->thr[t]->mem_base - env->frame->base)
                   var = &env->debug_info->scopes[sid].vars[i];
             if (var) name = var->name;
           }
@@ -205,7 +210,6 @@ void run() {
     if (input_string) {
       reader_t *in = reader_t_new(READER_STRING, input_string);
       if (read_input(in, env) != 0) {
-        printf("%swrong input%s\n", RED_BOLD, TERM_RESET);
         virtual_machine_t_delete(env);
         env = NULL;
       }
@@ -222,6 +226,20 @@ void run() {
   cont();
 }
 
+int variable_visible(int sid, int v) {
+  int visible = 0;
+  if (env->debug_info->scopes[sid].parent == MAP_SENTINEL) {
+    // global variable
+    if (env->debug_info->scopes[sid].vars[v].from_code < env->last_global_pc)
+      visible = 1;
+  } else {
+    if (env->debug_info->scopes[sid].vars[v].from_code < env->stored_pc)
+      visible = 1;
+  }
+
+  return visible;
+}
+
 void variable_list() {
   int n_vars = 0;
   int *global = NULL;
@@ -234,20 +252,22 @@ void variable_list() {
     for (int sid = env->debug_info->scope_map->val[s]; sid != MAP_SENTINEL;
          sid = env->debug_info->scopes[sid].parent) {
       for (int v = 0; v < env->debug_info->scopes[sid].n_vars; v++) {
-        int found = 0;
-        for (int i = 0; i < n_vars; i++)
-          if (!strcmp(info[i]->name,
-                      env->debug_info->scopes[sid].vars[v].name)) {
-            found = 1;
-            break;
+        if (variable_visible(sid, v)) {
+          int found = 0;
+          for (int i = 0; i < n_vars; i++)
+            if (!strcmp(info[i]->name,
+                        env->debug_info->scopes[sid].vars[v].name)) {
+              found = 1;
+              break;
+            }
+          if (!found) {
+            n_vars++;
+            global = realloc(global, n_vars * sizeof(int));
+            info = realloc(info, n_vars * sizeof(variable_info_t *));
+            global[n_vars - 1] =
+                (env->debug_info->scopes[sid].parent == MAP_SENTINEL);
+            info[n_vars - 1] = &(env->debug_info->scopes[sid].vars[v]);
           }
-        if (!found) {
-          n_vars++;
-          global = realloc(global, n_vars * sizeof(int));
-          info = realloc(info, n_vars * sizeof(variable_info_t *));
-          global[n_vars - 1] =
-              (env->debug_info->scopes[sid].parent == MAP_SENTINEL);
-          info[n_vars - 1] = &(env->debug_info->scopes[sid].vars[v]);
         }
       }
     }
@@ -277,12 +297,12 @@ void variable_list() {
 
 void print_variable_in_thread(char *name) {
   if (!env || !env->debug_info) return;
-  thread_t *t=get_thread(focused_thread);
+  thread_t *t = get_thread(focused_thread);
 
   if (focused_thread > -1) printf("focused thread %d\n", focused_thread);
   if (t == NULL) {
     printf("%sfocused thread not active, assuming id %lu%s\n", YELLOW_BOLD,
-           env->thr[0]->tid,TERM_RESET);
+           env->thr[0]->tid, TERM_RESET);
     t = env->thr[0];
   }
 
@@ -293,13 +313,16 @@ void print_variable_in_thread(char *name) {
   int global = 0;
 
   for (int sid = env->debug_info->scope_map->val[s];
-       !var && sid != MAP_SENTINEL; sid = env->debug_info->scopes[sid].parent)
-    for (int v = 0; !var && v < env->debug_info->scopes[sid].n_vars; v++)
-      if (!strcmp(name, env->debug_info->scopes[sid].vars[v].name)) {
+       !var && sid != MAP_SENTINEL; sid = env->debug_info->scopes[sid].parent) {
+    for (int v = 0; !var && v < env->debug_info->scopes[sid].n_vars; v++) {
+      if (variable_visible(sid, v) &&
+          !strcmp(name, env->debug_info->scopes[sid].vars[v].name)) {
         var = &env->debug_info->scopes[sid].vars[v];
         if (env->debug_info->scopes[sid].parent == MAP_SENTINEL) global = 1;
         break;
       }
+    }
+  }
 
   int addr = var->addr;
   if (!global) addr += env->frame->base;
@@ -312,29 +335,29 @@ void print_variable_in_thread(char *name) {
     printf("[");
     for (int d = 0; d < var->num_dim; d++) {
       if (d > 0) printf(",");
-      uint32_t size = lval(get_addr(t,(addr+4*(2+d)),4),uint32_t);
-      printf("%d",size);
+      uint32_t size = lval(get_addr(t, (addr + 4 * (2 + d)), 4), uint32_t);
+      printf("%d", size);
     }
     printf("]");
   }
   printf(" = ");
   input_layout_item_t it = get_layout(var, env);
-  if (var->num_dim==0) 
-   print_var(outw,get_addr(t,addr,4),&it);
+  if (var->num_dim == 0)
+    print_var(outw, get_addr(t, addr, 4), &it);
   else {
-    int *sizes = (int *)malloc(var->num_dim*sizeof(int));
-    for(int i=0;i<var->num_dim;i++) 
-      sizes[i]=lval(get_addr(t,(addr+4*(2+i)),4),uint32_t);
-   print_array(outw,env,&it,var->num_dim, sizes, 
-       lval(get_addr(t,addr,4),uint32_t),0,0);
-   free(sizes);
+    int *sizes = (int *)malloc(var->num_dim * sizeof(int));
+    for (int i = 0; i < var->num_dim; i++)
+      sizes[i] = lval(get_addr(t, (addr + 4 * (2 + i)), 4), uint32_t);
+    print_array(outw, env, &it, var->num_dim, sizes,
+                lval(get_addr(t, addr, 4), uint32_t), 0, 0);
+    free(sizes);
   }
   printf("%s\n", TERM_RESET);
   if (it.elems) free(it.elems);
 }
 
 void error_handler(error_t *err) {
-  fprintf(stderr, "%s\n", err->msg->str.base);
+  fprintf(stderr, "%s%s%s\n", RED_BOLD,err->msg->str.base,TERM_RESET);
 }
 
 void print_help(int argc, char **argv) {
@@ -376,7 +399,7 @@ typedef enum {
   T_NONE
 } tokens_t;
 
-#define MAX_TOKENS 3
+#define MAX_TOKENS 4
 
 // returns position of first non-token
 int parse(const char *in_str, tokens_t *result) {
@@ -536,7 +559,7 @@ int main(int argc, char **argv) {
         sscanf(result + 11, "%d", &focused_thread);
         break;
       case 12:
-        print_variable_in_thread(strtok(result + 5," \t"));
+        print_variable_in_thread(strtok(result + 5, " \t"));
         break;
       default:
         printf("unknown command\n");

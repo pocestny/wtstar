@@ -1,7 +1,3 @@
-/**
- * @file hash.c
- * @brief Implementation of hash.h
- */
 #include <hash.h>
 #include <stdlib.h>
 

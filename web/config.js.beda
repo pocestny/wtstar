@@ -1,7 +1,7 @@
 {
 	"service" : {
 		"api" : "fastcgi",
-		"socket": "/tmp/service_rasto.sock",
+		"socket": "/tmp/service_wtstar.sock",
     "user" : "rasto",
     "group": "www",
     "perms": "770"

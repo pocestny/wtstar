@@ -5,6 +5,7 @@
 #include <ast.h>
 #include <code.h>
 
+// each node created in the constructor gets a unique id
 static int __ast_node_t_id__ = 0;
 
 /* ----------------------------------------------------------------------------

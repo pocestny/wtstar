@@ -1,3 +1,8 @@
+/**
+ * @file wtrun.c
+ * @brief load a minary file and run it
+ *  @todo write documentation
+ */
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>

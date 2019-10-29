@@ -16,6 +16,13 @@ import watcher from './watcher.js'
 
 const no_program_msg = "no program loaded"
 
+var to_start=2;
+function show_start() {
+  to_start--;
+  if (to_start==0)
+    $("#loader").css({display:'none'});
+}
+
 var wt = {}
 
 var tabs = [ {id : 'tab1'} ];  // id, mID, marked
@@ -74,6 +81,7 @@ backend().then(function(cc) {
   wt.var_dims = cc.cwrap('web_var_dims', 'string', [ 'number' ]);
   wt.var_value = cc.cwrap('web_var_value', 'string', [ 'number' ]);
   wt.current_line = cc.cwrap('web_current_line', 'number', []);
+  setTimeout(show_start,100);
 });
 
 function format(wt) {
@@ -133,8 +141,8 @@ function set_watcher_threads() {
     var tid = wt.get(tids + 8 * i, 'i64');
     var par = wt.thread_parent(tid);
     var vv = ' ';
-    if (par != 0)
-      vv = wt.thread_base_name() + " = " + wt.thread_base_value(tid);
+    if (par != 0) 
+      vv =  wt.thread_base_name() + " = " + wt.thread_base_value(tid);
     data.push({'recid' : i + 1, 'tid' : tid, 'parent' : par, 'var' : vv});
   }
   watcher.set_threads(data);
@@ -411,8 +419,9 @@ w2ui['main_layout'].content('main', w2ui['inner_layout']);
 $(function() {
   document.addEventListener('keydown', keyDownHandler);
   editor.ace.session.on('change', editorChanged);
-  editor.ace.session.setValue($("#app-layout").text());
+  editor.ace.session.setValue($("#editor-data")[0].innerHTML);
   $("#app-layout").w2render('main_layout');
   statusbar.left(no_program_msg);
   watcher.init(set_watcher_vars);
+  setTimeout(show_start,100);
 });

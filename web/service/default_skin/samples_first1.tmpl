@@ -15,7 +15,29 @@
 
   </p><p class="has-text-justified" style="padding-top:5px">
   We could use the same technique as for computing the sum to get logarithmic time and linear
-work. However, we want to show the advantages of the cCRCW mode. Consider the following
+work. 
+
+<pre class="codepre" data-id="first1_log"><code class="wt">input int A[_];
+int n = A.size;
+output int x;
+
+int ln=log(n);
+int B[2 ^ ln];
+
+pardo(i : 2 ^ ln) B[i] = 2^ln+1;
+pardo(i : n) if (A[i] == 1) B[i] = i;
+
+n = 2 ^ ln;
+
+for (int t = 0; 2 ^ t < n; t++)
+  pardo(i : n / 2 ^ (t + 1))
+    B[i] = min(B[2 * i], B[2 * i + 1]);
+
+x = B[0];
+</code></pre>
+
+
+However, we want to show the advantages of the cCRCW mode. Consider the following
 program:
 
 <pre class="codepre" data-id="first1_quad"><code class="wt">#mode cCRCW

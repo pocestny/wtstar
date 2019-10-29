@@ -1,3 +1,8 @@
+/**
+ * @file wtdump.c
+ * @brief dump basic information about binary file
+ *  @todo write documentation
+ */
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>

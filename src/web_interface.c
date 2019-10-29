@@ -1,3 +1,12 @@
+/**
+ * @file web_interface.c
+ * @brief interface for wasm
+ *
+ * Compiled by emscripted to wasm, these functions are used by javascript 
+ * to interact with the binary
+ *
+ * @todo write documentation
+ */
 #include <stdlib.h>
 #include <string.h>
 
@@ -52,6 +61,7 @@ MAKE_FUN(value)
 
 #undef MAKE_FUN
 
+  
 int web_prepare_vars(uint64_t tid) {
   if (n_vars > 0) {
     for (int i = 0; i < n_vars; i++) {
@@ -70,8 +80,18 @@ int web_prepare_vars(uint64_t tid) {
 
   for (int sid = env->debug_info->scope_map->val[s]; sid != MAP_SENTINEL;
        sid = env->debug_info->scopes[sid].parent) {
-    for (int v = 0; v < env->debug_info->scopes[sid].n_vars; v++)
-      if (env->debug_info->scopes[sid].vars[v].addr < env->stored_pc) {
+    for (int v = 0; v < env->debug_info->scopes[sid].n_vars; v++) {
+      int visible=0;
+      if (env->debug_info->scopes[sid].parent == MAP_SENTINEL) {
+        // global variable
+        if (env->debug_info->scopes[sid].vars[v].from_code<env->last_global_pc)
+          visible=1;
+      } else {
+        if (env->debug_info->scopes[sid].vars[v].from_code<env->stored_pc)
+          visible=1;
+      }
+
+      if (visible) {
         int found = 0;
         for (int i = 0; i < n_vars; i++)
           if (!strcmp(info[i]->name,
@@ -88,7 +108,10 @@ int web_prepare_vars(uint64_t tid) {
           info[n_vars - 1] = &(env->debug_info->scopes[sid].vars[v]);
         }
       }
+    }
   }
+
+  if (n_vars==0) return 0;
 
   var_data = realloc(var_data, n_vars * sizeof(var_data_t));
   thread_t *t = get_thread(tid);
@@ -156,7 +179,7 @@ int64_t web_thread_parent(uint64_t tid) {
   return t->parent->tid;
 }
 
-static char *index_var = "<var>";
+static char *index_var = "[index]";
 
 char *web_thread_base_name() {
   if (!env || (env->state != VM_RUNNING && env->state != VM_OK)) return NULL;
@@ -169,8 +192,9 @@ char *web_thread_base_name() {
            !var && sid != MAP_SENTINEL;
            sid = env->debug_info->scopes[sid].parent)
         for (int i = 0; !var && i < env->debug_info->scopes[sid].n_vars; i++)
-          if (env->debug_info->scopes[sid].vars[i].addr ==
-              env->thr[0]->mem_base - env->frame->base)
+          if (env->thr[0]->mem_base >= env->frame->base &&
+              env->debug_info->scopes[sid].vars[i].addr ==
+                  env->thr[0]->mem_base - env->frame->base)
             var = &env->debug_info->scopes[sid].vars[i];
       if (var) name = var->name;
     }
@@ -228,7 +252,7 @@ int web_compile(char *name, char *text) {
 
 // return 1 if error occured while starting
 int web_start(char *input) {
-  //printf("WEB START\n");
+  // printf("WEB START\n");
   if (__web_state == WEB_NO_CODE) return 1;
   __web_state = WEB_VM_READY;
 
@@ -238,7 +262,7 @@ int web_start(char *input) {
   delete_errors();
 
   env = virtual_machine_t_new((uint8_t *)(code->str.base), code->str.ptr);
-  //printf("machine ready\n");
+  // printf("machine ready\n");
 
   if (!env) {
     __web_state = WEB_NO_CODE;
@@ -277,7 +301,8 @@ int web_current_line() {
   if (env->debug_info) {
     int it = code_map_find(env->debug_info->source_items_map, env->stored_pc);
     if (it == -1) return -1;
-    return env->debug_info->items[env->debug_info->source_items_map->val[it]].fl;
+    return env->debug_info->items[env->debug_info->source_items_map->val[it]]
+        .fl;
   }
   return env->stored_pc;
 }

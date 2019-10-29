@@ -1,17 +1,13 @@
-/**
- * @file errors.c
- * @brief implementation of the error handling routines from errors.h
- */
 #include <errors.h>
 #include <utils.h>
 
 #include <stdlib.h>
 
-static error_t **log = NULL;  //!< internal error log
-static int n_err = 0,         //!< number of errors stored
-    logsize = 0;              //!< allocated space
+static error_t **log = NULL;  // internal error log
+static int n_err = 0,         // number of errors stored
+    logsize = 0;              // allocated space
 
-static void (*error_handler)(error_t *) = NULL;  //!< registered error handler
+static void (*error_handler)(error_t *) = NULL;  // registered error handler
 
 CONSTRUCTOR(error_t) {
   ALLOC_VAR(r, error_t);

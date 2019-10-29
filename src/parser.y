@@ -865,29 +865,6 @@ expr_list:
 
   /* ************************* STATEMENTS  ***************************** 
   
-  STMT_COND:
-    par[0] = expression
-    par[1]  is a scope with two items: then and else
-
-  STMT_WHILE and STMT_DO
-    par[0] = expression
-    par[1]  is a scope with the statement
-
-  STMT_FOR:
-    par[0] = encapsulating scope 
-             contains 4 nodes: three sections from the "for" definition 
-             and one resulting statement
-
-  STMT_PARDO:
-    par[0] = scope with first item the driving variable
-             contains the statement
-    par[1] = expression
-
-  STMT_RETURN:
-    par[0] = expression
-
-  STMT_BREAKPOINT
-    par[0] = expression
 
   */
 

@@ -1,8 +1,86 @@
+/**
+ * @file parser_utils.c
+ * @brief utilities included directly into parser.y
+ *
+ * Some basic error checking is done here, and errors are reported using #errors.h
+ * while parsing. More checking is done later in #code_generation.h
+ */
+
+
+void ignore(); //!< don't fret about unused values
+
+//! add basic types as global constants
+void add_basic_types(ast_t *ast);
+
+//! add built-in functions into ast_t
+void add_builtin_functions(ast_t *ast);
+
+//! parse a typedef
+void make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
+                  static_type_member_t *members) ;
+
+//! add a flag to all variables in a list
+void add_variable_flag(int flag, ast_node_t *list) ;
+
+//! append list of variables to current scope
+void append_variables(ast_t *ast, ast_node_t *list);
+
+//! create an expression literal of specified integer value
+ast_node_t *expression_int_val(int val);
+
+/**
+ * update var so that it represents array with dimensions in exprlist
+ * on error, keep the variable as scalar
+ */
+void init_array(ast_t *ast, ast_node_t *var, ast_node_t *exprlist);
+
+//! parse input array
+void init_input_array(ast_t *ast, ast_node_t *var, int num_dim);
+
+//! parse variable
+ast_node_t *init_variable(ast_t *ast, YYLTYPE *loc, char *vname);
+
+//! parse function definitions
+ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
+                            char *name, YYLTYPE *nameloc, ast_node_t *params);
+
+//! parse specifier expression
+ast_node_t *create_specifier_expr(YYLTYPE *loc, ast_t *ast, ast_node_t *expr,
+                                  char *ident, YYLTYPE *iloc);
+
+//! pasre variable expression
+ast_node_t *expression_variable(ast_t *ast, YYLTYPE *loc, char *name);
+
+//! parse sizeof expression
+ast_node_t *expression_sizeof(ast_t *ast, YYLTYPE *loc, char *name,
+                              ast_node_t *dim);
+
+//! set the dimensions of an array variable
+ast_node_t *array_dimensions(ast_t *ast, YYLTYPE *loc, char *name);
+
+//! set the list of array indices
+int add_expression_array_parameters(ast_node_t *ve, ast_node_t *p);
+
+//! parse function call expression
+ast_node_t *expression_call(ast_t *ast, YYLTYPE *loc, char *name,
+                            ast_node_t *params);
+
+//! parse sort expression
+ast_node_t *expression_sort(ast_t *ast, YYLTYPE *loc, char *name,
+                            ast_node_t *params);
+
+/**
+ * AST_NODE_EXPRESSION initialized with variant and parameters
+ * check types, and set the resulting type
+ * on error, return 0 and deallocate node
+ * node is EXPR_BINARY, EXPR_CAST, EXPR_PREFIX or EXPR_POSTFIX
+ */
+int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node);
+
 #ifdef __PARSER_UTILS__
 
-void ignore(void *i) {}  // don't fret about unused values
+void ignore(void *i) {}  
 
-// add basic  types
 #define ADD_STATIC_TYPEDEF(typename, nbytes)                         \
   __type__##typename =                                               \
       ast_node_t_new(NULL, AST_NODE_STATIC_TYPE, strdup(#typename)); \
@@ -12,6 +90,7 @@ void ignore(void *i) {}  // don't fret about unused values
 ast_node_t *__type__int = NULL, *__type__float = NULL, *__type__void = NULL,
            *__type__char = NULL;
 
+// add basic types as global constants
 void add_basic_types(ast_t *ast) {
   ADD_STATIC_TYPEDEF(int, 4)
   ADD_STATIC_TYPEDEF(float, 4)
@@ -28,6 +107,7 @@ void add_basic_types(ast_t *ast) {
   p->val.v->base_type = __type__##typename->val.t;    \
   append(ast_node_t, &fn->val.f->params, p);
 
+// add built-in functions into ast_t
 void add_builtin_functions(ast_t *ast) {
   ast_node_t *fn, *p;
 
@@ -48,6 +128,7 @@ void add_builtin_functions(ast_t *ast) {
   append(ast_node_t, &ast->functions, fn);
 }
 
+// parse a typedef
 void make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
                   static_type_member_t *members) {
   if (!members || !ident) {
@@ -91,6 +172,7 @@ void make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
   free(ident);
 }
 
+// add a flag to all variables in a list
 void add_variable_flag(int flag, ast_node_t *list) {
   list_for(v, ast_node_t, list) v->val.v->io_flag = flag;
   list_for_end;
@@ -112,6 +194,7 @@ void append_variables(ast_t *ast, ast_node_t *list) {
   list_for_end;
 }
 
+// create an expression literal of specified integer value
 ast_node_t *expression_int_val(int val) {
   ast_node_t *zero = ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
   zero->val.e->type->type = __type__int->val.t;
@@ -151,6 +234,7 @@ void init_array(ast_t *ast, ast_node_t *var, ast_node_t *exprlist) {
   v->ranges = exprlist;
 }
 
+// parse input array
 void init_input_array(ast_t *ast, ast_node_t *var, int num_dim) {
   if (!var) return;
 
@@ -166,6 +250,7 @@ void init_input_array(ast_t *ast, ast_node_t *var, int num_dim) {
   v->ranges = NULL;
 }
 
+// parse variable
 ast_node_t *init_variable(ast_t *ast, YYLTYPE *loc, char *vname) {
   int role = ident_role(ast, vname, NULL);
   if (role & IDENT_LOCAL_VAR) {
@@ -188,6 +273,7 @@ ast_node_t *init_variable(ast_t *ast, YYLTYPE *loc, char *vname) {
   ast_node_t_delete(params);      \
   return NULL;
 
+// parse function definitions
 ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
                             char *name, YYLTYPE *nameloc, ast_node_t *params) {
   ast_node_t *fn = NULL;
@@ -242,6 +328,7 @@ ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
   return fn;
 }
 
+// parse specifier expression
 ast_node_t *create_specifier_expr(YYLTYPE *loc, ast_t *ast, ast_node_t *expr,
                                   char *ident, YYLTYPE *iloc) {
   if (expr->val.e->type->compound) {
@@ -270,6 +357,7 @@ ast_node_t *create_specifier_expr(YYLTYPE *loc, ast_t *ast, ast_node_t *expr,
   return res;
 }
 
+// pasre variable expression
 ast_node_t *expression_variable(ast_t *ast, YYLTYPE *loc, char *name) {
   ast_node_t *vn;
   int role = ident_role(ast, name, &vn);
@@ -286,6 +374,7 @@ ast_node_t *expression_variable(ast_t *ast, YYLTYPE *loc, char *name) {
   return res;
 }
 
+// parse sizeof expression
 ast_node_t *expression_sizeof(ast_t *ast, YYLTYPE *loc, char *name,
                               ast_node_t *dim) {
   ast_node_t *vn;
@@ -319,6 +408,7 @@ ast_node_t *expression_sizeof(ast_t *ast, YYLTYPE *loc, char *name,
   return res;
 }
 
+// set the dimensions of an array variable
 ast_node_t *array_dimensions(ast_t *ast, YYLTYPE *loc, char *name) {
   ast_node_t *vn;
   int role = ident_role(ast, name, &vn);
@@ -339,13 +429,14 @@ ast_node_t *array_dimensions(ast_t *ast, YYLTYPE *loc, char *name) {
   return res;
 }
 
+// set the list of array indices
 int add_expression_array_parameters(ast_node_t *ve, ast_node_t *p) {
   ve->val.e->variant = EXPR_ARRAY_ELEMENT;
-  // TODO: check type, number of dimensions, etc.
   ve->val.e->val.v->params = p;
   return 1;
 }
 
+// parse function call expression
 ast_node_t *expression_call(ast_t *ast, YYLTYPE *loc, char *name,
                             ast_node_t *params) {
   ast_node_t *fn;
@@ -365,6 +456,7 @@ ast_node_t *expression_call(ast_t *ast, YYLTYPE *loc, char *name,
   return res;
 }
 
+// parse sort expression
 ast_node_t *expression_sort(ast_t *ast, YYLTYPE *loc, char *name,
                             ast_node_t *params) {
   if (!params) {
@@ -418,10 +510,9 @@ int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node) {
     if (e->val.o->first == NULL || e->val.o->second == NULL) return 0;
     int equal = inferred_type_equal(e->val.o->first->val.e->type,
                                     e->val.o->second->val.e->type);
-    
-    if ((e->val.o->oper == TOK_EQ ||
-         e->val.o->oper == TOK_NEQ) &&
-        equal && !e->val.o->first->val.e->type->compound) {
+
+    if ((e->val.o->oper == TOK_EQ || e->val.o->oper == TOK_NEQ) && equal &&
+        !e->val.o->first->val.e->type->compound) {
       e->type->type = __type__int->val.t;
     } else if (e->val.o->oper == '=' && equal) {
       inferred_type_t_delete(e->type);

@@ -56,9 +56,11 @@ SAMPLES(sum)
 SAMPLES(psum)
 SAMPLES(first1)
 SAMPLES(lrank)
+SAMPLES(psrch)
+SAMPLES(hull)
 
 struct ide : public master {
-  ide(std::string _snippet) : master({"mode-dummy","ide"},{"ide"}){
+  ide(std::string _snippet) : master({"mode-wtstar","ide"},{"ide"}){
     snippet=_snippet;
   }
   std::string snippet;

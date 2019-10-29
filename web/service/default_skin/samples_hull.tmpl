@@ -1,0 +1,190 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view samples_hull uses content::samples_hull extends samples %>  
+
+<% template stuff() %>
+  <p class="subtitle is-3 section-title">Upper convex hull</p>
+  <p class="has-text-justified">
+  
+  <article class="message is-warning">
+  <div class="message-body">
+  Given is an array of <i>n</i> points, the task is to 
+  compute the upper part of the convex hull. In particular, the output should
+  be an array of points, containing the upper-hull points from left to right.
+  </div>
+  </article>
+  <div class="diagram">
+  <img src="<%= static_prefix %>/img/upper_hull_sample.png"/>
+  </div>
+
+  </p><p class="has-text-justified" style="padding-top:5px">
+  We present a divide-and-conquer techinque. We first sort the points according to the
+  <i>x</i> coordinate. The procedure works on sub-arrays defined by an interval 
+  <i>l-r</i>, and creates an array <code>inHull</code> of flags indicating
+  which points are in the hull. First, the interval is divided into two halves, 
+  and the upper hulls are computed. The indices of the hull points are then copied
+  to temporary arrays using prefix_sums:
+<pre class="codepre"><code class="wt">void copy_hull(int H[_], int l, int r) {
+  int n = r - l + 1, A[n], ps[n];
+  pardo(i : n) A[i] = inHull[l + i];
+  prefix_sums(A, ps);
+  pardo(i : n) if (inHull[l + i]) H[ps[i] - 1] = l + i;
+}
+</code></pre>
+
+  Next, we need to find a common tangent: one point
+  on each of the hulls such that all other points are below the line defined by them.
+  Since the hulls are convex, it is easy to find a tangent from a point on a left
+  hull to the right hull:
+
+<pre class="codepre"><code class="wt">int tangent_point(int from, int P[_]) {
+  int result = 0;
+  int n = P.size;
+  if (n < 2) return n - 1;
+  pardo(i : P.size) if (test_hit_lr(from, i, P) == 0) result = i;
+  return result;
+}
+</code></pre>
+
+where the <code>test_hit_lr</code> function tests, whether the line
+<code>A[from]-A[P[i]]</code> is tangent to the hull <code>A[P[0]]...A[P[P.size-1]]</code>
+assuming <code>A[from]</code> is to the left of <code>P</code>. It returns  0 if it is a 
+tangent, -1 or 1 if the tangent point is to the right or left on <code>P</code>. The
+test itself just checks the orientation (<code>dir_cw</code>,<code>dir_ccw</code>)
+of the neighboring points:
+<pre class="codepre"><code class="wt">int test_hit_lr(int from, int i, int P[_]) {
+  if (i < 0) return -1;
+  if (i >= P.size) return 1;
+  if (P.size == 1) return 0;
+  if (i == 0) {
+    if (dir_cw(A[from], A[P[i]], A[P[i + 1]])) return 0;
+    return -1;
+  }
+  if (i == P.size - 1) {
+    if (!dir_ccw(A[from], A[P[i]], A[P[i - 1]])) return 0;
+    return 1;
+  }
+  if (dir_ccw(A[from], A[P[i]], A[P[i - 1]])) return 1;
+  if (!dir_cw(A[from], A[P[i]], A[P[i + 1]])) return -1;
+  return 0;
+}
+</code></pre>
+Finally, the common tangent is a found by trying, in parallel, all points on the left hull.
+The overall code is like this:
+
+<pre class="codepre" data-id="hull_simpl"><code class="wt">input point A[_];
+int n = A.size;
+sort(A, point.x);
+int inHull[n];
+
+// returns size
+int compute_hull(int l, int r) {
+  int n = r - l + 1;
+  if (n < 3) {
+    // base
+    pardo(i : n) inHull[l + i] = 1;
+    return n;
+  } else {
+    int m = (r + l) / 2;
+    // prepare two halves for parallel execution
+    int ll[2], rr[2];
+    ll[0] = l;
+    rr[0] = m;
+    ll[1] = m + 1;
+    rr[1] = r;
+    int s[2]; // size of the two hulls
+
+    // divide and conquer
+    pardo(i : 2) s[i] = compute_hull(ll[i], rr[i]);
+
+    // the hulls are returned as flags in the inHull array,
+    // lets copy the indices of hull points into HL and HR
+    int HL[s[0]], HR[s[1]];
+    int tl, tr; // indices of tangent points
+
+    copy_hull(HL, ll[0], rr[0]);
+    copy_hull(HR, ll[1], rr[1]);
+
+    // find the tangent by brute force
+    pardo(i : s[0]) {
+      // find a tangent from HL[i] to HR
+      int t = tangent_point(HL[i], HR);
+      // if it also a tangent from HR[t] to HL, we have the result
+      if (test_hit_rl(HR[t], i, HL) == 0) {
+        tl = i;
+        tr = t;
+      }
+    }
+
+    // zero-out the parts that are not in hull
+    if (s[0] - tl > 1) pardo(i : s[0] - 1 - tl) inHull[HL[i + tl + 1]] = 0;
+    if (tr > 0) pardo(i : tr) inHull[HR[i]] = 0;
+    return tl + 1 + s[1] - tr;
+  }
+}
+
+output int q = compute_hull(0, n - 1);
+int ps[n];
+
+// finally, assemble the output
+prefix_sums(inHull, ps);
+output point H[ps[n - 1]];
+pardo(i : n) if (inHull[i]) H[ps[i] - 1] = A[i];
+
+</code></pre>
+
+However, finding the common tangent by brute force results in quadratic
+work in the worst case. We can use <a href="./samples_psrch">p-ary search</a>
+to fix it. Replace the tangent-finding code by the following:
+
+<pre class="codepre" data-id="hull_final"><code class="wt">// if HL is small, find the tangent by brute force
+    if (s[0]<9){
+      pardo(i : s[0]) {
+        // find a tangent from HL[i] to HR
+        int t = tangent_point_p_ary(0,HR.size-1,HL[i],HR,sqrt(HR.size));
+        // if it also a tangent from HR[t] to HL, we have the result
+        if (test_hit_rl(HR[t],i,HL)==0) {
+          tl=i;tr=t;
+        }
+      }
+    }
+    else {
+      // partition into sqrt intervals
+      int sn = sqrt(s[0])-1;
+      int hits[sn];
+      int result=-1;
+      int li = (sn-1)*sn, ri=s[0]-1;
+      pardo (i:sn-1) {
+        // fint the tangents for boundaries of intervals
+        int j = (i+1)*sn;
+        int  t = tangent_point_p_ary(0,HR.size-1,HL[j],HR,sqrt(HR.size));
+        int hit = test_hit_rl(HR[t],j,HL);
+        hits[i]=hit;
+        if (hit==0) {
+          // direct hit, we have the result
+          result=j; tl=j;tr=t;
+        }
+        if (hit==1) {
+          // this point is to the right and the previous is to the left (or does not exist)
+          // we have found the proper bucket
+          if (i==0) {li=0;ri=sn;}
+          else if (hits[i-1]==-1) {li=i*sn;ri=(i+1)*sn;}
+        }
+      }
+      // if there wasn't a direct hit, 
+      // check the found interval by brute force
+      if (result==-1)
+      pardo(i : ri-li+1) {
+        int t = tangent_point_p_ary(0,HR.size-1,HL[li+i],HR,HR.size);
+        if (test_hit_rl(HR[t],li+i,HL)==0) {tl=li+i;tr=t;}
+      }
+    }
+</code></pre>
+  </p>
+
+
+
+<% end %>
+
+<% end view %>  
+<% end skin %>  

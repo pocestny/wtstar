@@ -1,7 +1,3 @@
-/**
- * @file driver.c
- * @brief Implementation of the driver.h
- */
 #include <string.h>
 
 #include <driver.h>

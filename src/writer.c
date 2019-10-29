@@ -1,13 +1,9 @@
-/**
- * @file writer.c
- * @brief impements writer.h
- */
 #include <stdlib.h>
 #include <string.h>
 
 #include <writer.h>
 
-//! the smallest size for string-base writers
+// the smallest size for string-base writers
 #define WRITER_BASE_STRING_SIZE 10
 
 writer_t *writer_t_new(int type) {

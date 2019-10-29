@@ -48,6 +48,7 @@ faults=0
 def run_hull_half(input_string,dr):
     global W,T,faults
     pts=[]
+    print(input_string)
     try:    
         o = su.check_output("wtrun upper_hull.wtr".split(),input=input_string,encoding='ascii')
     except su.CalledProcessError as e:
@@ -55,6 +56,7 @@ def run_hull_half(input_string,dr):
         print (e.output)
         #print (e.returncode)
         return pts
+    print(o)
     o = o.split()
     #print(o[len(o)-2],o[len(o)-1])
     W+=int(o[len(o)-2])
@@ -98,6 +100,7 @@ def add_sub_polys(pts):
 def plot(data):
     ground = scipy_hull(data)
     answer = run_hull_half(make_input_string(data),1)
+    print(W,T)
     points=np.array(data)
     plt.plot(points[:,0], points[:,1], '.',zorder=500)
     
@@ -122,7 +125,7 @@ def plot(data):
     plt.show()
     return 0
 
-help_msg = 'upper_hull.py -w <what>\n   what = plot | run'
+help_msg = 'upper_hull.py -w <what> -n <size>\n   what = plot | run | test'
 
 
 def random_data(n):
@@ -132,27 +135,35 @@ def random_data(n):
     return data
 
 if (__name__ == '__main__'):
-    su.Popen('wtc upper_hull.wt -o upper_hull.wtr'.split(), stdout=su.DEVNULL)
+    #su.Popen('wtc upper_hull.wt -o upper_hull.wtr'.split(), stdout=su.DEVNULL)
+    su.Popen('wtc upper_hull_simple.wt -o upper_hull.wtr'.split(), stdout=su.DEVNULL)
     what =''
+    size=80
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hw:",["what="])
+        opts, args = getopt.getopt(sys.argv[1:],"hw:n:",["what=","size="])
     except getopt.GetoptError:
         print (help_msg)
         sys.exit(2)
     for opt, arg in opts:
-        if opt == '-h':
+        if opt == "-h":
             print (help_msg)
             sys.exit(2)
         elif opt in ("-w", "--what"):
             what = arg
-    if what=='' or (what!='plot' and what!='run'):  
+        elif opt in ("-n", "--size"):
+            size = int(arg)
+    if what=='' or (what!='plot' and what!='run' and what!='test'):  
+        print(what)
         print (help_msg)
         sys.exit(2)
    
     if what=='plot':
         #plot(data)
-        plot(random_data(80))
+        plot(random_data(size))
         #plt.savefig('upper_hull.png')
+    elif what=='run':
+        run_hull_half(make_input_string(random_data(size)),1)
+        print(W,T)
     else:
         Ws=[]
         Ts=[]
@@ -169,7 +180,7 @@ if (__name__ == '__main__'):
             Ws.append(W/cnt)
             Ts.append(T/cnt)
             print(W/cnt,T/cnt)
-        for n in range(100,1500,50):
+        for n in range(100,4500,250):
             print(n,end=' ',flush=True)
             W=T=0
             cnt=20

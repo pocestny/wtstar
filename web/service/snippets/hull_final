@@ -1,9 +1,74 @@
-/*
-  computing upper convex hull
-  */
-#include "utils/geometry.wt"
-#include "utils/max.wt"
-#include "utils/prefix_sums.wt"
+/* geometry */
+type point { float x, y; }
+  
+float signed_triangle_area(point a, point b, point c) {
+  return (
+      (a.x * b.y - a.y * b.x + a.y * c.x - a.x * c.y + b.x * c.y - c.x * b.y) /
+      2.0);
+}
+
+int dir_cw(point a, point b, point c) {
+  return (signed_triangle_area(a, b, c) < -1e-15);
+}
+int dir_ccw(point a, point b, point c) {
+  return (signed_triangle_area(a, b, c) > 1e-15);
+}
+
+
+// sum using balanced tree computation
+// T = O(log n)
+// W = O(n)
+int sum(int A[_]) {
+  int n = 2^log(A.size),Y[n];
+  pardo(i:n) Y[i]=0;
+  pardo(i:A.size) Y[i]=A[i];
+
+  for (int t = 0; 2 ^ t < n; t++)
+    pardo(i : n / 2 ^ (t + 1))
+      Y[i] = Y[2 * i] + Y[2 * i + 1];
+
+  return Y[0];
+}
+
+
+// nonrecursive prefix sums 
+// T = O(log n)
+// W = O(n)
+// [ additional O(n log n) memory ]
+void prefix_sums(int A[_], int S[_]) {
+  int n = 2^log(A.size), ln=log(n);
+
+  int B[ln+1, n];  // storage
+
+  // copy input
+  pardo(i : n) B[0, i] = 0;
+  pardo(i : A.size) B[0,i] = A[i];
+
+  // bottom-up traversal
+  for (int t = 0; 2 ^ t < n; t++)
+    pardo(i : n / 2 ^ (t + 1)) B[t + 1, i] = B[t, 2 * i] + B[t, 2 * i + 1];
+
+  // top-down traversal
+  for (int t = 0; 2 ^ t < n; t++) pardo(i : n / 2 ^ (ln - t)) {
+      B[ln - t - 1, 2 * i] = B[ln - t, i] - B[ln - t - 1, 2 * i + 1];
+      B[ln - t - 1, 2 * i + 1] = B[ln - t, i];
+    }
+
+  // write output
+  pardo(i : A.size) S[i] = B[0, i];
+}
+
+float maxf2(float a, float b) {
+  if (a>b) return a;
+  return b;
+}
+
+float minf2(float a, float b) {
+  if (a<b) return a;
+  return b;
+}
+
+
 
 input point A[_];
 int n=A.size;
@@ -111,7 +176,6 @@ int tangent_point_p_ary(int l, int r, int from, int P[_], int p) {
 // returns size
 int compute_hull(int l, int r) {
   int n = r - l + 1;
-  @1;
   if (n < 3) {
     // base
     pardo(i : n) inHull[l + i] = 1;

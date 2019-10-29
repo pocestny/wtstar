@@ -1,7 +1,7 @@
 export default (function (){
   var elem = $("<div style='width:100%;height:calc( 100% - 10px );'></div>");
   var editor = ace.edit(elem[0], {
-    theme: "ace/theme/chrome",
+    theme: "ace/theme/dawn",
     selectionStyle: "text",
     showPrintMargin: false,
     fontFamily: 'Roboto Mono',
@@ -14,7 +14,7 @@ export default (function (){
   var _addSession = function(tab,caption,text,onChange){
     sessions[tab] = {}
     sessions[tab].caption = caption;
-    sessions[tab].session = ace.createEditSession(text,"ace/mode/dummy");
+    sessions[tab].session = ace.createEditSession(text,"ace/mode/wtstar");
     sessions[tab].session.on('change',onChange);
   }
 

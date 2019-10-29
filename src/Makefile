@@ -1,4 +1,4 @@
-DEBUG=1
+DEBUG=0
 
 CC=clang
 BUILD_DIR=../_build
@@ -8,7 +8,7 @@ ifeq ($(DEBUG),1)
 CFLAGS+=-g
 BISONFLAGS= -v -fdiagnostics-show-caret -fdiagnostics-parseable-fixit
 else
-CFLAGS+=-O3
+CFLAGS+=-O3 -static
 BISONFLAGS=
 endif
 

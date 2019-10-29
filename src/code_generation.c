@@ -16,11 +16,15 @@
 #define DEBUG(...) printf(__VA_ARGS__)
 #endif
 
-extern ast_node_t *__type__int;
+extern ast_node_t *__type__int; // from parser_utils.c
 
 static ast_t *ast;
 static int was_error = 0;
+static void emit_code_scope(code_block_t *code, scope_t *sc);
 
+/* ----------------------------------------------------------------------------
+ * create error, and insert into errors.h log 
+ */
 static void error(YYLTYPE *loc, const char *format, ...) {
   was_error = 1;
   error_t *err = error_t_new();
@@ -34,10 +38,9 @@ static void error(YYLTYPE *loc, const char *format, ...) {
   emit_error(err);
 }
 
-static void emit_code_scope(code_block_t *code, scope_t *sc);
 
 /* ----------------------------------------------------------------------------
- * resizable page of code
+ * implementation of code_block_t
  */
 
 CONSTRUCTOR(code_block_t) {
@@ -103,9 +106,17 @@ void add_instr(code_block_t *out, int code, ...) {
 }
 
 /* ----------------------------------------------------------------------------
- * assign_variable_addresses
+ * assign addresses to variables
+ *
+ * for a scope, consider all nodes
+ *  handle nodes with possible sub-scopes
+ *  assign address to each variable
+ *
+ * base is the currently first free address
+ *
+ * closing a scope ends the visibility of the variables, so the base returned
+ * from assign_scope_variable_addresses is not incremented
  */
-
 static int assign_single_variable_address(uint32_t base, variable_t *var) {
   var->addr = base;
   if (var->num_dim > 0)
@@ -146,7 +157,7 @@ static int assign_scope_variable_addresses(uint32_t base, scope_t *sc) {
 }
 
 /* ----------------------------------------------------------------------------
- * size (in bytes) of an inferred type
+ * size (in bytes) of an inferred type (defined in ast.h )
  */
 static int inferred_type_size(inferred_type_t *t) {
   if (t->compound) {
@@ -1163,9 +1174,9 @@ static void emit_code_scope(code_block_t *code, scope_t *sc) {
 }
 
 /* ----------------------------------------------------------------------------
- * generate code for function
+ * used from emit_code_function to check if there is a return statement
+ * within pardo - this is forbidden
  */
-
 static void check_pardo_return(ast_node_t *node, int inside) {
   switch (node->node_type) {
     case AST_NODE_SCOPE: {
@@ -1194,6 +1205,10 @@ static void check_pardo_return(ast_node_t *node, int inside) {
     } break;
   }
 }
+
+/* ----------------------------------------------------------------------------
+ * generate code for function
+ */
 
 static void emit_code_function(code_block_t *code, ast_node_t *fn) {
   assert(fn->node_type == AST_NODE_FUNCTION);
@@ -1228,6 +1243,7 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
 }
 
 /* ----------------------------------------------------------------------------
+ * write the input/output variables section of the binary file
  */
 static void write_io_variables(writer_t *out, int flag) {
   int n = 0;
@@ -1249,10 +1265,12 @@ static void write_io_variables(writer_t *out, int flag) {
 }
 
 /* ----------------------------------------------------------------------------
+ * main entry
  */
 int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
   ast = _ast;
 
+  // just for debugging: write all types
   DEBUG("types\n");
   for (ast_node_t *t = ast->types; t; t = t->next) {
     static_type_t *type = t->val.t;
@@ -1265,6 +1283,9 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
   }
 
   {
+    // give each function its ID (used in the FNMAP) section of the code
+    // assign addresses to variables within in the function
+    // (parameters are located on the lowest addresses)
     int n = 0;
     for (ast_node_t *fn = ast->functions; fn; fn = fn->next) {
       assert(fn->node_type == AST_NODE_FUNCTION);
@@ -1283,26 +1304,33 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
     }
   }
 
+  // global variables have lowest addresses, even if they are defined
+  // late in the source
   uint32_t base = 0;
   DEBUG("root variables\n");
   for (ast_node_t *p = ast->root_scope->items; p; p = p->next)
     if (p->node_type == AST_NODE_VARIABLE)
       base = assign_node_variable_addresses(base, p);
+
+  // assign addresses to variables in subscopes
   DEBUG("root subscopes\n");
   for (ast_node_t *p = ast->root_scope->items; p; p = p->next)
     if (p->node_type != AST_NODE_VARIABLE)
       base = assign_node_variable_addresses(base, p);
-
+ 
+  // main part - generate the code block
   code_block_t *code = code_block_t_new();
   emit_code_scope(code, ast->root_scope);
   add_instr(code, ENDVM, 0);
 
+  // add code for functions at the end
   for (ast_node_t *fn = ast->functions; fn; fn = fn->next)
     if (fn->val.f->root_scope) {
       fn->val.f->addr = code->pos;
       emit_code_function(code, fn);
     }
 
+  // conpute the size of the memory used by global variables
   uint32_t global_size = 0;
   for (ast_node_t *nd = ast->root_scope->items; nd; nd = nd->next)
     if (nd->node_type == AST_NODE_VARIABLE) {
@@ -1315,6 +1343,7 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
       if (sz > global_size) global_size = sz;
     }
 
+  // write the binary file (see code.h)
   if (!was_error) {
     uint8_t section;
 
@@ -1370,6 +1399,7 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
         }
     }
 
+    // emit the debug information from debug.h
     if (!no_debug) emit_debug_section(out, ast, code->pos);
 
     {

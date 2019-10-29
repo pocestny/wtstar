@@ -211,7 +211,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
   r->threads = stack_t_new();
   r->frames = stack_t_new();
 
-  r->W = r->T = r->pc = r->stored_pc = r->virtual_grps = 0;
+  r->W = r->T = r->pc = r->stored_pc = r->virtual_grps = r->last_global_pc = 0;
   r->n_thr = r->a_thr = 1;
 
   frame_t *tf = frame_t_new(0);
@@ -490,6 +490,8 @@ int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp) {
 int instruction(virtual_machine_t *env, int stop_on_bp) {
   ___pc___ = env->pc;
   env->stored_pc = env->pc;
+  if (env->frame->base==0) env->last_global_pc=env->pc;
+
   env->state = VM_RUNNING;
   for (int t = 0; t < env->n_thr; t++) env->thr[t]->bp_hit = 0;
   uint8_t opcode = lval(env->code + env->pc, uint8_t);

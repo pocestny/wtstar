@@ -1,19 +1,25 @@
 /**
  * @file utils.h
+ * @brief various utilities used in several places
  */
 #ifndef __UTILS_H__
 #define __UTILS_H__
 #include <inttypes.h>
 
-// lvalue of given type at given address
+//! pointer of given type at given address
 #define ptr(pntr, type) ((type *)(pntr))
+//! lvalue of given type at given address
 #define lval(pntr, type) (*ptr(pntr, type))
 
+//! allocate a variable of given type
 #define ALLOC_VAR(var, type) type *var = (type *)malloc(sizeof(type));
 
+//! create constructor
 #define CONSTRUCTOR(name, ...) name *name##_new(__VA_ARGS__)
+//! create destructor
 #define DESTRUCTOR(name) void name##_delete(name *r)
 
+//! append to a list
 #define append(type, list, value)                                   \
   if (value) {                                                      \
     if (!(*(list)))                                                 \
@@ -26,6 +32,7 @@
     }                                                               \
   }
 
+//! iterate a list
 #define list_for(var, type, list)        \
   for (type *__tmp__ = list; __tmp__;) { \
     type *var = __tmp__;                 \
@@ -34,6 +41,7 @@
 #define list_for_end }
 
 #define YYLTYPE YYLTYPE
+//! location type structure for flex/bison
 typedef struct YYLTYPE {
   uint32_t fl, fc, ll, lc;
   const char *fn, *ln;

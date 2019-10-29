@@ -1,0 +1,133 @@
+/*
+  computing upper convex hull
+  input: an array of points
+  output: left-to right points on the upper hull
+*/
+
+#include "utils/geometry.wt"
+#include "utils/max.wt"
+#include "utils/prefix_sums.wt"
+
+input point A[_];
+int n = A.size;
+sort(A, point.x);
+
+// hack to make x coordinate unique
+pardo(i : n) A[i].x += i * 1e-6;
+
+// flags for points contained in the hull
+int inHull[n];
+
+// copy into H the points from the range l..r in inHull
+void copy_hull(int H[_], int l, int r) {
+  int n = r - l + 1, A[n], ps[n];
+  pardo(i : n) A[i] = inHull[l + i];
+  prefix_sums(A, ps);
+  pardo(i : n) if (inHull[l + i]) H[ps[i] - 1] = l + i;
+}
+
+// test if A[from]-A[p[i]] is tangent to A[P[0]]...A[P[P.size-1]]
+// A[from] is to the left of P
+// returns 0 if it is a tangent, -1 or 1 if the tangent point is
+// to the right or left on P
+int test_hit_lr(int from, int i, int P[_]) {
+  if (i < 0) return -1;
+  if (i >= P.size) return 1;
+  if (P.size == 1) return 0;
+  if (i == 0) {
+    if (dir_cw(A[from], A[P[i]], A[P[i + 1]])) return 0;
+    return -1;
+  }
+  if (i == P.size - 1) {
+    if (!dir_ccw(A[from], A[P[i]], A[P[i - 1]])) return 0;
+    return 1;
+  }
+  if (dir_ccw(A[from], A[P[i]], A[P[i - 1]])) return 1;
+  if (!dir_cw(A[from], A[P[i]], A[P[i + 1]])) return -1;
+  return 0;
+}
+
+// test if A[from]-A[p[i]] is tangent to A[P[0]]...A[P[P.size-1]]
+// A[from] is to the right of P
+// returns 0 if it is a tangent, -1 or 1 if the tangent point is
+// to the right or left on P
+int test_hit_rl(int from, int i, int P[_]) {
+  if (i < 0) return -1;
+  if (i >= P.size) return 1;
+  if (P.size == 1) return 0;
+  if (i == 0) {
+    if (dir_ccw(A[from], A[P[i]], A[P[i + 1]])) return 0;
+    return -1;
+  }
+  if (i == P.size - 1) {
+    if (!dir_cw(A[from], A[P[i]], A[P[i - 1]])) return 0;
+    return 1;
+  }
+  if (dir_cw(A[from], A[P[i]], A[P[i - 1]])) return 1;
+  if (!dir_ccw(A[from], A[P[i]], A[P[i + 1]])) return -1;
+  return 0;
+}
+
+// find a tangent from A[from] to A[P[0]]...
+// A[from] is to the left of A[P[i]]
+int tangent_point(int from, int P[_]) {
+  int result = 0;
+  int n = P.size;
+  if (n < 2) return n - 1;
+  pardo(i : P.size) if (test_hit_lr(from, i, P) == 0) result = i;
+  return result;
+}
+
+// returns size
+int compute_hull(int l, int r) {
+  int n = r - l + 1;
+  if (n < 3) {
+    // base
+    pardo(i : n) inHull[l + i] = 1;
+    return n;
+  } else {
+    int m = (r + l) / 2;
+    // prepare two halves for parallel execution
+    int ll[2], rr[2];
+    ll[0] = l;
+    rr[0] = m;
+    ll[1] = m + 1;
+    rr[1] = r;
+    int s[2];
+
+    // divide and conquer
+    pardo(i : 2) s[i] = compute_hull(ll[i], rr[i]);
+
+    // the hulls are returned as flags in the inHull array,
+    // lets copy the indices of hull points into HL and HR
+    int HL[s[0]], HR[s[1]];
+    int tl, tr;
+
+    copy_hull(HL, ll[0], rr[0]);
+    copy_hull(HR, ll[1], rr[1]);
+
+    // find the tangent by brute force
+    pardo(i : s[0]) {
+      // find a tangent from HL[i] to HR
+      int t = tangent_point(HL[i], HR);
+      // if it also a tangent from HR[t] to HL, we have the result
+      if (test_hit_rl(HR[t], i, HL) == 0) {
+        tl = i;
+        tr = t;
+      }
+    }
+
+    // zero-out the parts that are not in hull
+    if (s[0] - tl > 1) pardo(i : s[0] - 1 - tl) inHull[HL[i + tl + 1]] = 0;
+    if (tr > 0) pardo(i : tr) inHull[HR[i]] = 0;
+    return tl + 1 + s[1] - tr;
+  }
+}
+
+output int q = compute_hull(0, n - 1);
+int ps[n];
+
+// finally, assemble the output
+prefix_sums(inHull, ps);
+output point H[ps[n - 1]];
+pardo(i : n) if (inHull[i]) H[ps[i] - 1] = A[i];

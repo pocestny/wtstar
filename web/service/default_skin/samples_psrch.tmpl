@@ -1,0 +1,74 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view samples_psrch uses content::samples_psrch extends samples %>  
+
+<% template stuff() %>
+  <p class="subtitle is-3 section-title">p-ary search</p>
+  <p class="has-text-justified">
+  
+  <article class="message is-warning">
+  <div class="message-body">
+  Given is a strictly increasing sequence of integers <code>A</code>,
+  an integer <code>y</code>, and a parameter <code>p</code>.
+  The task is to find the position of <code>y</code> in <code>A</code> (or <code>-1</code>
+  if it is not there) in time <i>O(log n / log p)</i> and work <i>O(p log n/log p)</i>.
+  </div>
+</article>
+
+  </p><p class="has-text-justified" style="padding-top:5px">
+We use the idea of binary search generalized to <i>p</i> processors: to search
+for <i>y</i> in an interval <i>l-r</i> of the array, we divide the interval 
+into <i>p+1</i> buckets, and check in parallel which bucket could contain
+<i>y</i>. Since the sequence is strictly increasing, there is no conflict in writing
+the index of the bucket to a shared variable. Next, we recursively search within
+the selected bucket.
+
+<pre class="codepre" data-id="psrch"><code class="wt">input int A[_], y, p;
+output int result;
+int n = A.size;
+int B[n + 2];
+
+int search(int l, int r) {
+  int n = r - l + 1;
+  int result = -1;
+
+  if (p >= n) {
+    pardo(i : n) if (B[l + i] == y) result = l + i;
+    return result;
+  }
+  int q = n / (p + 1);
+  int bucket = -1;
+  pardo(i : p) {
+    int mypos = l + (i + 1) * q - 1;
+    if (B[mypos] == y)
+      result = mypos;
+    else if (B[mypos] > y && B[mypos - q] < y)
+      bucket = mypos;
+  }
+  if (result != -1) return result;
+  if (bucket == -1)
+    return search(l + p * q, r);
+  else
+    return search(bucket - q + 1, bucket);
+}
+
+if (y > A[n - 1])
+  result = -1;
+else if (y == A[n - 1])
+  result = n - 1;
+else {
+  B[0] = -99999;
+  B[n + 1] = 99999;
+  pardo(i : n) B[i + 1] = A[i];
+  result = search(1, n);
+  if (result > 0) result--;
+}
+</code></pre>
+
+
+  </p>
+
+<% end %>
+
+<% end view %>  
+<% end skin %>  

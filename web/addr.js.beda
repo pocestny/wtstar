@@ -1,1 +1,1 @@
-export const _addr = 'https://beda.dcs.fmph.uniba.sk/service/rasto/rpc'
+export const _addr = 'https://beda.dcs.fmph.uniba.sk/service/wtstar/rpc'

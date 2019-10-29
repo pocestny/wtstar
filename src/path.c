@@ -1,7 +1,3 @@
-/**
- * @file path.c
- * @brief implementation of path.h
- */
 #include <path.h>
 #include <stdlib.h>
 #include <string.h>
