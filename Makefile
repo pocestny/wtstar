@@ -25,3 +25,8 @@ documentation:
 clean:
 	${MAKE} -C src clean
 	${MAKE} -C web clean
+
+install-web: web documentation
+	rsync  -avh --delete ./_build/web/ rasto@beda.dcs.fmph.uniba.sk:/data/www/root/wtstar-static/
+	rsync  -avh --delete ./_build/documentation/html/ rasto@beda.dcs.fmph.uniba.sk:/data/www/root/wtstar-doc/
+
