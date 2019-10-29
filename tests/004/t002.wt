@@ -1,7 +1,0 @@
-type a1 {
-  int x1,x2,x1,x3;
-}
-
-type a2{
-  a1 huh;
-}

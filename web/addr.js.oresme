@@ -1,1 +1,0 @@
-export const _addr = 'http://localhost:12345/service/wtstar/rpc'

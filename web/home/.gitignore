@@ -1,6 +1,0 @@
-node_modules
-backend.js
-*.wasm
-*.wasm.map
-*.wast
-*.swp
