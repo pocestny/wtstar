@@ -4,7 +4,7 @@
     "port" : 12345
 	},
   "http" : {
-        "script_names" : [ "/service/wtstar" ]
+        "script_names" : [ "/wtstar" ]
    },
 
 "file_server" : {
