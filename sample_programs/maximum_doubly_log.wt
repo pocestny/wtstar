@@ -14,34 +14,54 @@ int n = A.size;
 int max_const(int A[_]) {
   int n = A.size;
   int max;
-  pardo(i:n) {
-    int lmax=1;
-    pardo (j:n)
-      if (A[j]>A[i]) lmax=0;
-    if (lmax)
-      max=i;
+  pardo(i : n) {
+    int lmax = 1;
+    pardo(j : n) if (A[j] > A[i] || (A[j] == A[i] && j > i)) lmax = 0;
+    if (lmax) max = i;
   }
   return A[max];
 }
 
-int max_log(int A[_]) {
-  int n=2^log(A.size);
+int shorten(int A[_], int iter) {
+  int n = 2 ^ log(A.size);
   int Y[n];
-  pardo(i:n) Y[i]=-1;
-  pardo(i:A.size) Y[i]=A[i];
-  for (int t = 0; 2 ^ t < n; t++)
-    pardo(i : n / 2 ^ (t + 1)) {
+  pardo(i : n) Y[i] = -1;
+  pardo(i : A.size) Y[i] = A[i];
+
+  for (int t = 0; t < iter; t++) pardo(i : n / 2 ^ (t + 1)) {
       int z;
       if (Y[2 * i] > Y[2 * i + 1])
-        z=Y[2*i];
-        else
-        z=Y[2*i+1];
-      Y[i]=z;
-      }
+        z = Y[2 * i];
+      else
+        z = Y[2 * i + 1];
+      Y[i] = z;
+    }
 
-  return Y[0];
+  pardo(i : A.size) A[i] = Y[i];
+  return n / 2 ^ iter;
 }
 
+int max_sqrt(int A[_]) {
+  int n = A.size;
+  if (n < 9) return max_const(A);
+  int sn = sqrt(n);
+  int B[sn];
 
+  pardo(i : sn) {
+    int AA[sn];
+    pardo(j : sn) AA[j] = 0;
+    pardo(j : sn) if (i * sn + j < n) AA[j] = A[i * sn + j];
+    B[i] = max_sqrt(AA);
+  }
+  return max_const(B);
+}
 
-max = max_log(A);
+if (n < 16)
+  max = max_const(A);
+else {
+  int iter = log(log(n));
+  int nn = shorten(A, iter);
+  int AA[nn];
+  pardo(i : nn) AA[i] = A[i];
+  max = max_sqrt(AA);
+}

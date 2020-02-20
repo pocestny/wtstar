@@ -58,6 +58,7 @@ SAMPLES(first1)
 SAMPLES(lrank)
 SAMPLES(psrch)
 SAMPLES(hull)
+SAMPLES(max)
 
 struct ide : public master {
   ide(std::string _snippet) : master({"mode-wtstar","ide"},{"ide"}){

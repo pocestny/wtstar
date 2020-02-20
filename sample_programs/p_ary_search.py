@@ -32,7 +32,7 @@ def test_p(p,count):
         y = rand.sample(range(2*n),1)[0]+2
         input_string=('[ '+' '.join(['%d']*len(input_list))+' ] %d %d') % (tuple(input_list)+(y,p))
         answer = int(baseline(input_list,y))
-        o = su.check_output("wtr p_ary_search.wtr".split(),input=input_string, encoding='ascii').split()
+        o = su.check_output("wtrun p_ary_search.wtr".split(),input=input_string, encoding='ascii').split()
         if (int(o[0]))!=answer:
             print_error(input_string,answer,int(o[0]))
         else:
