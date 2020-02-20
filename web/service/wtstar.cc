@@ -87,6 +87,7 @@ html_server ::html_server(cppcms::service &srv) : cppcms::application(srv) {
 //   PROCESS REQUEST
 void html_server::main(std::string url) {
   if (SLOW_DEBUG) sleep(2);
+  response().set_header("Content-Type","text/html; charset=utf-8");
   cppcms::application::main(url);
 }
 
