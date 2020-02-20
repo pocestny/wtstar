@@ -169,6 +169,10 @@ NOT,          //!< `a,... -> 1-a,...`
 OR,           //!< `a,b,... -> x,...`  x = a OR b
 AND,          //!< `a,b,... -> x,...`  x = a AND b
 
+BIT_OR,
+BIT_AND,
+BIT_XOR,
+
 EQ_INT,       //!< `a,b.... -> x,....` x=1 if a=b (int32_t)
 EQ_FLOAT,     //!< `a,b.... -> x,....` x=1 if a=b (float)
 GT_INT,       //!< `a,b.... -> x,....` x=1 if a>b (int32_t)
@@ -266,7 +270,7 @@ MEM_MODE_CCRCW      //!< common CRCW
 //! returns true if `oper` (token value) is numeric operator
 #define numeric_oper(oper) (\
       (oper) == '+' || (oper) == '-' || (oper) == '*' || (oper) == '^' || (oper) == '/' ||\
-      (oper) == '%')
+      (oper) == '%' || (oper) =='|' || (oper)=='&' || (oper)=='~')
 
 //! returns true if `oper` (token value) is comparison operator
 #define comparison_oper(oper) (\

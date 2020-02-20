@@ -696,6 +696,8 @@ int ident_role(ast_t *ast, char *ident, ast_node_t **result) {
   int res = IDENT_FREE;
   ast_node_t *nd;
 
+  if (result) (*result)=NULL;
+
   nd = ast_node_find(ast->functions, ident);
   if (nd) {
     res |= IDENT_FUNCTION;
@@ -716,11 +718,13 @@ int ident_role(ast_t *ast, char *ident, ast_node_t **result) {
       if (nd) {
         res |= IDENT_PARENT_LOCAL_VAR;
         if (result) (*result) = nd;
+        break;
       } else {
         nd = ast_node_find(sc->items, ident);
         if (nd) {
           res |= IDENT_PARENT_LOCAL_VAR;
           if (result) (*result) = nd;
+          break;
         }
       }
     }

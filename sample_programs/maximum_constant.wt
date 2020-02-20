@@ -1,0 +1,21 @@
+#mode cCRCW
+
+/*
+compute maximum (assume distinct elements)
+T = O(1)
+W = O(n^2)
+*/
+
+input int A[_];
+output int max;
+
+int n = A.size;
+
+pardo(i:n) {
+  int lmax=1;
+  pardo (j:n)
+    if (A[j]>A[i]) lmax=0;
+  if (lmax)
+    max=i;
+}
+

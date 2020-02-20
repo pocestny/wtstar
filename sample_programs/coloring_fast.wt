@@ -1,0 +1,47 @@
+/*
+    list coloring
+
+    input: cyclic array of successors encoding a list
+       2 -> 3 -> 0 -> 4 -> 5 -> 1 -> 2
+
+       i: 0  1  2  3  4  5
+    S[i]: 4  2  3  0  5  1
+
+    output: array of colors from {0,1,2}, s.t. two subsequent 
+    elements have distinct color, e.g.
+
+    C[i]: 0 1 0 1 1 0 
+
+    T = O (log* n)
+    W = O (n log* n)
+
+*/
+
+input int S[_];
+int n=S.size;
+output int C[n];
+
+pardo(i:n) C[i]=i;
+
+for (int t=n;t>1;t=log(t))
+pardo(i:n) {
+  int pos = (C[i]~C[S[i]])~|;
+  int bit=0;
+  if (C[i]&(2^pos)) bit=1;
+  C[i]=2*pos+bit;
+}
+
+int P[n];
+pardo(i:n) P[S[i]]=i;
+
+for (int c=3;c<6;c++)
+pardo(i:n) 
+if (C[i]==c) {
+  int u[3];
+  pardo(j:3)u[j]=0;
+  if (C[S[i]]<3) u[C[S[i]]]=1;
+  if (C[P[i]]<3) u[C[P[i]]]=1;
+  int k=0;
+  while(u[k]==1)k++;
+  C[i]=k;
+}
