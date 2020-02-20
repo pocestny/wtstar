@@ -48,15 +48,16 @@ faults=0
 def run_hull_half(input_string,dr):
     global W,T,faults
     pts=[]
-    print(input_string)
+    # print(input_string)
     try:    
         o = su.check_output("wtrun upper_hull.wtr".split(),input=input_string,encoding='ascii')
     except su.CalledProcessError as e:
         print ('EXEC FAILED')
+        print(input_string)
         print (e.output)
         #print (e.returncode)
         return pts
-    print(o)
+    # print(o)
     o = o.split()
     #print(o[len(o)-2],o[len(o)-1])
     W+=int(o[len(o)-2])
@@ -135,8 +136,8 @@ def random_data(n):
     return data
 
 if (__name__ == '__main__'):
-    #su.Popen('wtc upper_hull.wt -o upper_hull.wtr'.split(), stdout=su.DEVNULL)
-    su.Popen('wtc upper_hull_simple.wt -o upper_hull.wtr'.split(), stdout=su.DEVNULL)
+    su.Popen('wtc upper_hull.wt -o upper_hull.wtr'.split(), stdout=su.DEVNULL)
+    #su.Popen('wtc upper_hull_simple.wt -o upper_hull.wtr'.split(), stdout=su.DEVNULL)
     what =''
     size=80
     try:

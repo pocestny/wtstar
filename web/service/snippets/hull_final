@@ -1,4 +1,7 @@
-/* geometry */
+/*
+  computing upper convex hull
+  */
+
 type point { float x, y; }
   
 float signed_triangle_area(point a, point b, point c) {
@@ -14,62 +17,6 @@ int dir_ccw(point a, point b, point c) {
   return (signed_triangle_area(a, b, c) > 1e-15);
 }
 
-
-// sum using balanced tree computation
-// T = O(log n)
-// W = O(n)
-int sum(int A[_]) {
-  int n = 2^log(A.size),Y[n];
-  pardo(i:n) Y[i]=0;
-  pardo(i:A.size) Y[i]=A[i];
-
-  for (int t = 0; 2 ^ t < n; t++)
-    pardo(i : n / 2 ^ (t + 1))
-      Y[i] = Y[2 * i] + Y[2 * i + 1];
-
-  return Y[0];
-}
-
-
-// nonrecursive prefix sums 
-// T = O(log n)
-// W = O(n)
-// [ additional O(n log n) memory ]
-void prefix_sums(int A[_], int S[_]) {
-  int n = 2^log(A.size), ln=log(n);
-
-  int B[ln+1, n];  // storage
-
-  // copy input
-  pardo(i : n) B[0, i] = 0;
-  pardo(i : A.size) B[0,i] = A[i];
-
-  // bottom-up traversal
-  for (int t = 0; 2 ^ t < n; t++)
-    pardo(i : n / 2 ^ (t + 1)) B[t + 1, i] = B[t, 2 * i] + B[t, 2 * i + 1];
-
-  // top-down traversal
-  for (int t = 0; 2 ^ t < n; t++) pardo(i : n / 2 ^ (ln - t)) {
-      B[ln - t - 1, 2 * i] = B[ln - t, i] - B[ln - t - 1, 2 * i + 1];
-      B[ln - t - 1, 2 * i + 1] = B[ln - t, i];
-    }
-
-  // write output
-  pardo(i : A.size) S[i] = B[0, i];
-}
-
-float maxf2(float a, float b) {
-  if (a>b) return a;
-  return b;
-}
-
-float minf2(float a, float b) {
-  if (a<b) return a;
-  return b;
-}
-
-
-
 input point A[_];
 int n=A.size;
 sort(A, point.x);
@@ -77,63 +24,52 @@ sort(A, point.x);
 // hack to make x coordinate unique
 pardo(i:n) A[i].x+=i*1e-6;
 
-// flags for points contained in the hull
-int inHull[n];
-
-// copy into H the points from the range l..r in inHull 
-void copy_hull(int H[_], int l, int r) {
-  int n = r - l + 1, A[n], ps[n];
-  pardo(i : n) A[i] = inHull[l + i];
-  prefix_sums(A, ps);
-  pardo(i : n)  if (inHull[l + i]) H[ps[i] - 1] = l + i;
-}
-
-// test if A[from]-A[p[i]] is tangent to A[P[0]]...A[P[P.size-1]]
-// A[from] is to the left of P
+// test if from-P[i] is tangent to P[0]...P[P.size-1]
+// from is to the left of P
 // returns 0 if it is a tangent, -1 or 1 if the tangent point is 
 // to the right or left on P
-int test_hit_lr(int from, int i, int P[_]) {
+int test_hit_lr(point from, int i, point P[_]) {
   if (i<0) return -1;
   if (i>=P.size) return 1;
   if (P.size==1) return 0;
   if (i==0) {
-    if (dir_cw(A[from],A[P[i]],A[P[i+1]])) return 0;
+    if (dir_cw(from,P[i],P[i+1])) return 0;
     return -1;
   }
   if (i==P.size-1) {
-    if (!dir_ccw(A[from],A[P[i]],A[P[i-1]])) return 0;
+    if (!dir_ccw(from,P[i],P[i-1])) return 0;
     return 1;
   }
-  if (dir_ccw(A[from], A[P[i]], A[P[i-1]])) return 1;
-  if (!dir_cw(A[from], A[P[i]], A[P[i + 1]])) return -1;
+  if (dir_ccw(from, P[i], P[i-1])) return 1;
+  if (!dir_cw(from, P[i], P[i + 1])) return -1;
   return 0;
 }
 
-// test if A[from]-A[p[i]] is tangent to A[P[0]]...A[P[P.size-1]]
-// A[from] is to the right of P
+// test if from-P[i] is tangent to P[0]...P[P.size-1]
+// from is to the right of P
 // returns 0 if it is a tangent, -1 or 1 if the tangent point is 
 // to the right or left on P
-int test_hit_rl(int from, int i, int P[_]) {
+int test_hit_rl(point from, int i, point P[_]) {
   if (i<0) return -1;
   if (i>=P.size) return 1;
   if (P.size==1) return 0;
   if (i==0) {
-    if (dir_ccw(A[from],A[P[i]],A[P[i+1]])) return 0;
+    if (dir_ccw(from,P[i],P[i+1])) return 0;
     return -1;
   }
   if (i==P.size-1) {
-    if (!dir_cw(A[from],A[P[i]],A[P[i-1]])) return 0;
+    if (!dir_cw(from,P[i],P[i-1])) return 0;
     return 1;
   }
-  if (dir_cw(A[from], A[P[i]], A[P[i-1]])) return 1;
-  if (!dir_ccw(A[from], A[P[i]], A[P[i + 1]])) return -1;
+  if (dir_cw(from, P[i], P[i-1])) return 1;
+  if (!dir_ccw(from, P[i], P[i + 1])) return -1;
   return 0;
 }
 
 
-// find a tangent from A[from] to A[P[0]]...
-// A[from] is to the left of A[P[i]]
-int tangent_point_direct(int from, int P[_]) {
+// find a tangent from from to P[0]...
+// from is to the left of P[i]
+int tangent_point_direct(point from, point P[_]) {
   int result = 0;
   int n = P.size;
   if (n < 2) return n - 1;
@@ -144,7 +80,7 @@ int tangent_point_direct(int from, int P[_]) {
 }
 
 // use p-ary search to find the tangent
-int tangent_point_p_ary(int l, int r, int from, int P[_], int p) {
+int tangent_point_p_ary(int l, int r, point from, point P[_], int p) {
   int n = r - l + 1;
   int result = -1;
   if (p>=n) {
@@ -178,7 +114,6 @@ int compute_hull(int l, int r) {
   int n = r - l + 1;
   if (n < 3) {
     // base
-    pardo(i : n) inHull[l + i] = 1;
     return n;
   } else {
     int m = (r + l) / 2;
@@ -189,15 +124,16 @@ int compute_hull(int l, int r) {
     int s[2];
 
     // divide and conquer
-    pardo(i : 2) s[i] = compute_hull(ll[i], rr[i]);
+    pardo(i : 2) {s[i] = compute_hull(ll[i], rr[i]);}
 
     // the hulls are returned as flags in the inHull array,
     // lets copy the indices of hull points into HL and HR
-    int HL[s[0]], HR[s[1]];
+    point HL[s[0]], HR[s[1]];
     int tl, tr;
     
-    copy_hull(HL, ll[0], rr[0]);
-    copy_hull(HR, ll[1], rr[1]);
+    pardo(i:s[0]) HL[i]=A[ll[0]+i];
+    pardo(i:s[1]) HR[i]=A[ll[1]+i];
+
 
     // if HL is small, find the tangent by brute force
     if (s[0]<9){ 
@@ -241,23 +177,18 @@ int compute_hull(int l, int r) {
         if (test_hit_rl(HR[t],li+i,HL)==0) {tl=li+i;tr=t;}
       }
     }
+    pardo(i:tl+1) A[l+i]=HL[i];
+    pardo(i:s[1]-tr) A[l+tl+1+i]=HR[tr+i];
 
-    // zero-out the parts that are not in hull 
-    if (s[0] - tl > 1) pardo(i : s[0] - 1 - tl) 
-      inHull[HL[i + tl + 1]] = 0;
-    if (tr > 0) pardo(i : tr) 
-      inHull[HR[i]] = 0;
     return tl + 1 + s[1] - tr;
   }
 }
 
 
 output int q = compute_hull(0, n - 1);
-int ps[n];
 
 // finally, assemble the output
-prefix_sums(inHull, ps);
-output point H[ps[n - 1]];
-pardo(i : n) if (inHull[i]) H[ps[i] - 1] = A[i];
+output point H[q];
+pardo(i : q)  H[i] = A[i];
 
 
