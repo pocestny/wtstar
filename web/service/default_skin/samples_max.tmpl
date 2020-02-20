@@ -1,0 +1,116 @@
+<% c++ #include "../content.h" %>  
+<% skin default_skin %>  
+<% view samples_max uses content::samples_max extends samples %>  
+
+<% template stuff() %>
+  <p class="subtitle is-3 section-title">Computing maximum</p>
+  <p class="has-text-justified">
+  
+  <article class="message is-warning">
+  <div class="message-body">
+  Given is an array of <i>n</i> distinct positive integers. The
+  task is to compute the maximum of all elements.
+  </div>
+</article>
+
+  </p><p class="has-text-justified" style="padding-top:5px">
+  The simplest sequential way is as follows:
+<pre class="codepre" data-id="max_seq"><code class="wt">input int A[_];
+output int max = 0;
+
+for (int i = 0; i < A.size; i++)
+  if (A[i] > max) max = A[i];
+</code></pre>
+
+Assuming <i>n</i> is a power of two, we can use the same techinque as for sum
+to get logarithmic time with linear work as follows:
+
+<pre class="codepre" data-id="max_log"><code class="wt">input int A[_];
+int n = A.size;
+
+output int max;
+
+for (int t = 0; 2 ^ t < n; t++) 
+  pardo(i : n / 2 ^ (t + 1)) {
+    int z = A[2 * i + 1];
+    if (A[2 * i] > A[2 * i + 1]) z = A[2 * i];
+    A[i] = z;
+  }     
+    
+max = A[0];
+</code></pre>
+
+Using the <code>cCRCW</code> mode we can have constant time with quadratic work
+
+<pre class="codepre" data-id="max_const"><code class="wt">#mode cCRCW
+input int A[_];
+
+int n = A.size;
+output int max;
+
+pardo(i:n) {
+    int lmax=1;
+    pardo (j:n)
+      if (A[j]>A[i]) lmax=0;
+    if (lmax)
+      max=A[i];
+}
+</code></pre>
+
+With the previous version as subprogram, we can use the `square-root-recursion` to
+get <i>O(log log n)</i> time and <i>O(n log log n)</i> work
+<pre class="codepre" data-id="max_loglog1"><code class="wt">#mode cCRCW
+int max_sqrt(int A[_]) {
+  int n = A.size;
+  if (n < 9) return max_const(A);
+  int sn = sqrt(n);
+  int B[sn];
+
+  pardo(i : sn) {
+    int AA[sn];
+    pardo(j : sn) AA[j] = 0;
+    pardo(j : sn) if (i * sn + j < n) AA[j] = A[i * sn + j];
+    B[i] = max_sqrt(AA);
+  }
+  return max_const(B);
+}
+</code></pre>
+
+Finally, we can use the accelerated cascading technique to obtain linear work while keeping the time <i>O(log log n)</i>
+
+<pre class="codepre" data-id="max_loglog2"><code class="wt">int shorten(int A[_], int iter) {
+  int n = 2 ^ log(A.size);
+  int Y[n];
+  pardo(i : n) Y[i] = -1;
+  pardo(i : A.size) Y[i] = A[i];
+
+  for (int t = 0; t < iter; t++) pardo(i : n / 2 ^ (t + 1)) {
+      int z;
+      if (Y[2 * i] > Y[2 * i + 1])
+        z = Y[2 * i];
+      else
+        z = Y[2 * i + 1];
+      Y[i] = z;
+    }
+
+  pardo(i : A.size) A[i] = Y[i];
+  return n / 2 ^ iter;
+}
+
+if (n < 16)
+  max = max_const(A);
+else {
+  int iter = log(log(n));
+  int nn = shorten(A, iter);
+  int AA[nn];
+  pardo(i : nn) AA[i] = A[i];
+  max = max_sqrt(AA);
+}
+</code></pre>
+
+</p>
+
+<% end %>
+
+<% end view %>  
+<% end skin %>  

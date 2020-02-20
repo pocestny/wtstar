@@ -1,0 +1,13 @@
+#mode cCRCW
+input int A[_];
+
+int n = A.size;
+output int max;
+
+pardo(i:n) {
+    int lmax=1;
+    pardo (j:n)
+      if (A[j]>A[i]) lmax=0;
+    if (lmax)
+      max=A[i];
+}

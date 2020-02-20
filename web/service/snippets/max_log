@@ -1,0 +1,13 @@
+input int A[_];
+int n = A.size;
+
+output int max;
+
+for (int t = 0; 2 ^ t < n; t++) 
+  pardo(i : n / 2 ^ (t + 1)) {
+    int z = A[2 * i + 1];
+    if (A[2 * i] > A[2 * i + 1]) z = A[2 * i];
+    A[i] = z;
+  }
+
+max = A[0];
