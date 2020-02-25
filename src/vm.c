@@ -200,7 +200,7 @@ DESTRUCTOR(frame_t) {
   }
 
 CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
-  //printf("machine constructor\n");
+  // printf("machine constructor\n");
   ALLOC_VAR(r, virtual_machine_t)
 
   r->state = VM_READY;
@@ -233,7 +233,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
     GET(uint8_t, section, 1);
     switch (section) {
       case SECTION_HEADER: {
-        //printf(">> section header\n");
+        // printf(">> section header\n");
         uint8_t version;
         GET(uint8_t, version, 1)
         GET(uint32_t, r->global_size, 4)
@@ -241,7 +241,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
         GET(uint8_t, r->mem_mode, 1)
       } break;
       case SECTION_INPUT:
-        //printf(">> section input\n");
+        // printf(">> section input\n");
         GET(uint32_t, r->n_in_vars, 4)
         r->in_vars = (input_layout_item_t *)malloc(r->n_in_vars *
                                                    sizeof(input_layout_item_t));
@@ -255,7 +255,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
         }
         break;
       case SECTION_OUTPUT:
-        //printf(">> section output\n");
+        // printf(">> section output\n");
         GET(uint32_t, r->n_out_vars, 4)
         r->out_vars = (input_layout_item_t *)malloc(
             r->n_out_vars * sizeof(input_layout_item_t));
@@ -269,7 +269,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
         }
         break;
       case SECTION_FNMAP: {
-        //printf(">> section fnmap\n");
+        // printf(">> section fnmap\n");
         GET(uint32_t, r->fcnt, 4);
         if (r->fcnt > 0)
           r->fnmap = (fnmap_t *)malloc(r->fcnt * sizeof(fnmap_t));
@@ -282,14 +282,14 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
 
       } break;
       case SECTION_CODE:
-        //printf(">> section code\n");
+        // printf(">> section code\n");
         r->code_size = len - pos;
         r->code = (uint8_t *)malloc(len - pos);
         memcpy(r->code, in + pos, len - pos);
         pos = len;
         break;
       case SECTION_DEBUG:
-        //printf(">> section debug\n");
+        // printf(">> section debug\n");
         r->debug_info = debug_info_t_new(in, &pos, len);
         if (!r->debug_info) {
           virtual_machine_t_delete(r);
@@ -490,7 +490,7 @@ int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp) {
 int instruction(virtual_machine_t *env, int stop_on_bp) {
   ___pc___ = env->pc;
   env->stored_pc = env->pc;
-  if (env->frame->base==0) env->last_global_pc=env->pc;
+  if (env->frame->base == 0) env->last_global_pc = env->pc;
 
   env->state = VM_RUNNING;
   for (int t = 0; t < env->n_thr; t++) env->thr[t]->bp_hit = 0;
@@ -946,6 +946,30 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
               _PUSH(a, 4);
             } break;
 
+            case BIT_AND: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a &= b;
+              _PUSH(a, 4);
+            } break;
+
+            case BIT_OR: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a |= b;
+              _PUSH(a, 4);
+            } break;
+
+            case BIT_XOR: {
+              int32_t a, b;
+              _POP(a, 4);
+              _POP(b, 4);
+              a ^= b;
+              _PUSH(a, 4);
+            } break;
+
             case ADD_FLOAT: {
               float a, b;
               _POP(a, 4);
@@ -1123,10 +1147,11 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
             case LAST_BIT: {
               int32_t a, b = 0;
               _POP(a, 4);
-              while (a % 2 == 0) {
-                b++;
-                a >>= 1;
-              }
+              if (a != 0)
+                while (a % 2 == 0) {
+                  b++;
+                  a >>= 1;
+                }
               _PUSH(b, 4);
             } break;
 
@@ -1462,7 +1487,7 @@ int read_input(reader_t *r, virtual_machine_t *env) {
 
       reader_t *rw = reader_t_new(READER_STRING, w->str.base);
       for (int j = 0; j < n_elem; j++)
-        if (read_var(rw, env->heap->data + j * elem_size, var) != 0) {
+        if (read_var(rw, env->heap->data + base + j * elem_size, var) != 0) {
           writer_t_delete(w);
           reader_t_delete(rw);
           return -1;

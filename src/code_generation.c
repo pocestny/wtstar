@@ -16,14 +16,14 @@
 #define DEBUG(...) printf(__VA_ARGS__)
 #endif
 
-extern ast_node_t *__type__int; // from parser_utils.c
+extern ast_node_t *__type__int;  // from parser_utils.c
 
 static ast_t *ast;
 static int was_error = 0;
 static void emit_code_scope(code_block_t *code, scope_t *sc);
 
 /* ----------------------------------------------------------------------------
- * create error, and insert into errors.h log 
+ * create error, and insert into errors.h log
  */
 static void error(YYLTYPE *loc, const char *format, ...) {
   was_error = 1;
@@ -37,7 +37,6 @@ static void error(YYLTYPE *loc, const char *format, ...) {
   va_end(args);
   emit_error(err);
 }
-
 
 /* ----------------------------------------------------------------------------
  * implementation of code_block_t
@@ -87,7 +86,7 @@ void add_instr(code_block_t *out, int code, ...) {
       case JMP:
       case CALL:
       case JOIN_JMP:
-      case BREAK:  
+      case BREAK:
         lval(buf + len, int32_t) = va_arg(args, int);
         len += 4;
         break;
@@ -214,7 +213,7 @@ static int expr_on_heap(expression_t *ex) {
  */
 static void emit_code_var_addr(code_block_t *code, variable_t *var) {
   add_instr(code, PUSHC, var->addr, 0);
-  if (var->scope->fn) add_instr(code, FBASE,  0);
+  if (var->scope->fn) add_instr(code, FBASE, 0);
 }
 
 /* ----------------------------------------------------------------------------
@@ -659,6 +658,13 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
           return;
         }
 
+        if (t == TYPE_FLOAT &&
+            (ex->val.o->oper == '|' || ex->val.o->oper == '&' ||
+             ex->val.o->oper == '~')) {
+          error(&(exn->loc), "bitwise operator not supported on floats");
+          return;
+        }
+
         int op;
         switch (ex->val.o->oper) {
           case '+':
@@ -678,6 +684,15 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
             break;
           case '%':
             op = MOD_INT;
+            break;
+          case '|':
+            op = BIT_OR;
+            break;
+          case '&':
+            op = BIT_AND;
+            break;
+          case '~':
+            op = BIT_XOR;
             break;
         }
         emit_code_expression(code, ex->val.o->second, 0, 0);
@@ -1144,13 +1159,14 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, SETR, 0);
         } break;
         case STMT_BREAKPOINT: {
-          expression_t *ex = node->val.s->par[0]->val.e;                      
-          if (ex->type->compound || ex->type->type!=__type__int->val.t) {
-            error(&(node->loc),"breakpoint condition must be of integral type");
+          expression_t *ex = node->val.s->par[0]->val.e;
+          if (ex->type->compound || ex->type->type != __type__int->val.t) {
+            error(&(node->loc),
+                  "breakpoint condition must be of integral type");
             return;
-          }  
-          emit_code_expression(code,node->val.s->par[0],0,0);
-          add_instr(code,BREAK,node->val.s->tag,0);
+          }
+          emit_code_expression(code, node->val.s->par[0], 0, 0);
+          add_instr(code, BREAK, node->val.s->tag, 0);
         } break;
       }
       break;
@@ -1219,7 +1235,7 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
   DEBUG("emit_code_function %s (addr: %d)\n", fn->val.f->name, code->pos);
   for (ast_node_t *p = fn->val.f->params; p; p = p->next) {
     if (p->val.v->num_dim == 0) {
-      add_instr(code, PUSHC, p->val.v->addr, FBASE,  0);
+      add_instr(code, PUSHC, p->val.v->addr, FBASE, 0);
       int *casts, n_casts;
       static_type_compatible(p->val.v->base_type, p->val.v->base_type, &casts,
                              &n_casts);
@@ -1227,7 +1243,7 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
       if (casts) free(casts);
     } else {
       for (int i = 0; i < p->val.v->num_dim + 2; i++)
-        add_instr(code, PUSHC, p->val.v->addr + 4 * i, FBASE,  STC, 0);
+        add_instr(code, PUSHC, p->val.v->addr + 4 * i, FBASE, STC, 0);
     }
   }
 
@@ -1317,7 +1333,7 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
   for (ast_node_t *p = ast->root_scope->items; p; p = p->next)
     if (p->node_type != AST_NODE_VARIABLE)
       base = assign_node_variable_addresses(base, p);
- 
+
   // main part - generate the code block
   code_block_t *code = code_block_t_new();
   emit_code_scope(code, ast->root_scope);

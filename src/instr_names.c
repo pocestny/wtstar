@@ -1,69 +1,72 @@
 const char* const instr_names[]={
-"NOOP",       // 0
-"PUSHC",      // 1
-"PUSHB",      // 2
-"FBASE",      // 3
-"SIZE",       // 4
-"LDC",        // 5
-"LDB",        // 6
-"STC",        // 7
-"STB",        // 8
-"LDCH",       // 9
-"LDBH",       // a
-"STCH",       // b
-"STBH",       // c
-"IDX",        // d
-"SWS",        // e
-"POP",        // f
-"A2S",        // 10
-"POPA",       // 11
-"S2A",        // 12
-"RVA",        // 13
-"SWA",        // 14
-"ADD_INT",    // 15
-"SUB_INT",    // 16
-"MULT_INT",   // 17
-"DIV_INT",    // 18
-"MOD_INT",    // 19
-"ADD_FLOAT",  // 1a
-"SUB_FLOAT",  // 1b
-"MULT_FLOAT", // 1c
-"DIV_FLOAT",  // 1d
-"POW_INT",    // 1e
-"POW_FLOAT",  // 1f
-"NOT",        // 20
-"OR",         // 21
-"AND",        // 22
-"EQ_INT",     // 23
-"EQ_FLOAT",   // 24
-"GT_INT",     // 25
-"GT_FLOAT",   // 26
-"GEQ_INT",    // 27
-"GEQ_FLOAT",  // 28
-"LT_INT",     // 29
-"LT_FLOAT",   // 2a 
-"LEQ_INT",    // 2b
-"LEQ_FLOAT",  // 2c 
-"JMP",        // 2d
-"CALL",       // 2e
-"RETURN",     // 2f
-"FLOAT2INT",  // 30
-"INT2FLOAT",  // 31
-"FORK",       // 32
-"SPLIT",      // 33   
-"JOIN",       // 34
-"JOIN_JMP",   // 35
-"SETR",       // 36
-"MEM_MARK",   // 37
-"MEM_FREE",   // 38
-"ALLOC",      // 39
-"ENDVM",      // 3a
-"LAST_BIT",   // 3b
-"SORT",       // 3c
-"LOGF",       // 3d
-"LOG",        // 3e
-"SQRT",       // 3f
-"SQRTF",      // 40
-"BREAK",      // 41
+"NOOP",       
+"PUSHC",      
+"PUSHB",      
+"FBASE",      
+"SIZE",       
+"LDC",        
+"LDB",        
+"STC",        
+"STB",        
+"LDCH",       
+"LDBH",       
+"STCH",       
+"STBH",       
+"IDX",        
+"SWS",        
+"POP",        
+"A2S",        
+"POPA",       
+"S2A",        
+"RVA",        
+"SWA",        
+"ADD_INT",    
+"SUB_INT",    
+"MULT_INT",   
+"DIV_INT",    
+"MOD_INT",    
+"ADD_FLOAT",  
+"SUB_FLOAT",  
+"MULT_FLOAT", 
+"DIV_FLOAT",  
+"POW_INT",    
+"POW_FLOAT",  
+"NOT",        
+"OR",         
+"AND",        
+"BIT_OR",
+"BIT_AND",
+"BIT_XOR",
+"EQ_INT",     
+"EQ_FLOAT",   
+"GT_INT",     
+"GT_FLOAT",   
+"GEQ_INT",    
+"GEQ_FLOAT",  
+"LT_INT",     
+"LT_FLOAT",   
+"LEQ_INT",    
+"LEQ_FLOAT",  
+"JMP",        
+"CALL",       
+"RETURN",     
+"FLOAT2INT",  
+"INT2FLOAT",  
+"FORK",       
+"SPLIT",        
+"JOIN",       
+"JOIN_JMP",   
+"SETR",       
+"MEM_MARK",   
+"MEM_FREE",   
+"ALLOC",      
+"ENDVM",      
+"LAST_BIT",   
+"SORT",       
+"LOGF",       
+"LOG",        
+"SQRT",       
+"SQRTF",      
+"BREAK",      
 "???"
 };

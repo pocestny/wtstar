@@ -6,7 +6,7 @@
 
 This is the public source repository of the WT\* framework.
 The project page is [https://beda.dcs.fmph.uniba.sk/wtstar](https://beda.dcs.fmph.uniba.sk/wtstar). The Doxygen-generated source
-documentation is [https://beda.dcs.fmph.uniba.sk/wtstar-doc](https://beda.dcs.fmph.uniba.sk/wtstar-doc). Current version is RC 1.0.
+documentation is [https://beda.dcs.fmph.uniba.sk/wtstar-doc](https://beda.dcs.fmph.uniba.sk/wtstar-doc). Current version is RC 1.1.
 
 ## Building from the source
 
@@ -59,3 +59,10 @@ repository of ace.
 - make `#include` directive work in web IDE
 - improve the debugger (bot the cli, and the web-based)
 
+## CHANGELOG
+
+### RC 1.1
+
+- bug fix in reading multiple input arrays
+- added implementation of operators '|', '&', '~'
+- bug fix in operator '~|'
