@@ -50,6 +50,7 @@ class html_server : public cppcms::application {
   SIMPLE_METHOD(samples_psrch)
   SIMPLE_METHOD(samples_hull)
   SIMPLE_METHOD(samples_max)
+  SIMPLE_METHOD(samples_merge)
 
   void ide(std::string snippet_id) {
     content::ide data(snippets[snippet_id]);
@@ -78,6 +79,7 @@ html_server ::html_server(cppcms::service &srv) : cppcms::application(srv) {
   SIMPLE_DISPATCH(samples_psrch)
   SIMPLE_DISPATCH(samples_hull)
   SIMPLE_DISPATCH(samples_max)
+  SIMPLE_DISPATCH(samples_merge)
 
   dispatcher().assign("/ide/(.*)",&html_server::ide,this,1);
 

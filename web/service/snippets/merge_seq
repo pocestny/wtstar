@@ -1,0 +1,14 @@
+input int A[_], B[_];
+int n = A.size, m = B.size;
+output int C[n + m];
+int i = 0, j = 0, k = 0;
+
+while (i < n || j < m) 
+  if (i == n)
+    C[k++] = B[j++];
+  else if (j == m)
+    C[k++] = A[i++];
+  else if (A[i] < B[j])
+    C[k++] = A[i++];
+  else
+    C[k++] = B[j++];

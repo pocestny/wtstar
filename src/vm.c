@@ -1487,7 +1487,7 @@ int read_input(reader_t *r, virtual_machine_t *env) {
 
       reader_t *rw = reader_t_new(READER_STRING, w->str.base);
       for (int j = 0; j < n_elem; j++)
-        if (read_var(rw, env->heap->data + j * elem_size, var) != 0) {
+        if (read_var(rw, env->heap->data + base + j * elem_size, var) != 0) {
           writer_t_delete(w);
           reader_t_delete(rw);
           return -1;
