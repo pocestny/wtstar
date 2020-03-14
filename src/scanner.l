@@ -46,6 +46,7 @@ IDSYM   [a-zA-Z0-9_]
 DIGIT   [0-9]
 SYMBOL  [^a-zA-Z0-9 \t_'"]
 SYMBOL2  [^a-zA-Z0-9 \t_'";]
+END \n|\r\n
 
 %x include
 %x comment
@@ -83,7 +84,7 @@ SYMBOL2  [^a-zA-Z0-9 \t_'";]
 <comment>"*/"      BEGIN(INITIAL);
 <comment>[^*\n]+   // eat comment in chunks
 <comment>"*"       // eat the lone star
-<comment>\n        yylineno++; yycolumn=1;
+<comment>{END}        yylineno++; yycolumn=1;
 
   /* single line comment */
 "//".*\n             yylineno++;yycolumn=1;
@@ -158,7 +159,7 @@ sort/[^a-zA-Z0-9]    { return TOK_SORT; }
 
 
 {SPACE}+  /* eat whitespace */
-\n        yylineno++;yycolumn=1;
+{END}        yylineno++;yycolumn=1;
 
   /* symbols */
 
