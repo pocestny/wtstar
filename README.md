@@ -61,6 +61,9 @@ repository of ace.
 
 ## CHANGELOG
 
+### master branch
+- bug fix in treating windows cr/lf endlines
+
 ### RC 1.1
 
 - bug fix in reading multiple input arrays
