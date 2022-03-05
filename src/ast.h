@@ -169,7 +169,7 @@ typedef enum {
   EXPR_ARRAY_ELEMENT = 22,  //!< indexed array
   EXPR_VAR_NAME = 23,       //!< identifier - variable name
   EXPR_SIZEOF = 24,         //!< sizeof keyword
-  EXPR_POSTFIX = 25,        //!< fostfix expression
+  EXPR_POSTFIX = 25,        //!< postfix expression
   EXPR_PREFIX = 26,         //!< prefix expression
   EXPR_BINARY = 27,         //!< binary expression
   EXPR_CAST = 28,           //!< typecast

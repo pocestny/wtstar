@@ -58,8 +58,8 @@ typedef struct _thread_t {
   int refcnt;    //!< threads are refcounted, in constructor, destructor clears
                  //!< the last
   int returned;  //!< flag if return was called within a function
-  int bp_hit;    //<! if the breakpoint was currently hit
-  uint64_t tid;  //<! id of the thread (unique id assigned in constructor)
+  int bp_hit;    //!< if the breakpoint was currently hit
+  uint64_t tid;  //!< id of the thread (unique id assigned in constructor)
 } thread_t;
 
 //! constructor
@@ -102,7 +102,7 @@ typedef struct {
 //! virtual machine
 typedef struct {
   input_layout_item_t *in_vars, //!< input variables
-                      *out_vars; //<! output variables
+                      *out_vars; //!< output variables
   uint32_t n_in_vars,  //!< number of input variables
            n_out_vars, //!< number of output variables
            global_size; //!< size of the global variables (allocated at start)

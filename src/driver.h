@@ -5,7 +5,7 @@
  * The driver stores a set of files, and uses them to parse the input. The content of 
  * some files can be preloaded as string by #driver_set_file. The main entrypoint is 
  * #driver_parse that internally uses #driver_push_file and starts parsing using 
- * `yyparse`. #driver_push_file  pushes a new file to ste stack of used files; if the 
+ * `yyparse`. #driver_push_file  pushes a new file to the stack of used files; if the 
  * content has been preloaded by #driver_set_file, uses the string as buffer, otherwise 
  * tries to open the file. The #driver_push_file (and #driver_pop_file)  are also used 
  * from the `scanner.l` when an `#include <file>` directive is encountered.

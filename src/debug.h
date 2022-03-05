@@ -1,6 +1,6 @@
 /**
  * @file debug.h
- * @brief take care of nadling debugging info
+ * @brief take care of handling debugging info
  *
  * #emit_debug_section writes the debug info into binary. The #debug_info_t
  * structure is part of #virtual_machine_t and is read from binary in the
@@ -65,7 +65,7 @@ typedef struct {
   uint32_t type,  //!< index of type (type_info_t)
       num_dim,    //!< number of dimensions
       from_code,  //!< starting position of the initializer code
-      addr;       //!< addres in data
+      addr;       //!< address in data
 } variable_info_t;
 
 //! info about lexical scope
