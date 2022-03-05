@@ -296,6 +296,10 @@ void variable_list() {
 }
 
 void print_variable_in_thread(char *name) {
+  if(name == NULL) {
+    printf("Empty variable name\n");
+    return;
+  }
   if (!env || !env->debug_info) return;
   thread_t *t = get_thread(focused_thread);
 
@@ -322,6 +326,11 @@ void print_variable_in_thread(char *name) {
         break;
       }
     }
+  }
+
+  if(var == NULL) {
+    printf("Variable not found\n");
+    return;
   }
 
   int addr = var->addr;
