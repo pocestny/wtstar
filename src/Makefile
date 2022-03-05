@@ -1,4 +1,4 @@
-DEBUG=0
+DEBUG=1
 
 CC=clang
 BUILD_DIR=../_build
@@ -67,7 +67,7 @@ wtc: ${BUILD_DIR}/cli_tools/wtc
 wtrun: ${BUILD_DIR}/cli_tools/wtrun
 wtdb: ${BUILD_DIR}/cli_tools/wtdb
 wtdump: ${BUILD_DIR}/cli_tools/wtdump
-
+all: wtc wtrun wtdb wtdump
 
 ${BUILD_DIR}/cli_tools/wtc: ${WTC_DEPS}
 	mkdir -p ${BUILD_DIR}/cli_tools
@@ -92,4 +92,4 @@ ${BUILD_DIR}/cli_tools/wtdump: ${WTDUMP_DEPS}
 	flex --header-file=`basename $< .l`.h -o $@ $<
 
 clean:
-	rm -rf parser.output parser.c parser.h scanner.c scanner.h
+	rm -rf parser.output parser.c parser.h scanner.c scanner.h ../_build
