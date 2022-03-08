@@ -54,6 +54,15 @@ void describe() {
   print_io_vars(outw, tmp, tmp->n_in_vars, tmp->in_vars);
   printf("%soutput variables%s\n", CYAN_BOLD, TERM_RESET);
   print_io_vars(outw, tmp, tmp->n_out_vars, tmp->out_vars);
+  printf("--\n");
+  printf("CODE\n");
+  print_code(outw, tmp->code, tmp->code_size);
+  printf("HEADER\n");
+  dump_header(outw, tmp);
+  printf("TYPES\n");
+  print_types(outw, tmp);
+  printf("DEBUG INFO\n");
+  dump_debug_info(outw, tmp);
   input_needed = 0;
   if (tmp->n_in_vars > 0) input_needed = 1;
   virtual_machine_t_delete(tmp);
