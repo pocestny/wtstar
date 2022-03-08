@@ -1553,7 +1553,7 @@ void print_array(writer_t *w, virtual_machine_t *env, input_layout_item_t *var,
 
 void write_output(writer_t *w, virtual_machine_t *env, int i) {
   if (env->out_vars[i].num_dim > 0) {
-    int elem_size = count_size(&(env->out_vars[i]));
+    // int elem_size = count_size(&(env->out_vars[i])); // TODO! why is this unused
     uint8_t *global_mem =
         STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0]->mem->data;
     uint32_t base = lval(global_mem + env->out_vars[i].addr, uint32_t);

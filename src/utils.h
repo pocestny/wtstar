@@ -75,7 +75,7 @@ typedef struct YYLTYPE {
   {                                         \
     va_list _args;                          \
     va_start(_args, format);                \
-    char *buf;                              \
+    char *buf = "";                         \
     len = vsnprintf(buf, 0, format, _args); \
     va_end(_args);                          \
   }
