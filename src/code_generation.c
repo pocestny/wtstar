@@ -81,7 +81,7 @@ void add_instr(code_block_t *out, int code, ...) {
 
   while (code != NOOP) {
     buf[len++] = code;
-    switch (code) {
+    switch (code) { // remember how switch works
       case PUSHC:
       case JMP:
       case CALL:
@@ -841,6 +841,7 @@ static void emit_code_expression(code_block_t *code, ast_node_t *exn, int addr,
           int load = onheap ? LDCH : LDC;
           int store = onheap ? STCH : STC;
           add_instr(code, load, 0);
+          //TODO! what about store??
         } else
           emit_code_expression(code, ex->val.o->first, 0, 0);
         add_instr(code, PUSHB, 0, 0);
