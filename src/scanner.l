@@ -6,6 +6,7 @@
 #include <errors.h>
 
 extern writer_t *driver_error_writer; //TODO!
+extern include_project_t *ip;
 
 const char* const symbols[]={
   "(",")","{","}","[","]",

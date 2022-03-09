@@ -18,27 +18,13 @@
 #define __DRIVER_H__
 
 #include <ast.h>
-#include <parser.h>
-#include <scanner.h>
 
 typedef struct {
     int lineno;
 } yyextra_t;
 
 //! structure to store included files
-typedef struct _include_file_t {
-  char *name;           //!< normalized name
-  char *content;        //!< content, if preloaded by #driver_set_file
-  FILE *f;              //!< if there is no content, open this file
-  YY_BUFFER_STATE buf;  //!< if the parsing was interupted by inseting a new
-                        //!< file, save the state here
-  int lineno,           //!< current line
-      col;              //!< current column
-  int included;  //!< if the file was already included using #driver_push_file
-  struct _include_file_t *next,  //!< next file in the linked list
-      *included_from;  //!< pointer to where this file was included from
-  yyscan_t scanner; //TODO remove scanner dependency
-} include_file_t;
+typedef struct _include_file_t include_file_t;
 
 CONSTRUCTOR(include_file_t, const char *name);
 

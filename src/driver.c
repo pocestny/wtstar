@@ -2,7 +2,9 @@
 
 #include <driver.h>
 #include <errors.h>
+#include <parser.h>
 #include <path.h>
+#include <scanner.h>
 
 /**
  * @brief Invoke an error.
@@ -22,6 +24,21 @@ static void driver_error_handler(const char *s, ...) {
   va_end(args);
   emit_error(err);
 }
+
+//! structure to store included files
+typedef struct _include_file_t {
+  char *name;           //!< normalized name
+  char *content;        //!< content, if preloaded by #driver_set_file
+  FILE *f;              //!< if there is no content, open this file
+  YY_BUFFER_STATE buf;  //!< if the parsing was interupted by inseting a new
+                        //!< file, save the state here
+  int lineno,           //!< current line
+      col;              //!< current column
+  int included;  //!< if the file was already included using #driver_push_file
+  struct _include_file_t *next,  //!< next file in the linked list
+      *included_from;  //!< pointer to where this file was included from
+  yyscan_t scanner; //TODO remove scanner dependency
+} include_file_t;
 
 CONSTRUCTOR(include_file_t, const char *name) {
   ALLOC_VAR(r, include_file_t)
@@ -48,10 +65,6 @@ DESTRUCTOR(include_file_t) {
   if (r->next) include_file_t_delete(r->next);
   free(r);
 }
-
-// TODO remove global var
-// static include_file_t *files=NULL,  //!< the list of known included files
-//     *current=NULL;                  //!< pointer to the list of included files
 
 CONSTRUCTOR(include_project_t) {
   ALLOC_VAR(r, include_project_t);
@@ -119,9 +132,12 @@ static char *normalize_filename(include_file_t *prefix, const char *f) {
   return result;
 }
 
+//TODO remove global var
+include_project_t *ip;
+
 /* main parsing function */
 ast_t *driver_parse(const char *filename) {
-  include_project_t *ip;
+  ip = include_project_t_new();
   ast_t *ast = ast_t_new();
 
   // struct yyextra_t * extra;
@@ -140,7 +156,8 @@ ast_t *driver_parse(const char *filename) {
   free(name);
 
   if (driver_current_file(ip->current)) yyparse(ast, scanner);   
-  yylex_destroy(scanner);   
+  yylex_destroy(scanner);  
+  include_project_t_delete(ip); 
   return ast;
 }
 
@@ -209,7 +226,7 @@ int driver_pop_file(include_project_t *ip) {
 }
 
 /* deallocat memory */
-void driver_destroy() { /*include_file_t_delete();*/ }
+void driver_destroy() { /*include_file_t_delete(files);*/ }
 
 /* *********************** */
 /* various getters/setters */
