@@ -2,9 +2,7 @@
 
 #include <driver.h>
 #include <errors.h>
-#include <parser.h>
 #include <path.h>
-#include <scanner.h>
 
 /**
  * @brief Invoke an error.
@@ -25,22 +23,7 @@ static void driver_error_handler(const char *s, ...) {
   emit_error(err);
 }
 
-//! structure to store included files
-typedef struct _include_file_t {
-  char *name;           //!< normalized name
-  char *content;        //!< content, if preloaded by #driver_set_file
-  FILE *f;              //!< if there is no content, open this file
-  YY_BUFFER_STATE buf;  //!< if the parsing was interupted by inseting a new
-                        //!< file, save the state here
-  int lineno,           //!< current line
-      col;              //!< current column
-  int included;  //!< if the file was already included using #driver_push_file
-  struct _include_file_t *next,  //!< next file in the linked list
-      *included_from;  //!< pointer to where this file was included from
-  yyscan_t scanner; //TODO remove scanner dependency
-} include_file_t;
-
-static CONSTRUCTOR(include_file_t, const char *name) {
+CONSTRUCTOR(include_file_t, const char *name) {
   ALLOC_VAR(r, include_file_t)
   r->f = NULL;
   r->buf = NULL;
@@ -56,7 +39,7 @@ static CONSTRUCTOR(include_file_t, const char *name) {
   return r;
 }
 
-static DESTRUCTOR(include_file_t) {
+DESTRUCTOR(include_file_t) {
   if (r == NULL) return;
   if (r->name) free(r->name);
   if (r->content) free(r->content);
@@ -67,34 +50,46 @@ static DESTRUCTOR(include_file_t) {
 }
 
 // TODO remove global var
-static include_file_t *files=NULL,  //!< the list of known included files
-    *current=NULL;                  //!< pointer to the list of included files
+// static include_file_t *files=NULL,  //!< the list of known included files
+//     *current=NULL;                  //!< pointer to the list of included files
+
+CONSTRUCTOR(include_project_t) {
+  ALLOC_VAR(r, include_project_t);
+  r->files = NULL;
+  r->current = NULL;
+  return r;
+}
+
+DESTRUCTOR(include_project_t) {
+  if(r->files) include_file_t_delete(r->files);
+  r->current = NULL;
+}
 
 // TODO remove global var
 writer_t *driver_error_writer = NULL;
 
 //! internal: Insert a new empty file
-static include_file_t *insert_file(const char *filename) {
+static include_file_t *insert_file(include_project_t *ip, const char *filename) {
   include_file_t *file = include_file_t_new(filename);
-  if (files) file->next = files;
-  files = file;
+  if (ip->files) file->next = ip->files;
+  ip->files = file;
   return file;
 }
 
 /* initialize the driver */
-void driver_init() {  files = current = NULL; }
+void driver_init() {  /*files = current = NULL;*/ }
 
 /* preload / unload the given file */
-void driver_set_file(const char *filename, const char *content) {
+void driver_set_file(include_project_t *ip, const char *filename, const char *content) {
   include_file_t *file;
-  for (file = files; file && strcmp(file->name, filename); file = file->next)
+  for (file = ip->files; file && strcmp(file->name, filename); file = file->next)
     ;
   if (file && (file->f || file->buf)) {
     driver_error_handler("declined to preload current file, skipping");
     return;
   }
   if (file == NULL)
-    file = insert_file(filename);
+    file = insert_file(ip, filename);
   else if (file->content)
     free(file->content);
   if (content) {
@@ -126,6 +121,7 @@ static char *normalize_filename(include_file_t *prefix, const char *f) {
 
 /* main parsing function */
 ast_t *driver_parse(const char *filename) {
+  include_project_t *ip;
   ast_t *ast = ast_t_new();
 
   // struct yyextra_t * extra;
@@ -136,27 +132,27 @@ ast_t *driver_parse(const char *filename) {
   // yyset_column(1, scanner);
   // TODO!
 
-  for (include_file_t *file = files; file; file = file->next)
+  for (include_file_t *file = ip->files; file; file = file->next)
     file->included = 0;
 
   char *name = normalize_filename(NULL, filename);
-  driver_push_file(name, 1, scanner);
+  driver_push_file(ip, name, 1, scanner);
   free(name);
 
-  if (driver_current_file()) yyparse(ast, scanner);   
+  if (driver_current_file(ip->current)) yyparse(ast, scanner);   
   yylex_destroy(scanner);   
   return ast;
 }
 
 /* switch to a new file */
-void driver_push_file(const char *filename, int only_once, yyscan_t scanner) {
-  char *name = normalize_filename(current, filename);
+void driver_push_file(include_project_t *ip, const char *filename, int only_once, yyscan_t scanner) {
+  char *name = normalize_filename(ip->current, filename);
 
   include_file_t *file;
-  for (file = files; file && strcmp(file->name, name); file = file->next)
+  for (file = ip->files; file && strcmp(file->name, name); file = file->next)
     ;
 
-  if (file == NULL) file = insert_file(name);
+  if (file == NULL) file = insert_file(ip, name);
   if (file->included && only_once) {
     free(name);
     return;
@@ -184,16 +180,16 @@ void driver_push_file(const char *filename, int only_once, yyscan_t scanner) {
     }
   }
 
-  file->included_from = current;
-  current = file;
+  file->included_from = ip->current;
+  ip->current = file;
   free(name);
 }
 
 /* remove file from stack */
-int driver_pop_file() {
-  include_file_t *oldfile = current;
-  include_file_t *newfile = current->included_from;
-  current = newfile;
+int driver_pop_file(include_project_t *ip) {
+  include_file_t *oldfile = ip->current;
+  include_file_t *newfile = ip->current->included_from;
+  ip->current = newfile;
   if (oldfile) oldfile->included_from = NULL;
 
   if (oldfile->f) {
@@ -213,26 +209,26 @@ int driver_pop_file() {
 }
 
 /* deallocat memory */
-void driver_destroy() { include_file_t_delete(files); }
+void driver_destroy() { /*include_file_t_delete();*/ }
 
 /* *********************** */
 /* various getters/setters */
-const char *driver_current_file() {
+const char *driver_current_file(include_file_t *current) {
   if (current == NULL) return NULL;
   return current->name;
 }
 
-int driver_current_line() {
+int driver_current_line(include_file_t *current) {
   if (current == NULL) return -1;
   return current->lineno;
 }
 
-int driver_current_column() {
+int driver_current_column(include_file_t *current) {
   if (current == NULL) return -1;
   return current->col;
 }
 
-void driver_set_current_pos(int l, int col) {
+void driver_set_current_pos(include_file_t *current, int l, int col) {
   if (current) {
     current->lineno = l;
     current->col = col;

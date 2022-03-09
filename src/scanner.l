@@ -33,7 +33,7 @@ TOK_PLUS_ASSIGN, TOK_MINUS_ASSIGN, TOK_TIMES_ASSIGN, TOK_DIV_ASSIGN, TOK_MOD_ASS
 #define YY_USER_ACTION  \
   yylloc->fl = yylloc->ll = yylineno;\
   yylloc->fc = yycolumn; yylloc->lc = yycolumn + yyleng - 1; \
-  yylloc->fn = yylloc->ln = driver_current_file();\
+  yylloc->fn = yylloc->ln = driver_current_file(ip->current);\
   yycolumn += yyleng; \
   //printf("%3d %3d %3d |%s|\n",yylineno, yycolumn, yy_act, yytext);
 %}
@@ -59,10 +59,10 @@ END \n|\r\n
 
 <include>[^\"]*\" {  
     yytext[yyleng-1]=0;
-    driver_set_current_pos(yylineno,yycolumn);
-    driver_push_file(yytext,0,yyscanner);
-    yylineno=driver_current_line();
-    yycolumn=driver_current_column();
+    driver_set_current_pos(ip->current,yylineno,yycolumn);
+    driver_push_file(ip, yytext,0,yyscanner);
+    yylineno=driver_current_line(ip->current);
+    yycolumn=driver_current_column(ip->current);
     BEGIN(INITIAL);
   } 
 
@@ -70,10 +70,10 @@ END \n|\r\n
 
 <include_once>[^\"]*\" {  
     yytext[yyleng-1]=0;
-    driver_set_current_pos(yylineno,yycolumn);
-    driver_push_file(yytext,1,yyscanner);
-    yylineno=driver_current_line();
-    yycolumn=driver_current_column();
+    driver_set_current_pos(ip->current,yylineno,yycolumn);
+    driver_push_file(ip, yytext,1,yyscanner);
+    yylineno=driver_current_line(ip->current);
+    yycolumn=driver_current_column(ip->current);
     BEGIN(INITIAL);
   } 
 
@@ -179,16 +179,16 @@ sort/[^a-zA-Z0-9]    { return TOK_SORT; }
 
 
 <<EOF>> {
-    driver_set_current_pos(yylineno,yycolumn);
-    if (!driver_pop_file()) {
+    driver_set_current_pos(ip->current,yylineno,yycolumn);
+    if (!driver_pop_file(ip)) {
       //TODO? is okay to remove?
       // if (yy_buffer_stack) free(yy_buffer_stack);
       // yy_buffer_stack=NULL;
       yyterminate();
     }
     else {
-     yylineno = driver_current_line();
-     yycolumn = driver_current_column();
+     yylineno = driver_current_line(ip->current);
+     yycolumn = driver_current_column(ip->current);
      }
   }
 

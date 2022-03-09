@@ -18,10 +18,40 @@
 #define __DRIVER_H__
 
 #include <ast.h>
+#include <parser.h>
+#include <scanner.h>
 
 typedef struct {
     int lineno;
 } yyextra_t;
+
+//! structure to store included files
+typedef struct _include_file_t {
+  char *name;           //!< normalized name
+  char *content;        //!< content, if preloaded by #driver_set_file
+  FILE *f;              //!< if there is no content, open this file
+  YY_BUFFER_STATE buf;  //!< if the parsing was interupted by inseting a new
+                        //!< file, save the state here
+  int lineno,           //!< current line
+      col;              //!< current column
+  int included;  //!< if the file was already included using #driver_push_file
+  struct _include_file_t *next,  //!< next file in the linked list
+      *included_from;  //!< pointer to where this file was included from
+  yyscan_t scanner; //TODO remove scanner dependency
+} include_file_t;
+
+CONSTRUCTOR(include_file_t, const char *name);
+
+DESTRUCTOR(include_file_t);
+
+typedef struct _include_project_t {
+  include_file_t *files;    //!< the list of known included files
+  include_file_t *current;  //!< pointer to the list of included files
+} include_project_t;
+
+CONSTRUCTOR(include_project_t);
+
+DESTRUCTOR(include_project_t);
 
 //! Allocate memory and iitialize the driver
 void driver_init();
@@ -31,7 +61,7 @@ void driver_init();
  * @note driver makes a local copy of both strings, caller should free 
  * the parameters
  */
-void driver_set_file(const char *filename, const char *content);
+void driver_set_file(include_project_t *ip, const char *filename, const char *content);
 
 /**
  * @brief Parse file and return the result.
@@ -53,7 +83,7 @@ ast_t *driver_parse(const char *filename);
  * @todo When in web mode, and the content of a file is not preloaded, it should
  * not try to open the file (there is no filesystem present)
  */
-void driver_push_file(const char *filename, int only_once, void* scanner);
+void driver_push_file(include_project_t *ip, const char *filename, int only_once, void* scanner);
 
 /**
  * @brief Remove current file from the stack of included files.
@@ -62,13 +92,13 @@ void driver_push_file(const char *filename, int only_once, void* scanner);
 int driver_pop_file();
 
 //! Return the filename of the current file
-const char *driver_current_file();
+const char *driver_current_file(include_file_t *current);
 //! Currently scanned line in the current file
-int driver_current_line();
+int driver_current_line(include_file_t *current);
 //! Currently scanned column in the current line
-int driver_current_column();
+int driver_current_column(include_file_t *current);
 //! Set the stored position in the current file 
-void driver_set_current_pos(int l,int col);
+void driver_set_current_pos(include_file_t *current,int l,int col);
 
 //! Deallocate all memory
 void driver_destroy();
