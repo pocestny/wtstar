@@ -18,11 +18,6 @@
 #define __DRIVER_H__
 
 #include <ast.h>
-
-typedef struct {
-    int lineno;
-} yyextra_t;
-
 //! structure to store included files
 typedef struct _include_file_t include_file_t;
 
@@ -39,8 +34,13 @@ CONSTRUCTOR(include_project_t);
 
 DESTRUCTOR(include_project_t);
 
+typedef struct _extra_t {
+    include_project_t *ip;
+} yyextra_t;
+
+
 //! Allocate memory and iitialize the driver
-void driver_init();
+void driver_init(include_project_t *ip);
 
 /**
  * @brief Preload contents of a file.
@@ -59,7 +59,7 @@ void driver_set_file(include_project_t *ip, const char *filename, const char *co
  * structure using #ast_t_delete
  *
  */
-ast_t *driver_parse(const char *filename);
+ast_t *driver_parse(include_project_t *ip, const char *filename);
 
 /**
  * @brief Switch to a new file
@@ -87,6 +87,6 @@ int driver_current_column(include_file_t *current);
 void driver_set_current_pos(include_file_t *current,int l,int col);
 
 //! Deallocate all memory
-void driver_destroy();
+void driver_destroy(include_project_t *ip);
 
 #endif

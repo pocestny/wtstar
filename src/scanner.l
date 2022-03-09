@@ -6,7 +6,6 @@
 #include <errors.h>
 
 extern writer_t *driver_error_writer; //TODO!
-extern include_project_t *ip;
 
 const char* const symbols[]={
   "(",")","{","}","[","]",
@@ -34,7 +33,7 @@ TOK_PLUS_ASSIGN, TOK_MINUS_ASSIGN, TOK_TIMES_ASSIGN, TOK_DIV_ASSIGN, TOK_MOD_ASS
 #define YY_USER_ACTION  \
   yylloc->fl = yylloc->ll = yylineno;\
   yylloc->fc = yycolumn; yylloc->lc = yycolumn + yyleng - 1; \
-  yylloc->fn = yylloc->ln = driver_current_file(ip->current);\
+  yylloc->fn = yylloc->ln = driver_current_file(yyextra->ip->current);\
   yycolumn += yyleng; \
   //printf("%3d %3d %3d |%s|\n",yylineno, yycolumn, yy_act, yytext);
 %}
@@ -52,6 +51,7 @@ END \n|\r\n
 %x include_once
 %option noyywrap
 %option reentrant bison-bridge bison-locations
+%option extra-type="yyextra_t *"
 
 %%
 
@@ -60,10 +60,10 @@ END \n|\r\n
 
 <include>[^\"]*\" {  
     yytext[yyleng-1]=0;
-    driver_set_current_pos(ip->current,yylineno,yycolumn);
-    driver_push_file(ip, yytext,0,yyscanner);
-    yylineno=driver_current_line(ip->current);
-    yycolumn=driver_current_column(ip->current);
+    driver_set_current_pos(yyextra->ip->current,yylineno,yycolumn);
+    driver_push_file(yyextra->ip, yytext,0,yyscanner);
+    yylineno=driver_current_line(yyextra->ip->current);
+    yycolumn=driver_current_column(yyextra->ip->current);
     BEGIN(INITIAL);
   } 
 
@@ -71,10 +71,10 @@ END \n|\r\n
 
 <include_once>[^\"]*\" {  
     yytext[yyleng-1]=0;
-    driver_set_current_pos(ip->current,yylineno,yycolumn);
-    driver_push_file(ip, yytext,1,yyscanner);
-    yylineno=driver_current_line(ip->current);
-    yycolumn=driver_current_column(ip->current);
+    driver_set_current_pos(yyextra->ip->current,yylineno,yycolumn);
+    driver_push_file(yyextra->ip, yytext,1,yyscanner);
+    yylineno=driver_current_line(yyextra->ip->current);
+    yycolumn=driver_current_column(yyextra->ip->current);
     BEGIN(INITIAL);
   } 
 
@@ -180,16 +180,16 @@ sort/[^a-zA-Z0-9]    { return TOK_SORT; }
 
 
 <<EOF>> {
-    driver_set_current_pos(ip->current,yylineno,yycolumn);
-    if (!driver_pop_file(ip)) {
-      //TODO? is okay to remove?
+    driver_set_current_pos(yyextra->ip->current,yylineno,yycolumn);
+    if (!driver_pop_file(yyextra->ip)) {
+      //TODO!? is okay to remove?
       // if (yy_buffer_stack) free(yy_buffer_stack);
       // yy_buffer_stack=NULL;
       yyterminate();
     }
     else {
-     yylineno = driver_current_line(ip->current);
-     yycolumn = driver_current_column(ip->current);
+     yylineno = driver_current_line(yyextra->ip->current);
+     yycolumn = driver_current_column(yyextra->ip->current);
      }
   }
 

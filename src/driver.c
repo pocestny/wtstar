@@ -90,7 +90,10 @@ static include_file_t *insert_file(include_project_t *ip, const char *filename) 
 }
 
 /* initialize the driver */
-void driver_init() {  /*files = current = NULL;*/ }
+void driver_init(include_project_t *ip) {
+  /*files = current = NULL;*/
+  *ip = *include_project_t_new();
+}
 
 /* preload / unload the given file */
 void driver_set_file(include_project_t *ip, const char *filename, const char *content) {
@@ -132,32 +135,27 @@ static char *normalize_filename(include_file_t *prefix, const char *f) {
   return result;
 }
 
-//TODO remove global var
-include_project_t *ip;
-
 /* main parsing function */
-ast_t *driver_parse(const char *filename) {
-  ip = include_project_t_new();
+ast_t *driver_parse(include_project_t *_ip, const char *filename) {
   ast_t *ast = ast_t_new();
 
-  // struct yyextra_t * extra;
   //TODO! extra lineno = 1
+  yyextra_t extra;
+  extra.ip = _ip;
   yyscan_t scanner;       
-  yylex_init(&scanner);
+  yylex_init_extra(&extra, &scanner);
   // yyset_lineno(1, scanner);
   // yyset_column(1, scanner);
-  // TODO!
 
-  for (include_file_t *file = ip->files; file; file = file->next)
+  for (include_file_t *file = extra.ip->files; file; file = file->next)
     file->included = 0;
 
   char *name = normalize_filename(NULL, filename);
-  driver_push_file(ip, name, 1, scanner);
+  driver_push_file(extra.ip, name, 1, scanner);
   free(name);
 
-  if (driver_current_file(ip->current)) yyparse(ast, scanner);   
+  if (driver_current_file(extra.ip->current)) yyparse(ast, scanner);   
   yylex_destroy(scanner);  
-  include_project_t_delete(ip); 
   return ast;
 }
 
@@ -225,8 +223,11 @@ int driver_pop_file(include_project_t *ip) {
     return 1;
 }
 
-/* deallocat memory */
-void driver_destroy() { /*include_file_t_delete(files);*/ }
+/* deallocate memory */
+void driver_destroy(include_project_t *ip) {
+  /*include_file_t_delete(files);*/
+  include_project_t_delete(ip);
+}
 
 /* *********************** */
 /* various getters/setters */

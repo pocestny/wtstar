@@ -93,8 +93,9 @@ int main(int argc, char **argv) {
   register_error_handler(&error_handler);
   //   yydebug=1;
 
-  driver_init();
-  ast_t *r = driver_parse(inf);
+  include_project_t ip;
+  driver_init(&ip);
+  ast_t *r = driver_parse(&ip, inf);
 
   writer_t *out;
   out = writer_t_new(WRITER_FILE);
@@ -128,7 +129,7 @@ int main(int argc, char **argv) {
     emit_error(err);
   }
 
-  driver_destroy();
+  driver_destroy(&ip);
   ast_t_delete(r);
 
   writer_t_delete(out);
