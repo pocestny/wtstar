@@ -10,6 +10,8 @@
 
   #include <ast.h>
   #include <code.h>
+
+  typedef void* yyscan_t;
 }
 
 %debug
@@ -17,13 +19,15 @@
 %locations
 %define parse.error verbose
 %param {ast_t *ast}
+%lex-param {yyscan_t scanner}
+%parse-param {yyscan_t scanner}
 %define api.pure full
 
 %code provides {
    #define YY_DECL \
-       int yylex(YYSTYPE * yylval_param, YYLTYPE * yylloc_param, ast_t* ast)
+       int yylex(YYSTYPE * yylval_param, YYLTYPE * yylloc_param, ast_t* ast, yyscan_t yyscanner)
    YY_DECL;
-  void yyerror (YYLTYPE *yylloc, ast_t *, char const *, ...);
+  void yyerror (YYLTYPE *yylloc_param, ast_t *, char const *, ...);
   #include <parser_utils.c>
 
 }

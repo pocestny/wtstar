@@ -19,6 +19,10 @@
 
 #include <ast.h>
 
+typedef struct {
+    int lineno;
+} yyextra_t;
+
 //! Allocate memory and iitialize the driver
 void driver_init();
 
@@ -49,7 +53,7 @@ ast_t *driver_parse(const char *filename);
  * @todo When in web mode, and the content of a file is not preloaded, it should
  * not try to open the file (there is no filesystem present)
  */
-void driver_push_file(const char *filename, int only_once);
+void driver_push_file(const char *filename, int only_once, void* scanner);
 
 /**
  * @brief Remove current file from the stack of included files.

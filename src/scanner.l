@@ -5,9 +5,7 @@
 #include <driver.h>
 #include <errors.h>
 
-int yycolumn = 1;
-
-extern writer_t *driver_error_writer;
+extern writer_t *driver_error_writer; //TODO!
 
 const char* const symbols[]={
   "(",")","{","}","[","]",
@@ -52,7 +50,7 @@ END \n|\r\n
 %x comment
 %x include_once
 %option noyywrap
-%option bison-bridge bison-locations
+%option reentrant bison-bridge bison-locations
 
 %%
 
@@ -62,7 +60,7 @@ END \n|\r\n
 <include>[^\"]*\" {  
     yytext[yyleng-1]=0;
     driver_set_current_pos(yylineno,yycolumn);
-    driver_push_file(yytext,0);
+    driver_push_file(yytext,0,yyscanner);
     yylineno=driver_current_line();
     yycolumn=driver_current_column();
     BEGIN(INITIAL);
@@ -73,7 +71,7 @@ END \n|\r\n
 <include_once>[^\"]*\" {  
     yytext[yyleng-1]=0;
     driver_set_current_pos(yylineno,yycolumn);
-    driver_push_file(yytext,1);
+    driver_push_file(yytext,1,yyscanner);
     yylineno=driver_current_line();
     yycolumn=driver_current_column();
     BEGIN(INITIAL);
@@ -183,8 +181,9 @@ sort/[^a-zA-Z0-9]    { return TOK_SORT; }
 <<EOF>> {
     driver_set_current_pos(yylineno,yycolumn);
     if (!driver_pop_file()) {
-      if (yy_buffer_stack) free(yy_buffer_stack);
-      yy_buffer_stack=NULL;
+      //TODO? is okay to remove?
+      // if (yy_buffer_stack) free(yy_buffer_stack);
+      // yy_buffer_stack=NULL;
       yyterminate();
     }
     else {
@@ -197,9 +196,9 @@ sort/[^a-zA-Z0-9]    { return TOK_SORT; }
 %%
 
 
-void yyerror(YYLTYPE *yylloc, ast_t *r,  const char  *s, ...) { 
+void yyerror(YYLTYPE *yylloc_param, ast_t *r,  const char  *s, ...) { 
   error_t *err = error_t_new();
-  append_error_msg(err,"%s:%d:%d: ", yylloc->fn, yylloc->fl,  yylloc->fc);
+  append_error_msg(err,"%s:%d:%d: ", yylloc_param->fn, yylloc_param->fl,  yylloc_param->fc);
   va_list args;
   int n;
   get_printed_length(s,n);

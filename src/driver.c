@@ -6,8 +6,6 @@
 #include <path.h>
 #include <scanner.h>
 
-extern int yycolumn;
-
 /**
  * @brief Invoke an error.
  * Called from #driver_set_file and #driver_push_file when someting went wrong.
@@ -39,6 +37,7 @@ typedef struct _include_file_t {
   int included;  //!< if the file was already included using #driver_push_file
   struct _include_file_t *next,  //!< next file in the linked list
       *included_from;  //!< pointer to where this file was included from
+  yyscan_t scanner; //TODO remove scanner dependency
 } include_file_t;
 
 static CONSTRUCTOR(include_file_t, const char *name) {
@@ -53,6 +52,7 @@ static CONSTRUCTOR(include_file_t, const char *name) {
   r->next = NULL;
   r->content = NULL;
   r->included = 0;
+  r->scanner = NULL; //TODO remove scanner dependency
   return r;
 }
 
@@ -61,14 +61,16 @@ static DESTRUCTOR(include_file_t) {
   if (r->name) free(r->name);
   if (r->content) free(r->content);
   if (r->f) fclose(r->f);
-  if (r->buf) yy_delete_buffer(r->buf);
+  if (r->buf) yy_delete_buffer(r->buf, r->scanner); //TODO remove scanner dependency
   if (r->next) include_file_t_delete(r->next);
   free(r);
 }
 
+// TODO remove global var
 static include_file_t *files=NULL,  //!< the list of known included files
     *current=NULL;                  //!< pointer to the list of included files
 
+// TODO remove global var
 writer_t *driver_error_writer = NULL;
 
 //! internal: Insert a new empty file
@@ -126,21 +128,28 @@ static char *normalize_filename(include_file_t *prefix, const char *f) {
 ast_t *driver_parse(const char *filename) {
   ast_t *ast = ast_t_new();
 
+  // struct yyextra_t * extra;
+  //TODO! extra lineno = 1
+  yyscan_t scanner;       
+  yylex_init(&scanner);
+  // yyset_lineno(1, scanner);
+  // yyset_column(1, scanner);
+  // TODO!
+
   for (include_file_t *file = files; file; file = file->next)
     file->included = 0;
 
   char *name = normalize_filename(NULL, filename);
-  driver_push_file(name, 1);
+  driver_push_file(name, 1, scanner);
   free(name);
 
-  yylineno = 1;
-  yycolumn = 1;
-  if (driver_current_file()) yyparse(ast);
+  if (driver_current_file()) yyparse(ast, scanner);   
+  yylex_destroy(scanner);   
   return ast;
 }
 
 /* switch to a new file */
-void driver_push_file(const char *filename, int only_once) {
+void driver_push_file(const char *filename, int only_once, yyscan_t scanner) {
   char *name = normalize_filename(current, filename);
 
   include_file_t *file;
@@ -153,6 +162,7 @@ void driver_push_file(const char *filename, int only_once) {
     return;
   }
   file->included = 1;
+  file->scanner = scanner;
 
   if (file->buf) {
     driver_error_handler("circular includes not allowed (%s)", name);
@@ -161,12 +171,12 @@ void driver_push_file(const char *filename, int only_once) {
   }
 
   if (file->content) {
-    file->buf = yy_scan_string(file->content);
+    file->buf = yy_scan_string(file->content, scanner);
   } else {
     file->f = fopen(name, "r");
     if (file->f) {
-      file->buf = yy_create_buffer(file->f, YY_BUF_SIZE);
-      yy_switch_to_buffer(file->buf);
+      file->buf = yy_create_buffer(file->f, YY_BUF_SIZE, scanner);
+      yy_switch_to_buffer(file->buf, scanner);
     } else {
       driver_error_handler("cannot open file %s", name);
       free(name);
@@ -191,9 +201,9 @@ int driver_pop_file() {
     oldfile->f = NULL;
   }
 
-  if (newfile) yy_switch_to_buffer(newfile->buf);
+  if (newfile) yy_switch_to_buffer(newfile->buf, newfile->scanner);
 
-  yy_delete_buffer(oldfile->buf);
+  yy_delete_buffer(oldfile->buf, oldfile->scanner);
   oldfile->buf = NULL;
 
   if (newfile == NULL)
