@@ -109,9 +109,9 @@ int main(int argc, char **argv) {
       strcat(outf, suff);
     }
     
-    include_project_t ip;
-    driver_init(&ip);
-    ast_t *r = driver_parse(&ip, inf);
+    include_project_t *ip = include_project_t_new();
+    driver_init(ip);
+    ast_t *r = driver_parse(ip, inf);
 
     writer_t *out;
     out = writer_t_new(WRITER_FILE);
@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
       emit_error(err);
     }
 
-    driver_destroy(&ip);
+    driver_destroy(ip);
     ast_t_delete(r);
 
     writer_t_delete(out);

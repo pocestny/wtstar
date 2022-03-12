@@ -76,6 +76,7 @@ CONSTRUCTOR(include_project_t) {
 DESTRUCTOR(include_project_t) {
   if(r->files) include_file_t_delete(r->files);
   r->current = NULL;
+  free(r);
 }
 
 // TODO remove global var
