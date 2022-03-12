@@ -102,10 +102,11 @@ int main(int argc, char **argv) {
   for(int i = 0; i < ninfs; ++i) {
     inf = infs[i];
     if(ninfs > 1) {
-      char outf2[] = "";
-      strcpy(outf2, inf);
-      strcat(outf2, ".out");
-      outf = outf2;
+      if(outf) free(outf);
+      char *suff = ".out";
+      outf = (char *) malloc(1 + strlen(inf) + strlen(suff));
+      strcpy(outf, inf);
+      strcat(outf, suff);
     }
     
     include_project_t ip;
