@@ -6,6 +6,7 @@ CFLAGS=-I /usr/lib/clang/7/include -I .
 
 ifeq ($(DEBUG),1)
 CFLAGS+=-g
+# -Wall -Wextra -Wno-sign-compare -Wno-unused-parameter
 BISONFLAGS= -v -fdiagnostics-show-caret -fdiagnostics-parseable-fixit
 else
 CFLAGS+=-O3 -static

@@ -6,6 +6,8 @@
 #define __UTILS_H__
 #include <inttypes.h>
 
+#define COUNT_OF(x) ((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
+
 //! pointer of given type at given address
 #define ptr(pntr, type) ((type *)(pntr))
 //! lvalue of given type at given address

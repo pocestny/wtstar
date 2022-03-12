@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <utils.h>
 #include <code_generation.h>
 #include <driver.h>
 #include <errors.h>
@@ -88,50 +89,62 @@ int main(int argc, char **argv) {
   outf = NULL;
   inf = NULL;
   parse_options(argc, argv);
+  printf("inf=%s outf=%s\n", inf, outf);
   if (!inf) print_help(argc, argv);
 
   register_error_handler(&error_handler);
   //   yydebug=1;
 
-  include_project_t ip;
-  driver_init(&ip);
-  ast_t *r = driver_parse(&ip, inf);
+  char *infs[] = {"1.wt", "2.wt", "3.wt"};
+  int num_was_error = 0;
+  for(int i=0; i<COUNT_OF(infs); ++i) {
+    inf = infs[i];
+    char outf2[] = "";
+    strcpy(outf2, inf);
+    strcat(outf2, ".out");
+    outf = outf2;
+    
+    include_project_t ip;
+    driver_init(&ip);
+    ast_t *r = driver_parse(&ip, inf);
 
-  writer_t *out;
-  out = writer_t_new(WRITER_FILE);
+    writer_t *out;
+    out = writer_t_new(WRITER_FILE);
 
-  if (ast_debug) {
-    if (!outf || !strcmp(outf, "-"))
-      out->f = stdout;
-    else
-      out->f = fopen(outf, "wt");
-  } else {
-    if (outf && !strcmp(outf, "-"))
-      out->f = stdout;
-    else {
-      if (!outf) outf = "a.out";
-      out->f = fopen(outf, "wb");
+    if (ast_debug) {
+      if (!outf || !strcmp(outf, "-"))
+        out->f = stdout;
+      else
+        out->f = fopen(outf, "wt");
+    } else {
+      if (outf && !strcmp(outf, "-"))
+        out->f = stdout;
+      else {
+        if (!outf) outf = "a.out";
+        out->f = fopen(outf, "wb");
+      }
     }
+
+    int was_error = 0;
+    if (r->error_occured) {
+      was_error = 1;
+      error_t *err = error_t_new();
+      append_error_msg(err, "there were errors");
+      emit_error(err);
+    } else if (ast_debug)
+      ast_debug_print(r, out);
+    else if (emit_code(r, out, no_debug)) {
+      was_error = 1;
+      error_t *err = error_t_new();
+      append_error_msg(err, "there were errors");
+      emit_error(err);
+    }
+
+    driver_destroy(&ip);
+    ast_t_delete(r);
+
+    writer_t_delete(out);
+    num_was_error += was_error;
   }
-
-  int was_error = 0;
-  if (r->error_occured) {
-    was_error = 1;
-    error_t *err = error_t_new();
-    append_error_msg(err, "there were errors");
-    emit_error(err);
-  } else if (ast_debug)
-    ast_debug_print(r, out);
-  else if (emit_code(r, out, no_debug)) {
-    was_error = 1;
-    error_t *err = error_t_new();
-    append_error_msg(err, "there were errors");
-    emit_error(err);
-  }
-
-  driver_destroy(&ip);
-  ast_t_delete(r);
-
-  writer_t_delete(out);
-  return was_error;
+  return num_was_error;
 }
