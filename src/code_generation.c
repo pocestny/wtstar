@@ -1417,7 +1417,7 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
     }
 
     // emit the debug information from debug.h
-    if (!no_debug) emit_debug_section(out, ast, code->pos);
+    if (!no_debug) emit_debug_section(out, ast, code->pos + 1);
 
     {
       section = SECTION_CODE;
