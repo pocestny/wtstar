@@ -28,7 +28,9 @@
 #include <ast_debug_print.h>
 
 char *outf,  //!< name of output file
-    *inf;    //!< name of input file
+    *inf,    //!< name of input file
+    *infs[10];    //!< names of input files
+int ninfs = 0;
 
 int ast_debug = 0,  //!< flag: -D option enabled
     no_debug  = 0,  //!< flag: -x option enabled
@@ -63,7 +65,7 @@ void parse_options(int argc, char **argv) {
     } else if (!strcmp(argv[i], "-x")) {
       no_debug = 1;
     } else
-      inf = argv[i];
+      infs[ninfs++] = argv[i];
 }
 
 //! Error handler used in errors.h Here just prints the error to stderr.
@@ -87,22 +89,24 @@ void error_handler(error_t *err) {
  */
 int main(int argc, char **argv) {
   outf = NULL;
-  inf = NULL;
   parse_options(argc, argv);
-  printf("inf=%s outf=%s\n", inf, outf);
-  if (!inf) print_help(argc, argv);
+  printf("ninfs=%d outf=%s\n", ninfs, outf);
+  if (!ninfs) print_help(argc, argv);
+  for(int i = 0; i < ninfs; ++i)
+    printf("infs[%d]=%s\n", i, infs[i]);
 
   register_error_handler(&error_handler);
   //   yydebug=1;
 
-  char *infs[] = {"1.wt", "2.wt", "3.wt"};
   int num_was_error = 0;
-  for(int i=0; i<COUNT_OF(infs); ++i) {
+  for(int i = 0; i < ninfs; ++i) {
     inf = infs[i];
-    char outf2[] = "";
-    strcpy(outf2, inf);
-    strcat(outf2, ".out");
-    outf = outf2;
+    if(ninfs > 1) {
+      char outf2[] = "";
+      strcpy(outf2, inf);
+      strcat(outf2, ".out");
+      outf = outf2;
+    }
     
     include_project_t ip;
     driver_init(&ip);
