@@ -1284,7 +1284,7 @@ static void write_io_variables(writer_t *out, int flag) {
 /* ----------------------------------------------------------------------------
  * main entry
  */
-int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
+int emit_code(ast_t *_ast, writer_t *out, int no_debug, int instr_only) {
   ast = _ast;
 
   // just for debugging: write all types
@@ -1360,8 +1360,16 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
       if (sz > global_size) global_size = sz;
     }
 
-  // write the binary file (see code.h)
-  if (!was_error) {
+  if (was_error) {
+    code_block_t_delete(code);
+    return was_error;
+  }
+
+  if(instr_only) {
+    uint8_t section = SECTION_CODE;
+    out_raw(out, &section, 1);
+    out_raw(out, code->data, code->pos);
+  } else {  // write the binary file (see code.h)
     uint8_t section;
 
     {
@@ -1427,7 +1435,7 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
   }
 
   code_block_t_delete(code);
-  return was_error;
+  return 0;
 }
 
 #undef DEBUG

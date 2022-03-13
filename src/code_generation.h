@@ -37,6 +37,6 @@ void add_instr(code_block_t *out, int code, ...);
  *
  * uses the errors.h mechanism for announcing errors
  */
-int emit_code(ast_t *_ast, writer_t *out, int no_debug);
+int emit_code(ast_t *_ast, writer_t *out, int no_debug, int instr_only);
 
 #endif
