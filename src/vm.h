@@ -9,6 +9,7 @@
 
 #include <code.h>
 #include <debug.h>
+#include <hash.h>
 #include <reader.h>
 #include <utils.h>
 #include <writer.h>
@@ -99,6 +100,23 @@ typedef struct {
   int32_t out_size; //!< size of the output value
 } fnmap_t;
 
+typedef struct {
+  uint32_t id;
+  uint32_t bp_pos;
+  uint32_t code_pos;
+  uint32_t code_size;
+} breakpoint_t;
+
+CONSTRUCTOR(
+  breakpoint_t,
+  uint32_t id,
+  uint32_t bp_pos,
+  uint32_t code_pos,
+  uint32_t code_size
+);
+
+DESTRUCTOR(breakpoint_t);
+
 //! virtual machine
 typedef struct {
   input_layout_item_t *in_vars, //!< input variables
@@ -133,6 +151,8 @@ typedef struct {
 
   debug_info_t *debug_info; //!< debugging info (if present)
 
+  hash_table_t *bps;
+
   enum { VM_READY = 0, VM_RUNNING, VM_OK, VM_ERROR } state; //!< current state
 
 } virtual_machine_t;
@@ -141,6 +161,35 @@ typedef struct {
 CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len);
 //! destructor
 DESTRUCTOR(virtual_machine_t);
+
+//! add runtime breakpoint with condition
+int add_breakpoint(
+  virtual_machine_t *env,
+  uint32_t bp_pos,
+  uint8_t *code,
+  uint32_t code_size
+);
+
+//! remove runtime breakpoint
+void remove_breakpoint(virtual_machine_t *env, uint32_t bp_pos);
+
+/**
+ * TODO make description
+ */
+int get_dynamic_bp_id(virtual_machine_t *env, uint32_t bp_pos);
+
+/**
+ * @brief evaluate condition of breakpoint
+ * 
+ * executes instructions associated with given breakpoint in given thread and
+ * puts result onto stack
+ * does nothing if breakpoint was present at compile time
+ */
+int execute_breakpoint_condition(
+  virtual_machine_t *env,
+  uint32_t bp_pos,
+  int thr_id
+);
 
 /** 
  * @brief execute the virtual machine

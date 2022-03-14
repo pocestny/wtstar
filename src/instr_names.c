@@ -68,5 +68,6 @@ const char* const instr_names[]={
 "SQRT",       
 "SQRTF",      
 "BREAK",      
+"BREAKOUT",   
 "???"
 };

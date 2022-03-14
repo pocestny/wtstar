@@ -299,6 +299,8 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
     }
   }
 
+  r->bps = hash_table_t_new(32, breakpoint_t_delete); // TODO
+
   return r;
 }
 
@@ -331,6 +333,7 @@ DESTRUCTOR(virtual_machine_t) {
   stack_t_delete(r->frames);
   if (r->fnmap) free(r->fnmap);
   if (r->debug_info) debug_info_t_delete(r->debug_info);
+  if (r->bps) hash_table_t_delete(r->bps);
   free(r);
 }
 
@@ -419,6 +422,76 @@ static void perform_join(virtual_machine_t *env) {
   env->a_thr = 0;
   for (int t = 0; t < env->n_thr; t++)
     if (!env->thr[t]->returned) env->a_thr++;
+}
+
+CONSTRUCTOR(
+  breakpoint_t,
+  uint32_t id,
+  uint32_t bp_pos,
+  uint32_t code_pos,
+  uint32_t code_size
+) {
+  ALLOC_VAR(r, breakpoint_t);
+  r->id = id;
+  r->bp_pos = bp_pos;
+  r->code_pos = code_pos;
+  r->code_size = code_size;
+  return r;
+}
+
+DESTRUCTOR(breakpoint_t) {
+  if(r == NULL) return;
+  free(r);
+}
+
+int add_breakpoint(
+  virtual_machine_t *env,
+  uint32_t bp_pos,
+  uint8_t *code,
+  uint32_t code_size
+) {
+  uint32_t bp_id = 10000 + env->bps->full; // start from big to avoid collision
+  uint32_t code_pos = env->code_size;
+  int new_size = env->code_size + code_size + 1;
+
+  env->code = (uint8_t*) realloc(env->code, new_size);
+  env->code[bp_pos] = BREAK;
+  memcpy(env->code + code_pos, code, code_size);
+  env->code[new_size - 1] = BREAKOUT;
+
+  breakpoint_t *bp = breakpoint_t_new(bp_id, bp_pos, code_pos, code_size + 1);
+  hash_put(env->bps, bp_pos, bp);
+  env->code_size = new_size;
+
+  return bp_id;
+}
+
+void remove_breakpoint(virtual_machine_t *env, uint32_t bp_pos) {
+  breakpoint_t *bp = hash_get(env->bps, bp_pos);
+  if(bp == NULL)
+    return;
+  env->code[bp->bp_pos] = NOOP;
+  // we do not remove entry from hash table to enable breakout
+}
+
+int get_dynamic_bp_id(virtual_machine_t *env, uint32_t bp_pos) {
+  breakpoint_t *bp = hash_get(env->bps, bp_pos);
+  return bp == NULL ? 0 : bp->id;
+}
+
+int execute_breakpoint_condition(
+  virtual_machine_t *env,
+  uint32_t bp_pos,
+  int thr_id
+) {
+  if(!get_dynamic_bp_id(env, bp_pos))
+    return -10;
+  breakpoint_t *bp = hash_get(env->bps, bp_pos);
+  int pc = env->pc;
+  env->pc = bp->code_pos;
+  int resp = execute(env, -1, 0, 1);
+  env->pc = pc;
+  return resp;
 }
 
 int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp) {
@@ -664,21 +737,35 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
       break;
 
     case BREAK: {
+      uint32_t bp_pos = env->pc - 1;
+      int bp_id = get_dynamic_bp_id(env, bp_pos);
+      if(!bp_id) {
+        bp_id = lval(env->code + env->pc, uint32_t);
+        env->pc += 4;
+      }
+      if(!stop_on_bp)
+        break;
       int hits = 0;
-      for (int t = 0; t < env->n_thr; t++)
-        if (!env->thr[t]->returned) {
-          uint32_t f;
-          _POP(f, 4);
-          if (f && stop_on_bp) {
-            /*printf("breakpoint %d hit in thread %d\n",
-                   lval(env->code + env->pc, uint32_t), env->thr[t]->tid);*/
-            env->thr[t]->bp_hit = 1;
-            hits++;
-          }
+      for (int t = 0; t < env->n_thr; t++) {
+        if (env->thr[t]->returned)
+          continue;
+        int resp = execute_breakpoint_condition(env, bp_pos, t);
+        if(resp != -10)
+          return resp; // TODO! what if I hit another breakpoint? =dead
+        uint32_t f;
+        _POP(f, 4);
+        if (f) {
+          /*printf("breakpoint %d hit in thread %d\n",
+                  lval(env->code + env->pc, uint32_t), env->thr[t]->tid);*/
+          env->thr[t]->bp_hit = 1;
+          hits++;
         }
-      env->pc += 4;
-      if (hits > 0 && stop_on_bp)
-        return lval(env->code + (env->pc - 4), uint32_t);
+      }
+      if (hits)
+        return bp_id;
+    } break;
+    case BREAKOUT: {
+      return -10;
     } break;
 
     case RETURN: {

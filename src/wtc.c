@@ -142,11 +142,19 @@ int main(int argc, char **argv) {
       emit_error(err);
     } else if (ast_debug)
       ast_debug_print(r, out);
-    else if (emit_code(r, out, no_debug, instr_only)) {
-      was_error = 1;
-      error_t *err = error_t_new();
-      append_error_msg(err, "there were errors");
-      emit_error(err);
+    else {
+      int resp;
+      if (instr_only)
+        resp = emit_code_section(r, out);
+      else
+        resp = emit_code(r, out, no_debug);
+      
+      if (resp) {
+        was_error = 1;
+        error_t *err = error_t_new();
+        append_error_msg(err, "there were errors");
+        emit_error(err);
+      }
     }
 
     driver_destroy(ip);

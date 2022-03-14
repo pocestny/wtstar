@@ -161,8 +161,6 @@ void set_input_string(char *input) {
   }
 }
 
-void run();
-
 void cont() {
   if (!env || !(env->state == VM_READY || env->state == VM_RUNNING)) {
     printf("%sno program running%s\n", RED_BOLD, TERM_RESET);

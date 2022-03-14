@@ -232,7 +232,8 @@ LOGF,         //!<  `a... -> b...` (a,b:float) b=log2
 LOG,          //!<  `a... -> b...` (a,b:int) b = ceiling log2
 SQRT,         //!<  `a... -> b...` (a,b:int) b = ceiling(sqrt(a))
 SQRTF,        //!<  `a... -> b...` (a,b:float) b = sqrt(a)
-BREAK        //!<  followed by x (4B)  : `a ... -> ....` if `(a)`, fire breakpoint number `x`  
+BREAK,        //!<  followed by x (4B)  : `a ... -> ....` if `(a)`, fire breakpoint number `x`
+BREAKOUT
 } instruction_t;
 
 
