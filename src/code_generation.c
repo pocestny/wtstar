@@ -72,6 +72,12 @@ void add_code_block(code_block_t *dst, code_block_t *src) {
   if (src->pos > 0) code_block_push(dst, src->data, src->pos);
 }
 
+void add_noop(code_block_t *out) {
+  uint8_t buf[1];
+  buf[0] = NOOP;
+  code_block_push(out, buf, 1);
+}
+
 // add one instruction with parameters to code block
 void add_instr(code_block_t *out, int code, ...) {
   static uint8_t buf[4096];
@@ -977,6 +983,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
   if (!node || node->emitted) return;
   node->emitted = 1;
   node->code_from = code->pos;
+  add_noop(code);
   switch (node->node_type) {
     // ................................
     case AST_NODE_VARIABLE:

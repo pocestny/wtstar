@@ -14,6 +14,9 @@
 #include <reader.h>
 #include <vm.h>
 
+#include <driver.h>
+#include <code_generation.h>
+
 #include <linenoise.h>
 
 #define CYAN_BOLD "\x1b[36;1m"
@@ -35,9 +38,87 @@ int binary_length;
 int input_needed = 0;
 int focused_thread = -1;
 
+
+
+
+
+int debug_source = 0;
+char *source_file_name = NULL;
+ast_t *ast;
+include_project_t *ip;
+writer_t *out;
+
+char* strapp(char *src, char *suff) {
+  src = (char *) realloc(src, 1 + strlen(src) + strlen(suff));
+  return strcat(src, suff);
+}
+
+void ast_find_breakpoint(
+  ast_node_t *curr_node, scope_t *curr_scope,
+  ast_node_t **res_node, scope_t **res_scope
+) {
+  if(!curr_node) {
+    for(ast_node_t *next = curr_scope->items; next != NULL; next = next->next)
+      ast_find_breakpoint(next, curr_scope, res_node, res_scope);
+  } else if(curr_node->node_type == AST_NODE_SCOPE) {
+    scope_t *scope = curr_node->val.sc;
+    for(ast_node_t *next = scope->items; next != NULL; next = next->next)
+      ast_find_breakpoint(next, scope, res_node, res_scope);
+  } else if(curr_node->node_type == AST_NODE_STATEMENT) {
+    statement_t *stmt = curr_node->val.s;
+    for(int i = 0; i < 2; ++i) {
+      if(stmt->par[i])
+        ast_find_breakpoint(stmt->par[i], curr_scope, res_node, res_scope);
+    }
+    if(stmt->variant == STMT_BREAKPOINT) {
+      *res_node = curr_node;
+      *res_scope = curr_scope;
+      printf("found breakpoint %p %p\n", curr_node, curr_scope);
+    }
+  }
+}
+
+int db_add_breakpoint(virtual_machine_t *vm, ast_t *ast, char *fn) {
+  ip = include_project_t_new();
+  driver_init(ip);
+  // TODO read from string
+  // TODO add { ... } into source file
+
+  ast_node_t *bp_node;
+  scope_t *bp_scope;
+  // for every item in root scope
+  ast_find_breakpoint(NULL, ast->root_scope, &bp_node, &bp_scope);
+  ast->current_scope = bp_scope;
+  uint32_t bp_code_pos = bp_node->code_from;
+  bp_scope->items = NULL;
+  ast = driver_parse_from(ast, ip, fn);
+  list_append(ast_node_t, &bp_scope->items, bp_node);
+
+  out = writer_t_new(WRITER_STRING);
+  int resp = emit_code_scope_section(ast, bp_scope->items->val.sc, out);
+  
+  if (resp) {
+    error_t *err = error_t_new();
+    append_error_msg(err, "there were errors");
+    emit_error(err);
+    return 1;
+  }
+
+  uint32_t code_size = out->str.ptr - 1; // remove last instruction (ENDVM)
+  printf("breakpoint code_size %d\n", code_size);
+  add_breakpoint(vm, bp_code_pos, (uint8_t*)out->str.base, code_size);
+
+  writer_t_delete(out);
+  return 0;
+}
+
+
+
+
 void describe() {
   printf("loaded file:  %s%s%s\n", CYAN_BOLD, binary_file_name, TERM_RESET);
-  virtual_machine_t *tmp = virtual_machine_t_new(binary_file, binary_length);
+  // virtual_machine_t *tmp = virtual_machine_t_new(binary_file, binary_length);
+  virtual_machine_t *tmp = env;
   if (!tmp) {
     printf("%scorrupted file%s\n", RED_BOLD, TERM_RESET);
     input_needed = 0;
@@ -65,7 +146,7 @@ void describe() {
   dump_debug_info(outw, tmp);
   input_needed = 0;
   if (tmp->n_in_vars > 0) input_needed = 1;
-  virtual_machine_t_delete(tmp);
+  // virtual_machine_t_delete(tmp);
 }
 
 void show_threads() {
@@ -229,6 +310,10 @@ void run() {
       return;
     }
   }
+
+      describe();
+      db_add_breakpoint(env, ast, "breakpoint.wt"); // TODO
+      describe();
 
   cont();
 }
@@ -497,6 +582,33 @@ int main(int argc, char **argv) {
   if (!binary_file_name) print_help(argc, argv);
   outw = writer_t_new(WRITER_FILE);
   outw->f = stdout;
+  {
+    int sl = strlen(binary_file_name);
+    if(sl >= 3 && !strcmp(binary_file_name + sl - 3, ".wt")) {
+      debug_source = 1;
+      source_file_name = binary_file_name;
+      binary_file_name = strdup(source_file_name);
+      binary_file_name = strapp(binary_file_name, ".out");
+
+      ip = include_project_t_new();
+      driver_init(ip);
+      ast = driver_parse(ip, source_file_name);
+
+      out = writer_t_new(WRITER_FILE);
+      out->f = fopen(binary_file_name, "wb");
+      int resp = emit_code(ast, out, 0);
+      writer_t_delete(out);
+      
+      if (resp) {
+        error_t *err = error_t_new();
+        append_error_msg(err, "there were errors");
+        emit_error(err);
+        return 1;
+      }
+
+      // temporary testing made for break.wt
+    }
+  }
   load_file();
 
   register_error_handler(&error_handler);
@@ -584,4 +696,7 @@ int main(int argc, char **argv) {
     free(result);
     free(result_raw);
   }
+
+  driver_destroy(ip);
+  ast_t_delete(ast);
 }

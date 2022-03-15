@@ -45,12 +45,16 @@ WTR_DEPS=${WTR_SRC} ${WTR_HDRS}
 ##################################################################
 ########  build wtdb
 WTDB_SRC = wtdb.c vm.c instr_names.c reader.c writer.c  \
-					errors.c hash.c debug.c linenoise.c
+					errors.c hash.c debug.c linenoise.c \
+					ast.c parser.c scanner.c driver.c \
+					ast_debug_print.c code_generation.c path.c
 
 WTDB_HDRS= code.h vm.h reader.h writer.h  errors.h hash.h debug.h \
-					 linenoise.h
+					 linenoise.h \
+					 ast.h parser.h scanner.h driver.h utils.h \
+					 ast_debug_print.h code_generation.h path.h
 
-WTDB_DEPS=${WTDB_SRC} ${WTDB_HDRS} 
+WTDB_DEPS=${WTDB_SRC} ${WTDB_HDRS} ${WTC_DEPS}
 
 ##################################################################
 ########  build wtdump

@@ -74,7 +74,8 @@ CONSTRUCTOR(include_project_t) {
 }
 
 DESTRUCTOR(include_project_t) {
-  if(r->files) include_file_t_delete(r->files);
+  if (r == NULL) return;
+  if (r->files) include_file_t_delete(r->files);
   r->current = NULL;
   free(r);
 }
@@ -136,16 +137,19 @@ static char *normalize_filename(include_file_t *prefix, const char *f) {
   return result;
 }
 
-/* main parsing function */
-ast_t *driver_parse(include_project_t *_ip, const char *filename) {
-  ast_t *ast = ast_t_new();
-
+// can start from existing ast and with set current scope
+ast_t *driver_parse_from(
+  ast_t *from,
+  include_project_t *_ip,
+  const char *filename
+) {
+  ast_t *ast = from; // TODO create copy
   //TODO! extra lineno = 1
   yyextra_t extra;
   extra.ip = _ip;
   yyscan_t scanner;       
   yylex_init_extra(&extra, &scanner);
-  // yyset_lineno(1, scanner);
+  // yyset_lineno(1, scanner); // TODO
   // yyset_column(1, scanner);
 
   for (include_file_t *file = extra.ip->files; file; file = file->next)
@@ -158,6 +162,12 @@ ast_t *driver_parse(include_project_t *_ip, const char *filename) {
   if (driver_current_file(extra.ip->current)) yyparse(ast, scanner);   
   yylex_destroy(scanner);  
   return ast;
+}
+
+/* main parsing function */
+ast_t *driver_parse(include_project_t *_ip, const char *filename) {
+  ast_t *ast = ast_t_new();
+  return driver_parse_from(ast, _ip, filename);
 }
 
 /* switch to a new file */
