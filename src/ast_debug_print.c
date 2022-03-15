@@ -16,8 +16,8 @@ static const char *const node_names[] = {
 
 #define STMT_BASE 69
 static const char *const stmt_names[] = {
-    "STMT_COND",  "STMT_WHILE", "STMT_DO",       "STMT_FOR",
-    "STMT_PARDO", "STMT_BREAK", "STMT_CONTINUE", "STMT_RETURN"};
+    "STMT_COND",  "STMT_WHILE",  "STMT_DO", "STMT_FOR",
+    "STMT_PARDO", "STMT_RETURN", "STMT_BREAKPOINT"};
 
 #define EXPR_BASE 18
 static const char *const expr_names[] = {

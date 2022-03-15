@@ -341,8 +341,8 @@ typedef enum {
   STMT_DO = 71,         //!< do .. while loop
   STMT_FOR = 72,        //!< for loop
   STMT_PARDO = 73,      //!< pardo
-  STMT_RETURN = 75,     //!< return
-  STMT_BREAKPOINT = 76  //!< breapoint
+  STMT_RETURN = 74,     //!< return
+  STMT_BREAKPOINT = 75  //!< breapoint
 } statement_variant_t;
 
 /**
