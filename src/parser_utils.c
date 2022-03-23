@@ -22,7 +22,7 @@ void make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
 //! add a flag to all variables in a list
 void add_variable_flag(int flag, ast_node_t *list) ;
 
-//! list_append list of variables to current scope
+//! append list of variables to current scope
 void append_variables(ast_t *ast, ast_node_t *list);
 
 //! create an expression literal of specified integer value
@@ -81,23 +81,31 @@ int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node);
 
 void ignore(void *i) {}  
 
-#define ADD_STATIC_TYPEDEF(typename, nbytes)                         \
-  __type__##typename =                                               \
-      ast_node_t_new(NULL, AST_NODE_STATIC_TYPE, strdup(#typename)); \
-  __type__##typename->val.t->size = nbytes;                          \
-  list_append(ast_node_t, &ast->types, __type__##typename);
+// TODO global variables
+#define ADD_STATIC_TYPEDEF(ast, typename, nbytes)                      \
+  if(!__type__##typename) {                                            \
+    __type__##typename =                                               \
+        ast_node_t_new(NULL, AST_NODE_STATIC_TYPE, strdup(#typename)); \
+    __type__##typename->val.t->size = nbytes;                          \
+  }                                                                    \
+  {                                                                    \
+    int res;                                                           \
+    list_find(ast_node_t, &ast->types, __type__##typename, res);       \
+    if(!res) list_append(ast_node_t, &ast->types, __type__##typename); \
+  }
 
 ast_node_t *__type__int = NULL, *__type__float = NULL, *__type__void = NULL,
            *__type__char = NULL;
 
 // add basic types as global constants
 void add_basic_types(ast_t *ast) {
-  ADD_STATIC_TYPEDEF(int, 4)
-  ADD_STATIC_TYPEDEF(float, 4)
-  ADD_STATIC_TYPEDEF(void, 0)
-  ADD_STATIC_TYPEDEF(char, 1)
+  ADD_STATIC_TYPEDEF(ast, int, 4)
+  ADD_STATIC_TYPEDEF(ast, float, 4)
+  ADD_STATIC_TYPEDEF(ast, void, 0)
+  ADD_STATIC_TYPEDEF(ast, char, 1)
 }
 
+//TODO duplicates when recompiling
 #define NEW_BUILTIN_FUNCTION(name, outtype)            \
   fn = ast_node_t_new(NULL, AST_NODE_FUNCTION, #name); \
   fn->val.f->out_type = __type__##outtype->val.t;
@@ -178,7 +186,7 @@ void add_variable_flag(int flag, ast_node_t *list) {
   list_for_end;
 }
 
-// list_append list of variables to current scope
+// append list of variables to current scope
 void append_variables(ast_t *ast, ast_node_t *list) {
   list_for(v, ast_node_t, list) {
     v->next = NULL;
@@ -507,46 +515,50 @@ int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node) {
   expression_t *e = node->val.e;
 
   if (e->variant == EXPR_BINARY) {
-    if (e->val.o->first == NULL || e->val.o->second == NULL) return 0;
-    int equal = inferred_type_equal(e->val.o->first->val.e->type,
-                                    e->val.o->second->val.e->type);
+    expr_oper_t *binexpr = e->val.o;
+    if (binexpr->first == NULL || binexpr->second == NULL) return 0;
+    int equal = inferred_type_equal(binexpr->first->val.e->type,
+                                    binexpr->second->val.e->type);
 
-    if ((e->val.o->oper == TOK_EQ || e->val.o->oper == TOK_NEQ) && equal &&
-        !e->val.o->first->val.e->type->compound) {
+    if ((binexpr->oper == TOK_EQ || binexpr->oper == TOK_NEQ) && equal &&
+        !binexpr->first->val.e->type->compound) {
       e->type->type = __type__int->val.t;
-    } else if (e->val.o->oper == '=' && equal) {
+    } else if (binexpr->oper == '=' && equal) {
       inferred_type_t_delete(e->type);
-      e->type = inferred_type_copy(e->val.o->first->val.e->type);
+      e->type = inferred_type_copy(binexpr->first->val.e->type);
     } else {
       // only implicit type conversion is int->float
       int fi = 1, ff = 1, si = 1, sf = 1;
 
-      if (e->val.o->first->val.e->type->compound)
+      printf("compound %d %d\n",
+        binexpr->first->val.e->type->compound,
+        binexpr->second->val.e->type->compound);
+      if (binexpr->first->val.e->type->compound)
         fi = ff = 0;
       else {
-        if (e->val.o->first->val.e->type->type != __type__int->val.t) fi = 0;
-        if (e->val.o->first->val.e->type->type != __type__float->val.t) ff = 0;
+        if (binexpr->first->val.e->type->type != __type__int->val.t) fi = 0;
+        if (binexpr->first->val.e->type->type != __type__float->val.t) ff = 0;
       }
 
-      if (e->val.o->second->val.e->type->compound)
+      if (binexpr->second->val.e->type->compound)
         si = sf = 0;
       else {
-        if (e->val.o->second->val.e->type->type != __type__int->val.t) si = 0;
-        if (e->val.o->second->val.e->type->type != __type__float->val.t) sf = 0;
+        if (binexpr->second->val.e->type->type != __type__int->val.t) si = 0;
+        if (binexpr->second->val.e->type->type != __type__float->val.t) sf = 0;
       }
 
       if (fi && si)
         e->type->type = __type__int->val.t;
       else if ((fi || ff) && (si || sf)) {
-        if (assign_oper(e->val.o->oper) && fi)
+        if (assign_oper(binexpr->oper) && fi)
           e->type->type = __type__int->val.t;
-        else if (comparison_oper(e->val.o->oper) || e->val.o->oper == TOK_AND ||
-                 e->val.o->oper == TOK_OR) {
+        else if (comparison_oper(binexpr->oper) || binexpr->oper == TOK_AND ||
+                 binexpr->oper == TOK_OR) {
           e->type->type = __type__int->val.t;
         } else
           e->type->type = __type__float->val.t;
       } else {
-        yyerror(loc, ast, "type check error");
+        yyerror(loc, ast, "type check error %d %d %d %d", fi, ff, si, sf);
         return 0;
       }
     }

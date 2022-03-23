@@ -21,6 +21,20 @@
 //! create destructor
 #define DESTRUCTOR(name) void name##_delete(name *r)
 
+//! find in a list
+#define list_find(type, list, value, res) \
+  res = 0;                                \
+  if (value) {                            \
+    type *__tmp__ = *list;                \
+    while (__tmp__) {                     \
+      if (__tmp__ == value) {             \
+        res = 1;                          \
+        break;                            \
+      }                                   \
+      __tmp__ = __tmp__->next;            \
+    }                                     \
+  }
+
 //! append to a list
 #define list_append(type, list, value)                              \
   if (value) {                                                      \
