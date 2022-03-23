@@ -35,7 +35,7 @@ CONSTRUCTOR(include_project_t);
 DESTRUCTOR(include_project_t);
 
 typedef struct _extra_t {
-    include_project_t *ip;
+  include_project_t *ip;
 } yyextra_t;
 
 

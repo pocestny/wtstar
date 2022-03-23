@@ -39,6 +39,6 @@ void add_instr(code_block_t *out, int code, ...);
  */
 int emit_code(ast_t *_ast, writer_t *out, int no_debug);
 
-int emit_code_section(ast_t *_ast, writer_t *out);
+int emit_code_scope_section(ast_t *_ast, scope_t *scope, writer_t *out);
 
 #endif

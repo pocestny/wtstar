@@ -1442,7 +1442,8 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
   return 0;
 }
 
-int emit_code_section(ast_t *_ast, writer_t *out) {
+// TODO don't recompute all memory
+int emit_code_scope_section(ast_t *_ast, scope_t *scope, writer_t *out) {
   ast = _ast;
 
   // global variables have lowest addresses, even if they are defined
@@ -1461,29 +1462,14 @@ int emit_code_section(ast_t *_ast, writer_t *out) {
 
   // main part - generate the code block
   code_block_t *code = code_block_t_new();
-  emit_code_scope(code, ast->root_scope);
+  emit_code_scope(code, scope);
   add_instr(code, ENDVM, 0);
-
-  // compute the size of the memory used by global variables
-  uint32_t global_size = 0;
-  for (ast_node_t *nd = ast->root_scope->items; nd; nd = nd->next)
-    if (nd->node_type == AST_NODE_VARIABLE) {
-      variable_t *var = nd->val.v;
-      uint32_t sz = var->addr;
-      if (var->num_dim == 0)
-        sz += var->base_type->size;
-      else
-        sz += 4 * (2 + var->num_dim);
-      if (sz > global_size) global_size = sz;
-    }
 
   if (was_error) {
     code_block_t_delete(code);
     return was_error;
   }
 
-  uint8_t section = SECTION_CODE;
-  out_raw(out, &section, 1);
   out_raw(out, code->data, code->pos);
 
   code_block_t_delete(code);

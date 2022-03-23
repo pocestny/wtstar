@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
     else {
       int resp;
       if (instr_only)
-        resp = emit_code_section(r, out);
+        resp = emit_code_scope_section(r, r->root_scope, out);
       else
         resp = emit_code(r, out, no_debug);
       
