@@ -577,6 +577,39 @@ void completion(const char *buf, linenoiseCompletions *lc) {
   free(cmd);
 }
 
+void parse_args(int argc, char **argv) {
+  parse_options(argc, argv);
+  if (!binary_file_name) print_help(argc, argv);
+  outw = writer_t_new(WRITER_FILE);
+  outw->f = stdout;
+  {
+    int sl = strlen(binary_file_name);
+    if(sl >= 3 && !strcmp(binary_file_name + sl - 3, ".wt")) {
+      debug_source = 1;
+      source_file_name = binary_file_name;
+      binary_file_name = strdup(source_file_name);
+      binary_file_name = strapp(binary_file_name, ".out");
+
+      ip = include_project_t_new();
+      driver_init(ip);
+      ast = driver_parse(ip, source_file_name);
+
+      out = writer_t_new(WRITER_FILE);
+      out->f = fopen(binary_file_name, "wb");
+      int resp = emit_code(ast, out, 0);
+      writer_t_delete(out);
+      
+      if (resp) {
+        error_t *err = error_t_new();
+        append_error_msg(err, "there were errors");
+        emit_error(err);
+        exit(1);
+      }
+    }
+  }
+  load_file();
+}
+
 int parse_cmd(char **response) {
   printf(WHITE_BOLD);
   fflush(stdout);
@@ -614,38 +647,7 @@ int parse_cmd(char **response) {
 }
 
 int main(int argc, char **argv) {
-  parse_options(argc, argv);
-  if (!binary_file_name) print_help(argc, argv);
-  outw = writer_t_new(WRITER_FILE);
-  outw->f = stdout;
-  {
-    int sl = strlen(binary_file_name);
-    if(sl >= 3 && !strcmp(binary_file_name + sl - 3, ".wt")) {
-      debug_source = 1;
-      source_file_name = binary_file_name;
-      binary_file_name = strdup(source_file_name);
-      binary_file_name = strapp(binary_file_name, ".out");
-
-      ip = include_project_t_new();
-      driver_init(ip);
-      ast = driver_parse(ip, source_file_name);
-
-      out = writer_t_new(WRITER_FILE);
-      out->f = fopen(binary_file_name, "wb");
-      int resp = emit_code(ast, out, 0);
-      writer_t_delete(out);
-      
-      if (resp) {
-        error_t *err = error_t_new();
-        append_error_msg(err, "there were errors");
-        emit_error(err);
-        return 1;
-      }
-
-      // temporary testing made for break.wt
-    }
-  }
-  load_file();
+  parse_args(argc, argv);
 
   register_error_handler(&error_handler);
   linenoiseSetCompletionCallback(completion);
