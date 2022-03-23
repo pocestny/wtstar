@@ -577,6 +577,42 @@ void completion(const char *buf, linenoiseCompletions *lc) {
   free(cmd);
 }
 
+int parse_cmd(char **response) {
+  printf(WHITE_BOLD);
+  fflush(stdout);
+  char *result_raw = linenoise(">> ");
+  printf(TERM_RESET);
+  fflush(stdout);
+  if(!result_raw) {
+    printf("EOF\n");
+    return 0; // exit
+  }
+  linenoiseHistoryAdd(result_raw);
+
+  tokens_t tokens[MAX_TOKENS];
+  int pos = parse(result_raw, tokens);
+  char *result = malloc(strlen(result_raw) + 10);
+  result[0] = 0;
+  for (int i = 0; i < MAX_TOKENS && tokens[i] != T_NONE; i++) {
+    strcat(result, keywords[tokens[i]]);
+    strcat(result, " ");
+  }
+  if (pos != -1)
+    strcat(result, result_raw + pos);
+
+  int cmd = -1;
+  for (int i = 0; commands[i][0] != '?'; i++)
+    if (!strncmp(commands[i], result, strlen(commands[i]))) {
+      cmd = i;
+      break;
+    }
+
+  free(result_raw);
+
+  *response = result;
+  return cmd;
+}
+
 int main(int argc, char **argv) {
   parse_options(argc, argv);
   if (!binary_file_name) print_help(argc, argv);
@@ -615,42 +651,17 @@ int main(int argc, char **argv) {
   linenoiseSetCompletionCallback(completion);
 
   printf("type %shelp%s for the list of commands\n", WHITE_BOLD, TERM_RESET);
-  tokens_t tokens[MAX_TOKENS];
 
   while (1) {
-    printf(WHITE_BOLD);
-    fflush(stdout);
-    char *result_raw = linenoise(">> ");
-    printf(TERM_RESET);
-    fflush(stdout);
-    if(!result_raw) {
-      printf("EOF\n");
-      break;
-    }
-    linenoiseHistoryAdd(result_raw);
-
-    int pos = parse(result_raw, tokens);
-    char *result = malloc(strlen(result_raw) + 10);
-    result[0] = 0;
-    for (int i = 0; i < MAX_TOKENS && tokens[i] != T_NONE; i++) {
-      strcat(result, keywords[tokens[i]]);
-      strcat(result, " ");
-    }
-    if (pos != -1)
-      strcat(result, result_raw + pos);
-    int cmd = -1;
-    for (int i = 0; commands[i][0] != '?'; i++)
-      if (!strncmp(commands[i], result, strlen(commands[i]))) {
-        cmd = i;
-        break;
-      }
+    char *response;
+    int cmd = parse_cmd(&response);
     switch (cmd) {
       case 0:
         exit(0);
         break;
       case 1:
         // set input string
-        set_input_string(result + 17);
+        set_input_string(response + 17);
         break;
       case 2:
         printf("set input file\n");
@@ -689,17 +700,16 @@ int main(int argc, char **argv) {
         variable_list();
         break;
       case 11:  // set thread
-        sscanf(result + 11, "%d", &focused_thread);
+        sscanf(response + 11, "%d", &focused_thread);
         break;
       case 12:
-        print_variable_in_thread(strtok(result + 5, " \t"));
+        print_variable_in_thread(strtok(response + 5, " \t"));
         break;
       default:
         printf("unknown command\n");
         break;
     }
-    free(result);
-    free(result_raw);
+    free(response);
   }
 
   driver_destroy(ip);
