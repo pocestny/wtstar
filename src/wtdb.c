@@ -623,6 +623,10 @@ int main(int argc, char **argv) {
     char *result_raw = linenoise(">> ");
     printf(TERM_RESET);
     fflush(stdout);
+    if(!result_raw) {
+      printf("EOF\n");
+      break;
+    }
     linenoiseHistoryAdd(result_raw);
 
     int pos = parse(result_raw, tokens);
@@ -632,7 +636,8 @@ int main(int argc, char **argv) {
       strcat(result, keywords[tokens[i]]);
       strcat(result, " ");
     }
-    strcat(result, result_raw + pos);
+    if (pos != -1)
+      strcat(result, result_raw + pos);
     int cmd = -1;
     for (int i = 0; commands[i][0] != '?'; i++)
       if (!strncmp(commands[i], result, strlen(commands[i]))) {
