@@ -22,7 +22,7 @@
 #define DESTRUCTOR(name) void name##_delete(name *r)
 
 //! append to a list
-#define append(type, list, value)                                   \
+#define list_append(type, list, value)                              \
   if (value) {                                                      \
     if (!(*(list)))                                                 \
       *(list) = (value);                                            \

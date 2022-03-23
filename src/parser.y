@@ -173,7 +173,7 @@ typedef_list
               else if ($1==NULL) $$=$2;
               else {
                 $$=$1; 
-                append(static_type_member_t,&$$,$2);
+                list_append(static_type_member_t,&$$,$2);
               }
             }
 
@@ -203,7 +203,7 @@ typedef_ident_list:
             yyerror(&@3,ast,"duplicate type member '%s' in type definition",$3);
           } else {
             static_type_member_t *nt = static_type_member_t_new($3,NULL);
-            append(static_type_member_t,&$$,nt);
+            list_append(static_type_member_t,&$$,nt);
           }
           free($3);
           $3=NULL;
@@ -441,7 +441,7 @@ nonempty_parameter_declarator_list:
           if (ast_node_find($$,$3->val.v->name))
             yyerror(&@3,ast,"redefinition of parameter");
           else
-            append(ast_node_t,&$$,$3);
+            list_append(ast_node_t,&$$,$3);
         }
       }
     ;
@@ -467,7 +467,7 @@ type_decl: TYPENAME
 expr: 
     expr_assign {$$=$1;} 
     |  
-    expr ',' expr_assign {$$=$1;append(ast_node_t,&$$,$3);}
+    expr ',' expr_assign {$$=$1;list_append(ast_node_t,&$$,$3);}
     ;
 
 expr_assign:
@@ -828,7 +828,7 @@ initializer_list
                   {
                     $$=$1;
                     inferred_type_append($$->val.e->type,$3->val.e->type);
-                    append(ast_node_t,&($$->val.e->val.i),$3->val.e->val.i);
+                    list_append(ast_node_t,&($$->val.e->val.i),$3->val.e->val.i);
                     free($3);
                   }
                 | error ',' initializer_item {$$=$3;}
@@ -863,7 +863,7 @@ expr_list:
     expr_list ',' expr_assign 
       {
         $$=$1;
-        append(ast_node_t,&$$,$3);
+        list_append(ast_node_t,&$$,$3);
       }
     |
     error ',' expr_assign {$$=$3;}
@@ -887,7 +887,7 @@ stmt_scope
             {
               $$=$<ast_node_val>2;
               ast->current_scope=$$->val.sc->parent;
-              append(ast_node_t,&ast->current_scope->items,$$);
+              list_append(ast_node_t,&ast->current_scope->items,$$);
             }
   
             | '{' '}' {$$=NULL;}
@@ -901,7 +901,7 @@ scope_item
 stmt_expr 
          : expr ';' 
          {
-            append(ast_node_t,&ast->current_scope->items,$1);
+            list_append(ast_node_t,&ast->current_scope->items,$1);
          }
     ;
 
@@ -916,14 +916,14 @@ stmt_cond
           }
           stmt maybe_else {
             ast->current_scope=ast->current_scope->parent;
-            append(ast_node_t,&ast->current_scope->items,$<ast_node_val>5);
+            list_append(ast_node_t,&ast->current_scope->items,$<ast_node_val>5);
           }
          ;
 
 maybe_else 
           : %empty  
             {
-                append(ast_node_t,&ast->current_scope->items,
+                list_append(ast_node_t,&ast->current_scope->items,
                       ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_EMPTY));
             }
           | ELSE stmt ;
@@ -939,7 +939,7 @@ stmt_iter
           }
           stmt {
             ast->current_scope=ast->current_scope->parent;
-            append(ast_node_t,&ast->current_scope->items,$<ast_node_val>5);
+            list_append(ast_node_t,&ast->current_scope->items,$<ast_node_val>5);
           }
          | DO 
           {
@@ -952,7 +952,7 @@ stmt_iter
           {
             $<ast_node_val>2->val.s->par[0]=$6;
             ast->current_scope=ast->current_scope->parent;
-            append(ast_node_t,&ast->current_scope->items,$<ast_node_val>2);
+            list_append(ast_node_t,&ast->current_scope->items,$<ast_node_val>2);
           }
          |  FOR '('  
             {
@@ -964,7 +964,7 @@ stmt_iter
               ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_FOR);
               ast->current_scope=$<ast_node_val>3->val.sc->parent;
               n->val.s->par[0]=$<ast_node_val>3;
-              append(ast_node_t,&ast->current_scope->items,n);
+              list_append(ast_node_t,&ast->current_scope->items,n);
             }
          | PARDO '(' IDENT ':'
             {
@@ -982,7 +982,7 @@ stmt_iter
               ast->current_scope=$<ast_node_val>5->val.sc->parent;
               n->val.s->par[0]=$<ast_node_val>5;
               n->val.s->par[1]=$6;
-              append(ast_node_t,&ast->current_scope->items,n);
+              list_append(ast_node_t,&ast->current_scope->items,n);
             }
          ;
 
@@ -991,11 +991,11 @@ for_stmt: ';' | stmt;
 for_specifier
              : first_for_item expr ';' maybe_expr ')'
                 {
-                  append(ast_node_t,&ast->current_scope->items,$2);
+                  list_append(ast_node_t,&ast->current_scope->items,$2);
                   if ($4) {
-                    append(ast_node_t,&ast->current_scope->items,$4);
+                    list_append(ast_node_t,&ast->current_scope->items,$4);
                   } else {
-                    append(ast_node_t,&ast->current_scope->items,
+                    list_append(ast_node_t,&ast->current_scope->items,
                         ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_EMPTY));
                   }
                 }
@@ -1007,7 +1007,7 @@ first_for_item
               | variable_declaration  
               | ';' 
                 {
-                  append(ast_node_t,&ast->current_scope->items,
+                  list_append(ast_node_t,&ast->current_scope->items,
                     ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_EMPTY)
                   );
                 }  
@@ -1018,7 +1018,7 @@ stmt_jump
           {
             ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_RETURN);
             n->val.s->par[0]=$2;
-            append(ast_node_t,&ast->current_scope->items,n);
+            list_append(ast_node_t,&ast->current_scope->items,n);
             n->val.s->ret_fn=ast->current_scope->fn;
           }
           |
@@ -1026,14 +1026,14 @@ stmt_jump
             ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_BREAKPOINT);
             n->val.s->tag=$1;
             n->val.s->par[0]=expression_int_val(1);
-            append(ast_node_t,&ast->current_scope->items,n);
+            list_append(ast_node_t,&ast->current_scope->items,n);
           }
           |
           BREAKPOINT '(' expr ')' {
             ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_BREAKPOINT);
             n->val.s->tag=$1;
             n->val.s->par[0]=$3;
-            append(ast_node_t,&ast->current_scope->items,n);
+            list_append(ast_node_t,&ast->current_scope->items,n);
           }
          ;
 

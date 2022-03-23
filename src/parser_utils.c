@@ -22,7 +22,7 @@ void make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
 //! add a flag to all variables in a list
 void add_variable_flag(int flag, ast_node_t *list) ;
 
-//! append list of variables to current scope
+//! list_append list of variables to current scope
 void append_variables(ast_t *ast, ast_node_t *list);
 
 //! create an expression literal of specified integer value
@@ -85,7 +85,7 @@ void ignore(void *i) {}
   __type__##typename =                                               \
       ast_node_t_new(NULL, AST_NODE_STATIC_TYPE, strdup(#typename)); \
   __type__##typename->val.t->size = nbytes;                          \
-  append(ast_node_t, &ast->types, __type__##typename);
+  list_append(ast_node_t, &ast->types, __type__##typename);
 
 ast_node_t *__type__int = NULL, *__type__float = NULL, *__type__void = NULL,
            *__type__char = NULL;
@@ -105,7 +105,7 @@ void add_basic_types(ast_t *ast) {
 #define BUILTIN_PARAM(name, typename)                 \
   p = ast_node_t_new(NULL, AST_NODE_VARIABLE, #name); \
   p->val.v->base_type = __type__##typename->val.t;    \
-  append(ast_node_t, &fn->val.f->params, p);
+  list_append(ast_node_t, &fn->val.f->params, p);
 
 // add built-in functions into ast_t
 void add_builtin_functions(ast_t *ast) {
@@ -113,19 +113,19 @@ void add_builtin_functions(ast_t *ast) {
 
   NEW_BUILTIN_FUNCTION(sqrtf, float)
   BUILTIN_PARAM(x, float)
-  append(ast_node_t, &ast->functions, fn);
+  list_append(ast_node_t, &ast->functions, fn);
 
   NEW_BUILTIN_FUNCTION(sqrt, int)
   BUILTIN_PARAM(x, int)
-  append(ast_node_t, &ast->functions, fn);
+  list_append(ast_node_t, &ast->functions, fn);
 
   NEW_BUILTIN_FUNCTION(logf, float)
   BUILTIN_PARAM(x, float)
-  append(ast_node_t, &ast->functions, fn);
+  list_append(ast_node_t, &ast->functions, fn);
 
   NEW_BUILTIN_FUNCTION(log, int)
   BUILTIN_PARAM(x, int)
-  append(ast_node_t, &ast->functions, fn);
+  list_append(ast_node_t, &ast->functions, fn);
 }
 
 // parse a typedef
@@ -168,7 +168,7 @@ void make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
     return;
   }
 
-  append(ast_node_t, &ast->types, nt);
+  list_append(ast_node_t, &ast->types, nt);
   free(ident);
 }
 
@@ -178,7 +178,7 @@ void add_variable_flag(int flag, ast_node_t *list) {
   list_for_end;
 }
 
-// append list of variables to current scope
+// list_append list of variables to current scope
 void append_variables(ast_t *ast, ast_node_t *list) {
   list_for(v, ast_node_t, list) {
     v->next = NULL;
@@ -187,7 +187,7 @@ void append_variables(ast_t *ast, ast_node_t *list) {
               v->val.v->name);
       ast_node_t_delete(v);
     } else {
-      append(ast_node_t, &ast->current_scope->items, v);
+      list_append(ast_node_t, &ast->current_scope->items, v);
       v->val.v->scope = ast->current_scope;
     }
   }
@@ -322,7 +322,7 @@ ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
     fn = ast_node_t_new(loc, AST_NODE_FUNCTION, name);
     fn->val.f->params = params;
     fn->val.f->out_type = type;
-    append(ast_node_t, &ast->functions, fn);
+    list_append(ast_node_t, &ast->functions, fn);
   }
 
   return fn;

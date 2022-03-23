@@ -177,7 +177,7 @@ inferred_type_t *inferred_type_copy(inferred_type_t *t) {
   if (t->compound) {
     res->compound = 1;
     list_for(ti, inferred_type_item_t, t->list) {
-      append(inferred_type_item_t, &res->list,
+      list_append(inferred_type_item_t, &res->list,
              inferred_type_item_t_new(inferred_type_copy(ti->type)));
     }
     list_for_end;
@@ -204,7 +204,7 @@ inferred_type_t *inferred_type_append(inferred_type_t *dst,
     src->list = inferred_type_item_t_new(t);
   }
 
-  append(inferred_type_item_t, &(dst->list), src->list);
+  list_append(inferred_type_item_t, &(dst->list), src->list);
   free(src);
   return dst;
 }
