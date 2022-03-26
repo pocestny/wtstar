@@ -104,9 +104,20 @@ int db_add_breakpoint(virtual_machine_t *vm, ast_t *ast, char *fn) {
     return 1;
   }
 
-  uint32_t code_size = out->str.ptr - 1; // remove last instruction (ENDVM)
+  uint32_t code_size = out->str.ptr; // remove last instruction (ENDVM)
+  uint8_t *code = (uint8_t*)out->str.base;
+  if (!(
+    code[code_size-1] == ENDVM &&
+    code[code_size-2] == MEM_FREE &&
+    code[code_size-3] == POP
+  )) {
+    printf("%sno final expression%s\n", RED_BOLD, TERM_RESET);
+    return 1;
+  }
+
   printf("breakpoint code_size %d\n", code_size);
-  add_breakpoint(vm, bp_code_pos, (uint8_t*)out->str.base, code_size);
+  // code_size - 1 to remove ENDVM
+  add_breakpoint(vm, bp_code_pos, code, code_size - 1);
 
   writer_t_delete(out);
   return 0;
@@ -115,38 +126,42 @@ int db_add_breakpoint(virtual_machine_t *vm, ast_t *ast, char *fn) {
 
 
 
-void describe() {
+void describe(virtual_machine_t *cenv) {
   printf("loaded file:  %s%s%s\n", CYAN_BOLD, binary_file_name, TERM_RESET);
-  // virtual_machine_t *tmp = virtual_machine_t_new(binary_file, binary_length);
-  virtual_machine_t *tmp = env;
-  if (!tmp) {
+  int cenv_need_free = 0;
+  if (cenv == NULL) {
+    cenv = virtual_machine_t_new(binary_file, binary_length);
+    cenv_need_free = 1;
+  }
+  if (!cenv) {
     printf("%scorrupted file%s\n", RED_BOLD, TERM_RESET);
     input_needed = 0;
     return;
   }
-  if (tmp->debug_info) {
+  if (cenv->debug_info) {
     printf("source files: %s", CYAN_BOLD);
-    for (int i = 0; i < tmp->debug_info->n_files; i++)
-      printf("%s ", tmp->debug_info->files[i]);
+    for (int i = 0; i < cenv->debug_info->n_files; i++)
+      printf("%s ", cenv->debug_info->files[i]);
     printf("%s\n", TERM_RESET);
   }
-  printf("memory mode:  %s\n", mode_name(tmp->mem_mode));
+  printf("memory mode:  %s\n", mode_name(cenv->mem_mode));
   printf("%sinput variables%s\n", CYAN_BOLD, TERM_RESET);
-  print_io_vars(outw, tmp, tmp->n_in_vars, tmp->in_vars);
+  print_io_vars(outw, cenv, cenv->n_in_vars, cenv->in_vars);
   printf("%soutput variables%s\n", CYAN_BOLD, TERM_RESET);
-  print_io_vars(outw, tmp, tmp->n_out_vars, tmp->out_vars);
+  print_io_vars(outw, cenv, cenv->n_out_vars, cenv->out_vars);
   printf("--\n");
   printf("CODE\n");
-  print_code(outw, tmp->code, tmp->code_size);
+  print_code(outw, cenv->code, cenv->code_size);
   printf("HEADER\n");
-  dump_header(outw, tmp);
+  dump_header(outw, cenv);
   printf("TYPES\n");
-  print_types(outw, tmp);
+  print_types(outw, cenv);
   printf("DEBUG INFO\n");
-  dump_debug_info(outw, tmp);
+  dump_debug_info(outw, cenv);
   input_needed = 0;
-  if (tmp->n_in_vars > 0) input_needed = 1;
-  // virtual_machine_t_delete(tmp);
+  if (cenv->n_in_vars > 0) input_needed = 1;
+  if (cenv_need_free)
+    virtual_machine_t_delete(cenv);
 }
 
 void show_threads() {
@@ -218,7 +233,7 @@ void load_file() {
     virtual_machine_t_delete(env);
     env = NULL;
   }
-  describe();
+  describe(NULL);
 }
 
 void print_input() {
@@ -311,9 +326,9 @@ void run() {
     }
   }
 
-      describe();
+      describe(env);
       db_add_breakpoint(env, ast, "breakpoint.wt"); // TODO
-      describe();
+      describe(env);
 
   cont();
 }
@@ -607,7 +622,6 @@ void parse_args(int argc, char **argv) {
       }
     }
   }
-  load_file();
 }
 
 int parse_cmd(char **response) {
@@ -648,6 +662,7 @@ int parse_cmd(char **response) {
 
 int main(int argc, char **argv) {
   parse_args(argc, argv);
+  load_file();
 
   register_error_handler(&error_handler);
   linenoiseSetCompletionCallback(completion);
@@ -693,7 +708,7 @@ int main(int argc, char **argv) {
         printf("%s\n", TERM_RESET);
         break;
       case 8:
-        describe();
+        describe(env);
         break;
       case 9:
         show_threads();

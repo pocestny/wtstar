@@ -450,16 +450,23 @@ int add_breakpoint(
   uint8_t *code,
   uint32_t code_size
 ) {
+  if (!(
+    code[code_size-1] == MEM_FREE &&
+    code[code_size-2] == POP
+  ))
+    return -1;
+
   uint32_t bp_id = 10000 + env->bps->full; // start from big to avoid collision
   uint32_t code_pos = env->code_size;
-  int new_size = env->code_size + code_size + 1;
+  int new_size = env->code_size + code_size;
 
   env->code = (uint8_t*) realloc(env->code, new_size);
   env->code[bp_pos] = BREAK;
   memcpy(env->code + code_pos, code, code_size);
-  env->code[new_size - 1] = BREAKOUT;
+  // replace POP with BREAKOUT to remember result
+  env->code[new_size - 2] = BREAKOUT;
 
-  breakpoint_t *bp = breakpoint_t_new(bp_id, bp_pos, code_pos, code_size + 1);
+  breakpoint_t *bp = breakpoint_t_new(bp_id, bp_pos, code_pos, code_size);
   hash_put(env->bps, bp_pos, bp);
   env->code_size = new_size;
 
@@ -636,8 +643,6 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
       if (env->a_thr > 0) {
         env->W++;
         env->T++;
-      }
-      if (env->a_thr > 0) {
         stack_t *nonzero = stack_t_new();
         stack_t *zero = stack_t_new();
         for (int t = 0; t < env->n_thr; t++)
@@ -773,6 +778,14 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
     } break;
     case BREAKOUT: {
       printf("BREAKOUT\n");
+      for (int t = 0; t < env->n_thr; t++) {
+        if (env->thr[t]->returned)
+          continue;
+        uint32_t f;
+        _POP(f, 4); // take result from stack
+        instruction(env, 0); // execute final MEM_FREE
+        _PUSH(f, 4); // push result back on stack
+      }
       return -10;
     } break;
 
@@ -1555,7 +1568,7 @@ int scan_array(reader_t *r, writer_t *w, input_layout_item_t *var, int *sizes,
 
 int read_input(reader_t *r, virtual_machine_t *env) {
   thread_t *tt = STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0];
-
+  printf("reader %s\n", r->str.base);
   for (int i = 0; i < env->n_in_vars; i++) {
     input_layout_item_t *var = &(env->in_vars[i]);
     int elem_size = count_size(var);
