@@ -668,12 +668,13 @@ int main(int argc, char **argv) {
 
   printf("type %shelp%s for the list of commands\n", WHITE_BOLD, TERM_RESET);
 
-  while (1) {
+  int running = 1;
+  while (running) {
     char *response;
     int cmd = parse_cmd(&response);
     switch (cmd) {
       case 0:
-        exit(0);
+        running = 0;
         break;
       case 1:
         // set input string
@@ -727,7 +728,8 @@ int main(int argc, char **argv) {
     }
     free(response);
   }
-
+  
+  virtual_machine_t_delete(env);
   driver_destroy(ip);
   ast_t_delete(ast);
 }

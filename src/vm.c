@@ -299,7 +299,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
     }
   }
 
-  r->bps = hash_table_t_new(32, breakpoint_t_delete); // TODO!!
+  r->bps = hash_table_t_new(32, (void (*)(void *))&breakpoint_t_delete);
 
   return r;
 }
