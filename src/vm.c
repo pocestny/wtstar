@@ -450,21 +450,24 @@ int add_breakpoint(
   uint8_t *code,
   uint32_t code_size
 ) {
+  if (code[code_size - 1] == ENDVM)
+    code_size--;
   if (!(
-    code[code_size-1] == MEM_FREE &&
-    code[code_size-2] == POP
+    code[code_size - 1] == MEM_FREE &&
+    code[code_size - 2] != MEM_FREE
   ))
     return -1;
 
   uint32_t bp_id = 10000 + env->bps->full; // start from big to avoid collision
   uint32_t code_pos = env->code_size;
-  int new_size = env->code_size + code_size;
+  int new_size = env->code_size + code_size + 1;
 
   env->code = (uint8_t*) realloc(env->code, new_size);
   env->code[bp_pos] = BREAK;
   memcpy(env->code + code_pos, code, code_size);
-  // replace POP with BREAKOUT to remember result
+  // replace MEM_FREE with BREAKOUT to remember result
   env->code[new_size - 2] = BREAKOUT;
+  env->code[new_size - 1] = MEM_FREE;
 
   breakpoint_t *bp = breakpoint_t_new(bp_id, bp_pos, code_pos, code_size);
   hash_put(env->bps, bp_pos, bp);
@@ -495,10 +498,11 @@ int execute_breakpoint_condition(
   if(!get_dynamic_bp_id(env, bp_pos))
     return -10;
   breakpoint_t *bp = hash_get(env->bps, bp_pos);
-  int pc = env->pc;
+  int pc = env->pc, stored_pc = env->stored_pc;
   env->pc = bp->code_pos;
   int resp = execute(env, -1, 0, 1);
   env->pc = pc;
+  env->stored_pc = stored_pc;
   return resp;
 }
 

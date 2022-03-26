@@ -106,18 +106,17 @@ int db_add_breakpoint(virtual_machine_t *vm, ast_t *ast, char *fn) {
 
   uint32_t code_size = out->str.ptr; // remove last instruction (ENDVM)
   uint8_t *code = (uint8_t*)out->str.base;
-  if (!(
-    code[code_size-1] == ENDVM &&
-    code[code_size-2] == MEM_FREE &&
-    code[code_size-3] == POP
+  if (!( // this is only a heuristic
+    code[code_size - 1] == ENDVM &&
+    code[code_size - 2] == MEM_FREE &&
+    code[code_size - 3] != MEM_FREE
   )) {
     printf("%sno final expression%s\n", RED_BOLD, TERM_RESET);
     return 1;
   }
 
   printf("breakpoint code_size %d\n", code_size);
-  // code_size - 1 to remove ENDVM
-  add_breakpoint(vm, bp_code_pos, code, code_size - 1);
+  add_breakpoint(vm, bp_code_pos, code, code_size);
 
   writer_t_delete(out);
   return 0;

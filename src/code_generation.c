@@ -1055,7 +1055,8 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
       break;
     // ................................
     case AST_NODE_EXPRESSION:
-      emit_code_expression(code, node, 0, 1);
+      // clear was changed to 0 so that code generates for breakpoints
+      emit_code_expression(code, node, 0, 0);
       break;
     // ................................
     case AST_NODE_STATEMENT:
