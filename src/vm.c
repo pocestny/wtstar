@@ -56,7 +56,7 @@ int ipow(int base, int exp) {
   int result = 1;
   while (exp) {
     if (exp & 1) result *= base;
-    exp /= 2;
+    exp >>= 1;
     base *= base;
   }
   return result;
@@ -1042,6 +1042,10 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
               int32_t a, b;
               _POP(a, 4);
               _POP(b, 4);
+              if (!b) {
+                throw("division by zero");
+                return -6;
+              }
               a /= b;
               _PUSH(a, 4);
             } break;
@@ -1050,6 +1054,10 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
               int32_t a, b;
               _POP(a, 4);
               _POP(b, 4);
+              if (!b) {
+                throw("modulo by zero");
+                return -6;
+              }
               a %= b;
               _PUSH(a, 4);
             } break;
@@ -1106,6 +1114,10 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
               float a, b;
               _POP(a, 4);
               _POP(b, 4);
+              if (!b) {
+                throw("division by zero");
+                return -6;
+              }
               a /= b;
               _PUSH(a, 4);
             } break;
