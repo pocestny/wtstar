@@ -299,7 +299,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
     }
   }
 
-  r->bps = hash_table_t_new(32, breakpoint_t_delete); // TODO
+  r->bps = hash_table_t_new(32, breakpoint_t_delete); // TODO!!
 
   return r;
 }
@@ -494,13 +494,12 @@ int execute_breakpoint_condition(
   uint32_t bp_pos,
   int thr_id
 ) {
-  printf("execute_breakpoint_condition %d %d\n", bp_pos, thr_id);
   if(!get_dynamic_bp_id(env, bp_pos))
     return -10;
   breakpoint_t *bp = hash_get(env->bps, bp_pos);
   int pc = env->pc, stored_pc = env->stored_pc;
   env->pc = bp->code_pos;
-  int resp = execute(env, -1, 0, 1);
+  int resp = execute(env, -1, 0, 0); // TODO stop_on_bp set to 1
   env->pc = pc;
   env->stored_pc = stored_pc;
   return resp;
@@ -540,7 +539,7 @@ int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp) {
           printf(" %d", lval(&env->code[env->pc + 1], uint8_t));
           break;
         case ENDVM:
-          printf("ENDVM\n"); // TODO printf
+          printf("ENDVM\n");
           printf("\n\n");
           break;
       }
@@ -581,7 +580,6 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
   env->state = VM_RUNNING;
   for (int t = 0; t < env->n_thr; t++) env->thr[t]->bp_hit = 0;
   uint8_t opcode = lval(env->code + env->pc, uint8_t);
-  printf("___pc___ %d %d %s\n", ___pc___, env->n_thr, instr_names[opcode]); // TODO printf
   if (opcode == ENDVM) {
     env->state = VM_OK;
     return -1;
@@ -757,17 +755,15 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         bp_id = lval(env->code + env->pc, uint32_t);
         env->pc += 4;
       }
-      printf("BREAK %d %d %d\n", bp_id, stop_on_bp, env->n_thr);
       if(!stop_on_bp)
         break;
       int hits = 0;
       for (int t = 0; t < env->n_thr; t++) {
         if (env->thr[t]->returned)
           continue;
-        printf("here %d\n", t);
         int resp = execute_breakpoint_condition(env, bp_pos, t);
         if(resp != -10)
-          return resp; // TODO! what if I hit another breakpoint? =dead
+          return resp;
         uint32_t f;
         _POP(f, 4);
         if (f) {
@@ -781,7 +777,6 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         return bp_id;
     } break;
     case BREAKOUT: {
-      printf("BREAKOUT\n");
       for (int t = 0; t < env->n_thr; t++) {
         if (env->thr[t]->returned)
           continue;

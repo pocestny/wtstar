@@ -1443,23 +1443,8 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
   return 0;
 }
 
-// TODO don't recompute all memory
 int emit_code_scope_section(ast_t *_ast, scope_t *scope, writer_t *out) {
   ast = _ast;
-
-  // global variables have lowest addresses, even if they are defined
-  // late in the source
-  uint32_t base = 0;
-  DEBUG("root variables\n");
-  for (ast_node_t *p = ast->root_scope->items; p; p = p->next)
-    if (p->node_type == AST_NODE_VARIABLE)
-      base = assign_node_variable_addresses(base, p);
-
-  // assign addresses to variables in subscopes
-  DEBUG("root subscopes\n");
-  for (ast_node_t *p = ast->root_scope->items; p; p = p->next)
-    if (p->node_type != AST_NODE_VARIABLE)
-      base = assign_node_variable_addresses(base, p);
 
   // main part - generate the code block
   code_block_t *code = code_block_t_new();

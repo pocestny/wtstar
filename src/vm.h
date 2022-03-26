@@ -174,7 +174,8 @@ int add_breakpoint(
 void remove_breakpoint(virtual_machine_t *env, uint32_t bp_pos);
 
 /**
- * TODO make description
+ * Return breakpoint id associated with dynamically inserted BREAK instruction
+ * numbered bp_pos or 0 if given instruction is not dynamically inserted BREAK
  */
 int get_dynamic_bp_id(virtual_machine_t *env, uint32_t bp_pos);
 
