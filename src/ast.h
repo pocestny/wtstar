@@ -472,7 +472,13 @@ typedef struct {
   static_type_t *current_type;  //!< used while parsing
   int error_occured;            //!< flag if parsing was correct
   int mem_mode;                 //!< last issued token for memory mode
+  ast_node_t 
+    *__type__int, *__type__float, //!< builtin types
+    *__type__void, *__type__char;
+  int __ast_node_t_id__; //!< each node created in the constructor gets a unique id
 } ast_t;
+
+extern ast_t *GLOBAL_ast;
 
 //! allocates the ast_t structure and returns pointer
 CONSTRUCTOR(ast_t);

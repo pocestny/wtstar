@@ -775,7 +775,7 @@ expr_literal:
     INT_LITERAL
       {
         $$=ast_node_t_new(&@$, AST_NODE_EXPRESSION, EXPR_LITERAL);
-        $$->val.e->type->type = __type__int->val.t;
+        $$->val.e->type->type = ast->__type__int->val.t;
         $$->val.e->val.l = malloc(sizeof(int));
         *((int *)($$->val.e->val.l)) = $1;
       }
@@ -783,7 +783,7 @@ expr_literal:
     FLOAT_LITERAL 
       {
         $$=ast_node_t_new(&@$, AST_NODE_EXPRESSION, EXPR_LITERAL);
-        $$->val.e->type->type = __type__float->val.t;
+        $$->val.e->type->type = ast->__type__float->val.t;
         $$->val.e->val.l = malloc(sizeof(float));
         *((float *)($$->val.e->val.l)) = $1;
       }
@@ -791,7 +791,7 @@ expr_literal:
     CHAR_LITERAL 
       {
         $$=ast_node_t_new(&@$, AST_NODE_EXPRESSION, EXPR_LITERAL);
-        $$->val.e->type->type = __type__char->val.t;
+        $$->val.e->type->type = ast->__type__char->val.t;
         $$->val.e->val.l = malloc(1);
         *((char *)($$->val.e->val.l)) = $1;
       }
@@ -809,7 +809,7 @@ initializer_list
                     for(int i=strlen($1)-1;i>=0;--i) {
                         ast_node_t *tmp =
                               ast_node_t_new(NULL, AST_NODE_EXPRESSION, EXPR_LITERAL);
-                        tmp->val.e->type->type = __type__char->val.t;
+                        tmp->val.e->type->type = ast->__type__char->val.t;
                         tmp->val.e->val.l = malloc(1);
                         *(char *)(tmp->val.e->val.l) = $1[i];
                         tmp->next=$$->val.e->val.i;
@@ -817,7 +817,7 @@ initializer_list
 
                         ALLOC_VAR(t,inferred_type_t);
                         t->compound=0;
-                        t->type=__type__char->val.t;
+                        t->type=ast->__type__char->val.t;
 
                         inferred_type_item_t *tt= inferred_type_item_t_new(t);
                         tt->next=$$->val.e->type->list;
@@ -972,7 +972,7 @@ stmt_iter
               ast->current_scope=$<ast_node_val>$->val.sc;
 
               ast_node_t *v = init_variable(ast,&@3,$3);
-              v->val.v->base_type=__type__int->val.t;
+              v->val.v->base_type=ast->__type__int->val.t;
               append_variables(ast,v);
               $3=NULL;
             } 
@@ -1025,7 +1025,7 @@ stmt_jump
           BREAKPOINT {
             ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_BREAKPOINT);
             n->val.s->tag=$1;
-            n->val.s->par[0]=expression_int_val(1);
+            n->val.s->par[0]=expression_int_val(ast, 1);
             list_append(ast_node_t,&ast->current_scope->items,n);
           }
           |

@@ -144,6 +144,7 @@ ast_t *driver_parse_from(
   const char *filename
 ) {
   ast_t *ast = from; // TODO create copy
+  GLOBAL_ast = ast;
   //TODO! extra lineno = 1
   yyextra_t extra;
   extra.ip = _ip;

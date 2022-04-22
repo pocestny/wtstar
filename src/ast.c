@@ -5,15 +5,11 @@
 #include <ast.h>
 #include <code.h>
 
-// each node created in the constructor gets a unique id
-static int __ast_node_t_id__ = 0;
+ast_t *GLOBAL_ast; // TODO global variable
 
 /* ----------------------------------------------------------------------------
  * static types
  */
-
-extern ast_node_t *__type__int;
-extern ast_node_t *__type__void;
 
 CONSTRUCTOR(static_type_t, char *name) {
   ALLOC_VAR(r, static_type_t);
@@ -134,7 +130,7 @@ DESTRUCTOR(function_t) {
 CONSTRUCTOR(inferred_type_t) {
   ALLOC_VAR(r, inferred_type_t);
   r->compound = 0;
-  r->type = __type__void->val.t;
+  r->type = GLOBAL_ast->__type__void->val.t;
   return r;
 }
 
@@ -503,10 +499,10 @@ int expr_int(expression_t *e) {
   if (e->type->compound) {
     if (e->type->list == NULL || e->type->list->next != NULL) return 0;
     if (e->type->list->type->compound) return 0;
-    if (static_type_equal(e->type->list->type->type, __type__int->val.t)) return 1;
+    if (static_type_equal(e->type->list->type->type, GLOBAL_ast->__type__int->val.t)) return 1;
     return 0;
   } else {
-    if (static_type_equal(e->type->type, __type__int->val.t)) return 1;
+    if (static_type_equal(e->type->type, GLOBAL_ast->__type__int->val.t)) return 1;
     return 0;
   }
 }
@@ -534,7 +530,7 @@ DESTRUCTOR(statement_t) {
 
 CONSTRUCTOR(ast_node_t, YYLTYPE *iloc, int node_type, ...) {
   ALLOC_VAR(r, ast_node_t)
-  r->id = __ast_node_t_id__++;
+  r->id = GLOBAL_ast->__ast_node_t_id__++;
   r->code_from = r->code_to = -1;
   r->next = NULL;
   r->emitted = 0;
@@ -686,6 +682,11 @@ CONSTRUCTOR(ast_t) {
   r->root_scope = scope_t_new();
   r->current_scope = r->root_scope;
   r->error_occured = 0;
+  r->__type__int = NULL;
+  r->__type__float = NULL;
+  r->__type__void = NULL;
+  r->__type__char = NULL;
+  r->__ast_node_t_id__ = 0;
   return r;
 }
 

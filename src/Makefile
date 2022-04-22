@@ -35,10 +35,10 @@ WTC_DEPS=${WTC_SRC} ${WTC_HDRS} parser_utils.c
 
 ##################################################################
 ########  build wtrun
-WTR_SRC = wtrun.c vm.c instr_names.c reader.c writer.c  \
+WTR_SRC = ast.c wtrun.c vm.c instr_names.c reader.c writer.c  \
 					errors.c hash.c debug.c
 
-WTR_HDRS= code.h vm.h reader.h writer.h  errors.h hash.h debug.h
+WTR_HDRS= ast.h code.h vm.h reader.h writer.h  errors.h hash.h debug.h
 
 WTR_DEPS=${WTR_SRC} ${WTR_HDRS} 
 
@@ -58,10 +58,10 @@ WTDB_DEPS=${WTDB_SRC} ${WTDB_HDRS} ${WTC_DEPS}
 
 ##################################################################
 ########  build wtdump
-WTDUMP_SRC = wtdump.c instr_names.c reader.c writer.c  \
+WTDUMP_SRC = ast.c wtdump.c instr_names.c reader.c writer.c  \
 						 errors.c hash.c debug.c vm.c
 
-WTDUMP_HDRS= code.h reader.h writer.h  vm.h errors.h hash.h \
+WTDUMP_HDRS= ast.h code.h reader.h writer.h  vm.h errors.h hash.h \
 						 debug.h
 
 WTDUMP_DEPS=${WTDUMP_SRC} ${WTDUMP_HDRS} 
@@ -72,7 +72,6 @@ wtc: ${BUILD_DIR}/cli_tools/wtc
 wtrun: ${BUILD_DIR}/cli_tools/wtrun
 wtdb: ${BUILD_DIR}/cli_tools/wtdb
 wtdump: ${BUILD_DIR}/cli_tools/wtdump
-all: wtc wtrun wtdb wtdump
 
 ${BUILD_DIR}/cli_tools/wtc: ${WTC_DEPS}
 	mkdir -p ${BUILD_DIR}/cli_tools

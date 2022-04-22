@@ -16,9 +16,6 @@
 #define DEBUG(...) printf(__VA_ARGS__)
 #endif
 
-extern ast_node_t *__type__int;  // from parser_utils.c
-
-static ast_t *ast;
 static int was_error = 0;
 static void emit_code_scope(code_block_t *code, scope_t *sc);
 
@@ -1069,7 +1066,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           ast_node_t *C = B->next;
           ast_node_t *D = C->next;
           if (B->val.e->type->compound ||
-              !static_type_equal(B->val.e->type->type, __type__int->val.t)) {
+              !static_type_equal(B->val.e->type->type, GLOBAL_ast->__type__int->val.t)) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
@@ -1086,7 +1083,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           int ret = code->pos;
           if (node->val.s->par[0]->val.e->type->compound ||
-              !static_type_equal(node->val.s->par[0]->val.e->type->type, __type__int->val.t)) {
+              !static_type_equal(node->val.s->par[0]->val.e->type->type, GLOBAL_ast->__type__int->val.t)) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
@@ -1100,7 +1097,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           int ret = code->pos;
           if (node->val.s->par[0]->val.e->type->compound ||
-              !static_type_equal(node->val.s->par[0]->val.e->type->type, __type__int->val.t)) {
+              !static_type_equal(node->val.s->par[0]->val.e->type->type, GLOBAL_ast->__type__int->val.t)) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
@@ -1113,7 +1110,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
         case STMT_PARDO: {
           if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           if (node->val.s->par[1]->val.e->type->compound ||
-              !static_type_equal(node->val.s->par[1]->val.e->type->type, __type__int->val.t)) {
+              !static_type_equal(node->val.s->par[1]->val.e->type->type, GLOBAL_ast->__type__int->val.t)) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
@@ -1126,7 +1123,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
         case STMT_COND: {
           if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           if (node->val.s->par[0]->val.e->type->compound ||
-              !static_type_equal(node->val.s->par[0]->val.e->type->type, __type__int->val.t)) {
+              !static_type_equal(node->val.s->par[0]->val.e->type->type, GLOBAL_ast->__type__int->val.t)) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
@@ -1169,7 +1166,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
         } break;
         case STMT_BREAKPOINT: {
           expression_t *ex = node->val.s->par[0]->val.e;
-          if (ex->type->compound || !static_type_equal(ex->type->type, __type__int->val.t)) {
+          if (ex->type->compound || !static_type_equal(ex->type->type, GLOBAL_ast->__type__int->val.t)) {
             error(&(node->loc),
                   "breakpoint condition must be of integral type");
             return;
@@ -1272,10 +1269,10 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
  */
 static void write_io_variables(writer_t *out, int flag) {
   int n = 0;
-  for (ast_node_t *x = ast->root_scope->items; x; x = x->next)
+  for (ast_node_t *x = GLOBAL_ast->root_scope->items; x; x = x->next)
     if (x->node_type == AST_NODE_VARIABLE && x->val.v->io_flag == flag) n++;
   out_raw(out, &n, 4);
-  for (ast_node_t *x = ast->root_scope->items; x; x = x->next)
+  for (ast_node_t *x = GLOBAL_ast->root_scope->items; x; x = x->next)
     if (x->node_type == AST_NODE_VARIABLE && x->val.v->io_flag == flag) {
       out_raw(out, &(x->val.v->addr), 4);
       out_raw(out, &(x->val.v->num_dim), 4);
@@ -1293,11 +1290,11 @@ static void write_io_variables(writer_t *out, int flag) {
  * main entry
  */
 int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
-  ast = _ast;
+  GLOBAL_ast = _ast;
 
   // just for debugging: write all types
   DEBUG("types\n");
-  for (ast_node_t *t = ast->types; t; t = t->next) {
+  for (ast_node_t *t = GLOBAL_ast->types; t; t = t->next) {
     static_type_t *type = t->val.t;
     DEBUG("%s (size %d) = [ ", type->name, type->size);
     for (static_type_member_t *m = type->members; m; m = m->next) {
@@ -1312,7 +1309,7 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
     // assign addresses to variables within in the function
     // (parameters are located on the lowest addresses)
     int n = 0;
-    for (ast_node_t *fn = ast->functions; fn; fn = fn->next) {
+    for (ast_node_t *fn = GLOBAL_ast->functions; fn; fn = fn->next) {
       assert(fn->node_type == AST_NODE_FUNCTION);
       if (!fn->val.f->root_scope) {
         DEBUG("function %s without scope\n", fn->val.f->name);
@@ -1333,23 +1330,23 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
   // late in the source
   uint32_t base = 0;
   DEBUG("root variables\n");
-  for (ast_node_t *p = ast->root_scope->items; p; p = p->next)
+  for (ast_node_t *p = GLOBAL_ast->root_scope->items; p; p = p->next)
     if (p->node_type == AST_NODE_VARIABLE)
       base = assign_node_variable_addresses(base, p);
 
   // assign addresses to variables in subscopes
   DEBUG("root subscopes\n");
-  for (ast_node_t *p = ast->root_scope->items; p; p = p->next)
+  for (ast_node_t *p = GLOBAL_ast->root_scope->items; p; p = p->next)
     if (p->node_type != AST_NODE_VARIABLE)
       base = assign_node_variable_addresses(base, p);
 
   // main part - generate the code block
   code_block_t *code = code_block_t_new();
-  emit_code_scope(code, ast->root_scope);
+  emit_code_scope(code, GLOBAL_ast->root_scope);
   add_instr(code, ENDVM, 0);
 
   // add code for functions at the end
-  for (ast_node_t *fn = ast->functions; fn; fn = fn->next)
+  for (ast_node_t *fn = GLOBAL_ast->functions; fn; fn = fn->next)
     if (fn->val.f->root_scope) {
       fn->val.f->addr = code->pos;
       emit_code_function(code, fn);
@@ -1357,7 +1354,7 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
 
   // compute the size of the memory used by global variables
   uint32_t global_size = 0;
-  for (ast_node_t *nd = ast->root_scope->items; nd; nd = nd->next)
+  for (ast_node_t *nd = GLOBAL_ast->root_scope->items; nd; nd = nd->next)
     if (nd->node_type == AST_NODE_VARIABLE) {
       variable_t *var = nd->val.v;
       uint32_t sz = var->addr;
@@ -1384,7 +1381,7 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
       out_raw(out, &version, 1);
       out_raw(out, &global_size, 4);
       uint8_t mm;
-      switch (ast->mem_mode) {
+      switch (GLOBAL_ast->mem_mode) {
         case TOK_MODE_EREW:
           mm = MEM_MODE_EREW;
           break;
@@ -1413,10 +1410,10 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
       section = SECTION_FNMAP;
       out_raw(out, &section, 1);
       uint32_t n = 0;
-      for (ast_node_t *fn = ast->functions; fn; fn = fn->next)
+      for (ast_node_t *fn = GLOBAL_ast->functions; fn; fn = fn->next)
         if (fn->val.f->root_scope) n++;
       out_raw(out, &n, 4);
-      for (ast_node_t *fn = ast->functions; fn; fn = fn->next)
+      for (ast_node_t *fn = GLOBAL_ast->functions; fn; fn = fn->next)
         if (fn->val.f->root_scope) {
           out_raw(out, &(fn->val.f->addr), 4);
           int32_t out_size = fn->val.f->out_type->size;
@@ -1430,7 +1427,7 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
     }
 
     // emit the debug information from debug.h
-    if (!no_debug) emit_debug_section(out, ast, code->pos + 1);
+    if (!no_debug) emit_debug_section(out, GLOBAL_ast, code->pos + 1);
 
     {
       section = SECTION_CODE;
@@ -1444,7 +1441,7 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
 }
 
 int emit_code_scope_section(ast_t *_ast, scope_t *scope, writer_t *out) {
-  ast = _ast;
+  GLOBAL_ast = _ast;
 
   // main part - generate the code block
   code_block_t *code = code_block_t_new();
