@@ -173,6 +173,9 @@ int add_breakpoint(
 //! remove runtime breakpoint
 void remove_breakpoint(virtual_machine_t *env, uint32_t bp_pos);
 
+//! enable/disable runtime breakpoint
+void enable_breakpoint(virtual_machine_t *env, uint32_t bp_pos, int enable);
+
 /**
  * Return breakpoint id associated with dynamically inserted BREAK instruction
  * numbered bp_pos or 0 if given instruction is not dynamically inserted BREAK
