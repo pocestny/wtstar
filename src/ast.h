@@ -52,6 +52,9 @@ DESTRUCTOR(static_type_t);
 //! (for non-basic type assert fails)
 int static_type_basic(static_type_t *t);
 
+//! return boolean of equality
+int static_type_equal(static_type_t *t1, static_type_t *t2);
+
 /**
  * @brief list of members of a static_type_t
  *

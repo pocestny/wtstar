@@ -433,7 +433,7 @@ static void emit_variable(writer_t *out, ast_t *ast, int j) {
           strlen(variables[j]->val.v->name) + 1);
   uint32_t type;
   for (ast_node_t *t = ast->types; t; t = t->next)
-    if (t->val.t == variables[j]->val.v->base_type) {
+    if (static_type_equal(t->val.t, variables[j]->val.v->base_type)) {
       type = t->val.t->id;
       break;
     }

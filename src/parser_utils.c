@@ -293,7 +293,7 @@ ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
       yyerror(nameloc, ast, "redefinition of function %s", name);
       __define_function_abort__
     }
-    if (f->out_type != type) {
+    if (!static_type_equal(f->out_type, type)) {
       yyerror(loc, ast, "type mismatch in function definition");
       __define_function_abort__
     }
@@ -311,7 +311,7 @@ ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
                 x->val.v->name, y->val.v->name);
         __define_function_abort__
       }
-      if (x->val.v->base_type != y->val.v->base_type) {
+      if (!static_type_equal(x->val.v->base_type, y->val.v->base_type)) {
         yyerror(&y->loc, ast, "parameter type mismatch");
         __define_function_abort__
       }
@@ -491,7 +491,7 @@ ast_node_t *expression_sort(ast_t *ast, YYLTYPE *loc, char *name,
 
   while (p->val.e->variant == EXPR_SPECIFIER) p = p->val.e->val.s->ex;
   if (p->val.e->type->compound ||
-      var->val.v->base_type != p->val.e->type->type) {
+      !static_type_equal(var->val.v->base_type, p->val.e->type->type)) {
     yyerror(loc, ast, "type mismatch");
     free(name);
     ast_node_t_delete(params);
@@ -536,15 +536,15 @@ int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node) {
       if (binexpr->first->val.e->type->compound)
         fi = ff = 0;
       else {
-        if (binexpr->first->val.e->type->type != __type__int->val.t) fi = 0;
-        if (binexpr->first->val.e->type->type != __type__float->val.t) ff = 0;
+        if (!static_type_equal(binexpr->first->val.e->type->type, __type__int->val.t)) fi = 0;
+        if (!static_type_equal(binexpr->first->val.e->type->type, __type__float->val.t)) ff = 0;
       }
 
       if (binexpr->second->val.e->type->compound)
         si = sf = 0;
       else {
-        if (binexpr->second->val.e->type->type != __type__int->val.t) si = 0;
-        if (binexpr->second->val.e->type->type != __type__float->val.t) sf = 0;
+        if (!static_type_equal(binexpr->second->val.e->type->type, __type__int->val.t)) si = 0;
+        if (!static_type_equal(binexpr->second->val.e->type->type, __type__float->val.t)) sf = 0;
       }
 
       if (fi && si)

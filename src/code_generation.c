@@ -1069,7 +1069,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           ast_node_t *C = B->next;
           ast_node_t *D = C->next;
           if (B->val.e->type->compound ||
-              B->val.e->type->type != __type__int->val.t) {
+              !static_type_equal(B->val.e->type->type, __type__int->val.t)) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
@@ -1086,7 +1086,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           int ret = code->pos;
           if (node->val.s->par[0]->val.e->type->compound ||
-              node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
+              !static_type_equal(node->val.s->par[0]->val.e->type->type, __type__int->val.t)) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
@@ -1100,7 +1100,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           int ret = code->pos;
           if (node->val.s->par[0]->val.e->type->compound ||
-              node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
+              !static_type_equal(node->val.s->par[0]->val.e->type->type, __type__int->val.t)) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
@@ -1113,7 +1113,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
         case STMT_PARDO: {
           if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           if (node->val.s->par[1]->val.e->type->compound ||
-              node->val.s->par[1]->val.e->type->type != __type__int->val.t) {
+              !static_type_equal(node->val.s->par[1]->val.e->type->type, __type__int->val.t)) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
@@ -1126,7 +1126,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
         case STMT_COND: {
           if (!node->val.s->par[0] || !node->val.s->par[1]) return;
           if (node->val.s->par[0]->val.e->type->compound ||
-              node->val.s->par[0]->val.e->type->type != __type__int->val.t) {
+              !static_type_equal(node->val.s->par[0]->val.e->type->type, __type__int->val.t)) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
@@ -1169,7 +1169,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
         } break;
         case STMT_BREAKPOINT: {
           expression_t *ex = node->val.s->par[0]->val.e;
-          if (ex->type->compound || ex->type->type != __type__int->val.t) {
+          if (ex->type->compound || !static_type_equal(ex->type->type, __type__int->val.t)) {
             error(&(node->loc),
                   "breakpoint condition must be of integral type");
             return;

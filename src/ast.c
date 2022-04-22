@@ -58,6 +58,11 @@ static_type_member_t *static_type_member_find(static_type_member_t *list,
   return list;
 }
 
+
+int static_type_equal(static_type_t *t1, static_type_t *t2) {
+  return strcmp(t1->name, t2->name) == 0;
+}
+
 /* ----------------------------------------------------------------------------
  * variables
  */
@@ -218,7 +223,7 @@ int inferred_type_equal(inferred_type_t *a, inferred_type_t *b) {
     if (al || bl) return 0;
     return 1;
   } else
-    return a->type == b->type;
+    return static_type_equal(a->type, b->type);
 }
 
 int static_type_basic(static_type_t *t) {
@@ -498,10 +503,10 @@ int expr_int(expression_t *e) {
   if (e->type->compound) {
     if (e->type->list == NULL || e->type->list->next != NULL) return 0;
     if (e->type->list->type->compound) return 0;
-    if (e->type->list->type->type == __type__int->val.t) return 1;
+    if (static_type_equal(e->type->list->type->type, __type__int->val.t)) return 1;
     return 0;
   } else {
-    if (e->type->type == __type__int->val.t) return 1;
+    if (static_type_equal(e->type->type, __type__int->val.t)) return 1;
     return 0;
   }
 }
