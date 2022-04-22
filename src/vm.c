@@ -484,22 +484,24 @@ int add_breakpoint(
   return bp_id;
 }
 
-void remove_breakpoint(virtual_machine_t *env, uint32_t bp_pos) {
+int remove_breakpoint(virtual_machine_t *env, uint32_t bp_pos) {
   breakpoint_t *bp = hash_get(env->bps, bp_pos);
   if(bp == NULL)
-    return;
+    return -1;
   env->code[bp->bp_pos] = NOOP;
   // we do not remove entry from hash table to enable breakout
+  return 0;
 }
 
-void enable_breakpoint(virtual_machine_t *env, uint32_t bp_pos, int enable) {
+int enable_breakpoint(virtual_machine_t *env, uint32_t bp_pos, int enabled) {
   breakpoint_t *bp = hash_get(env->bps, bp_pos);
   if(bp == NULL)
-    return;
-  if (enable)
+    return -1;
+  if (enabled)
     env->code[bp->bp_pos] = BREAK;
   else
     env->code[bp->bp_pos] = NOOP;
+  return 0;
 }
 
 int get_dynamic_bp_id(virtual_machine_t *env, uint32_t bp_pos) {
