@@ -7,7 +7,11 @@ static error_t **log = NULL;  // internal error log
 static int n_err = 0,         // number of errors stored
     logsize = 0;              // allocated space
 
-static void (*error_handler)(error_t *) = NULL;  // registered error handler
+static void (*registered_error_handler)(error_t *, void *) = NULL;  // registered error handler
+
+void default_error_handler(error_t *err, void *data) {
+  fprintf(stderr, "%s\n", err->msg->str.base);
+}
 
 CONSTRUCTOR(error_t) {
   ALLOC_VAR(r, error_t);
@@ -35,11 +39,15 @@ void append_error_vmsg(error_t *err, int len, const char *format,
   out_vtext(err->msg, len, format, args);
 }
 
-void register_error_handler(void (*handler)(error_t *)) {
-  error_handler = handler;
+void register_error_handler(error_handler_t handler) {
+  registered_error_handler = handler;
 }
 
 void emit_error(error_t *err) {
+  emit_error_handle(err, NULL, NULL);
+}
+
+void emit_error_handle(error_t *err, error_handler_t error_handler, void *user_data) {
   if (n_err >= logsize) {
     if (logsize < 8)
       logsize = 8;
@@ -48,7 +56,9 @@ void emit_error(error_t *err) {
     log = (error_t **)realloc(log, logsize * sizeof(error_t *));
   }
   log[n_err++] = err;
-  if (error_handler) error_handler(err);
+  if (error_handler) error_handler(err, user_data);
+  else if (registered_error_handler) registered_error_handler(err, user_data);
+  // else default_error_handler(err, user_data);
 }
 
 void clear_errors() {

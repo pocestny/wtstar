@@ -22,7 +22,7 @@ static void driver_error_handler(const char *s, ...) {
   va_start(args, s);
   append_error_vmsg(err, n, s, args);
   va_end(args);
-  emit_error(err);
+  emit_error_handle(err, GLOBAL_ast->error_handler, GLOBAL_ast->error_handler_data);
 }
 
 //! structure to store included files
@@ -161,8 +161,10 @@ ast_t *driver_parse_from(
 }
 
 /* main parsing function */
-ast_t *driver_parse(include_project_t *_ip, const char *filename) {
+ast_t *driver_parse(include_project_t *_ip, const char *filename, error_handler_t error_handler, void *error_handler_data) {
   ast_t *ast = ast_t_new();
+  ast->error_handler = error_handler;
+  ast->error_handler_data = error_handler_data;
   return driver_parse_from(ast, _ip, filename);
 }
 

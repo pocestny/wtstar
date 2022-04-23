@@ -14,10 +14,6 @@
 #include <reader.h>
 #include <vm.h>
 
-void error_handler(error_t *err) {
-  fprintf(stderr, "%s\n", err->msg->str.base);
-}
-
 int trace_on = 0, print_io = 0, wt_stat = 1;
 char *inf;
 
@@ -51,7 +47,7 @@ int main(int argc, char **argv) {
   parse_options(argc, argv);
   if (!inf) print_help(argc, argv);
 
-  register_error_handler(&error_handler);
+  register_error_handler(&default_error_handler);
 
   FILE *f = fopen(inf, "rb");
   fseek(f, 0, SEEK_END);

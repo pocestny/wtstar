@@ -27,6 +27,9 @@ typedef struct {
   writer_t *msg;
 } error_t;
 
+//! Error handler used in errors.h Here just prints the error to stderr.
+void default_error_handler(error_t *err, void *data);
+
 //! Allocate an error_t struct and return the pointer.
 CONSTRUCTOR(error_t);
 
@@ -43,10 +46,13 @@ void append_error_msg(error_t *err, const char *format, ...);
  */
 void append_error_vmsg(error_t *err, int len, const char *format, va_list args);
 
+typedef void (*error_handler_t)(error_t *err, void *);
 //! Register a function called within #emit_error.
-void register_error_handler(void (*handler)(error_t *));
+void register_error_handler(void (*handler)(error_t *, void *));
 //! Insert error to the internal log, and call error_handler, if defined.
 void emit_error(error_t *err);
+//! Insert error to the internal log, and call provided error_handler.
+void emit_error_handle(error_t *err, error_handler_t, void *user_data);
 
 //! Clear the internal log.
 void clear_errors();

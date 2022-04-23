@@ -72,11 +72,6 @@ void parse_options(int argc, char **argv) {
       infs[ninfs++] = argv[i];
 }
 
-//! Error handler used in errors.h Here just prints the error to stderr.
-void error_handler(error_t *err) {
-  fprintf(stderr, "%s\n", err->msg->str.base);
-}
-
 /**
  * @brief Main entry.
  *
@@ -99,7 +94,6 @@ int main(int argc, char **argv) {
   for(int i = 0; i < ninfs; ++i)
     printf("infs[%d]=%s\n", i, infs[i]);
 
-  register_error_handler(&error_handler);
   //   yydebug=1;
 
   int num_was_error = 0;
@@ -115,7 +109,7 @@ int main(int argc, char **argv) {
     
     include_project_t *ip = include_project_t_new();
     driver_init(ip);
-    ast_t *r = driver_parse(ip, inf);
+    ast_t *r = driver_parse(ip, inf, default_error_handler, NULL);
 
     writer_t *out;
     out = writer_t_new(WRITER_FILE);
@@ -139,7 +133,7 @@ int main(int argc, char **argv) {
       was_error = 1;
       error_t *err = error_t_new();
       append_error_msg(err, "there were errors");
-      emit_error(err);
+      emit_error_handle(err, r->error_handler, r->error_handler_data);
     } else if (ast_debug)
       ast_debug_print(r, out);
     else {
@@ -153,7 +147,7 @@ int main(int argc, char **argv) {
         was_error = 1;
         error_t *err = error_t_new();
         append_error_msg(err, "there were errors");
-        emit_error(err);
+        emit_error_handle(err, r->error_handler, r->error_handler_data);
       }
     }
 

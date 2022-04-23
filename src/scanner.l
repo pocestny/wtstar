@@ -206,7 +206,7 @@ void yyerror(YYLTYPE *yylloc_param, ast_t *r,  const char  *s, ...) {
   va_start(args,s);
   append_error_vmsg(err,n,s,args);
   va_end(args);
-  emit_error(err);
+  emit_error_handle(err, r->error_handler, r->error_handler_data);
   r->error_occured=1;
 }
 

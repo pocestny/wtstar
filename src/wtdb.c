@@ -53,6 +53,10 @@ char* strapp(char *src, char *suff) {
   return strcat(src, suff);
 }
 
+void error_handler(error_t *err, void *data) {
+  fprintf(stderr, "%s%s%s\n", RED_BOLD,err->msg->str.base,TERM_RESET);
+}
+
 void ast_find_breakpoint(
   ast_node_t *curr_node, scope_t *curr_scope,
   ast_node_t **res_node, scope_t **res_scope
@@ -100,7 +104,7 @@ int db_add_breakpoint(virtual_machine_t *vm, ast_t *ast, char *fn) {
   if (resp) {
     error_t *err = error_t_new();
     append_error_msg(err, "there were errors");
-    emit_error(err);
+    emit_error_handle(err, ast->error_handler, ast->error_handler_data);
     return 1;
   }
 
@@ -471,10 +475,6 @@ void print_variable_in_thread(char *name) {
   if (it.elems) free(it.elems);
 }
 
-void error_handler(error_t *err) {
-  fprintf(stderr, "%s%s%s\n", RED_BOLD,err->msg->str.base,TERM_RESET);
-}
-
 void print_help(int argc, char **argv) {
   printf("usage: %s file\n", argv[0]);
   printf("options:\n");
@@ -606,7 +606,7 @@ void parse_args(int argc, char **argv) {
 
       ip = include_project_t_new();
       driver_init(ip);
-      ast = driver_parse(ip, source_file_name);
+      ast = driver_parse(ip, source_file_name, error_handler, NULL);
 
       out = writer_t_new(WRITER_FILE);
       out->f = fopen(binary_file_name, "wb");
@@ -616,7 +616,7 @@ void parse_args(int argc, char **argv) {
       if (resp) {
         error_t *err = error_t_new();
         append_error_msg(err, "there were errors");
-        emit_error(err);
+        emit_error_handle(err, ast->error_handler, ast->error_handler_data);
         exit(1);
       }
     }

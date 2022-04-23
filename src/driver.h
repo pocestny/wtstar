@@ -65,7 +65,7 @@ ast_t *driver_parse_from(
  * structure using #ast_t_delete
  *
  */
-ast_t *driver_parse(include_project_t *ip, const char *filename);
+ast_t *driver_parse(include_project_t *ip, const char *filename, error_handler_t error_handler, void *error_handler_data);
 
 /**
  * @brief Switch to a new file

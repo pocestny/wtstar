@@ -11,6 +11,7 @@
 
 #include <utils.h>
 #include <writer.h>
+#include <errors.h>
 
 struct _ast_node_t;
 struct _scope_t;
@@ -476,6 +477,9 @@ typedef struct {
     *__type__int, *__type__float, //!< builtin types
     *__type__void, *__type__char;
   int __ast_node_t_id__; //!< each node created in the constructor gets a unique id
+
+  error_handler_t error_handler;
+  void *error_handler_data;
 } ast_t;
 
 extern ast_t *GLOBAL_ast;

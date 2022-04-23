@@ -15,10 +15,6 @@
 #include <reader.h>
 #include <vm.h>
 
-void error_handler(error_t *err) {
-  fprintf(stderr, "%s\n", err->msg->str.base);
-}
-
 char *inf;
 int dump_code = 0, dump_debug = 0;
 
@@ -49,7 +45,7 @@ int main(int argc, char **argv) {
   parse_options(argc, argv);
   if (!inf) print_help(argc, argv);
 
-  register_error_handler(&error_handler);
+  register_error_handler(&default_error_handler);
 
   FILE *f = fopen(inf, "rb");
   fseek(f, 0, SEEK_END);

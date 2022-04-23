@@ -32,7 +32,7 @@ static void error(YYLTYPE *loc, const char *format, ...) {
   va_start(args, format);
   append_error_vmsg(err, n, format, args);
   va_end(args);
-  emit_error(err);
+  emit_error_handle(err, GLOBAL_ast->error_handler, GLOBAL_ast->error_handler_data);
 }
 
 /* ----------------------------------------------------------------------------
