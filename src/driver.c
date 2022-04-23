@@ -3,7 +3,7 @@
 #include <driver.h>
 #include <errors.h>
 #include <parser.h>
-#include <path.h>
+#include <cwalk.h>
 #include <scanner.h>
 
 /**
@@ -119,22 +119,17 @@ void driver_set_file(include_project_t *ip, const char *filename, const char *co
 //! use the \ref path_t from path.h to resolve `.` and `..`, and add relative
 //! path
 static char *normalize_filename(include_file_t *prefix, const char *f) {
-  path_t *p;
-  if (prefix)
-    p = path_t_new(NULL, prefix->name);
-  else
-    p = NULL;
-  if (p && p->last) {
-    path_item_t *it = p->last;
-    p->last = p->last->prev;
-    if (!p->last) p->first = NULL;
-    path_item_t_delete(it);
+  int has_prefix = prefix && prefix->name;
+  size_t len = (has_prefix ? strlen(prefix->name) : 0) + strlen(f) + 2;
+  char *p = (char*)malloc(len * sizeof(char));
+  p[0] = 0;
+  if (has_prefix) {
+    cwk_path_get_dirname(prefix->name, &len);
+    strncpy(p, prefix->name, len);
   }
-  path_t *np = path_t_new(p, f);
-  char *result = path_string(np);
-  path_t_delete(np);
-  path_t_delete(p);
-  return result;
+  cwk_path_join(p, f, p, -1);
+  cwk_path_normalize(p, p, -1);
+  return p;
 }
 
 // can start from existing ast and with set current scope

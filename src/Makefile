@@ -23,12 +23,12 @@ documentation:
 ##################################################################
 ########  build wtc
 WTC_SRC = ast.c parser.c scanner.c driver.c writer.c wtc.c \
-					ast_debug_print.c code_generation.c errors.c path.c \
+					ast_debug_print.c code_generation.c errors.c cwalk.c \
 					debug.c hash.c
 
 WTC_HDRS= ast.h parser.h scanner.h driver.h writer.h code.h\
 					utils.h ast_debug_print.h code_generation.h errors.h \
-					path.h debug.h hash.h
+					cwalk.h debug.h hash.h
 
 WTC_DEPS=${WTC_SRC} ${WTC_HDRS} parser_utils.c
 
@@ -47,12 +47,12 @@ WTR_DEPS=${WTR_SRC} ${WTR_HDRS}
 WTDB_SRC = wtdb.c vm.c instr_names.c reader.c writer.c  \
 					errors.c hash.c debug.c linenoise.c \
 					ast.c parser.c scanner.c driver.c \
-					ast_debug_print.c code_generation.c path.c
+					ast_debug_print.c code_generation.c cwalk.c
 
 WTDB_HDRS= code.h vm.h reader.h writer.h  errors.h hash.h debug.h \
 					 linenoise.h \
 					 ast.h parser.h scanner.h driver.h utils.h \
-					 ast_debug_print.h code_generation.h path.h
+					 ast_debug_print.h code_generation.h cwalk.h
 
 WTDB_DEPS=${WTDB_SRC} ${WTDB_HDRS} ${WTC_DEPS}
 
