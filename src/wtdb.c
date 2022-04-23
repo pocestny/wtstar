@@ -126,7 +126,7 @@ int db_add_breakpoint(virtual_machine_t *vm, ast_t *ast, char *fn) {
 
 
 void describe(virtual_machine_t *cenv) {
-  printf("loaded file:  %s%s%s\n", CYAN_BOLD, binary_file_name, TERM_RESET);
+  printf("%sloaded file:  %s%s\n", CYAN_BOLD, TERM_RESET, binary_file_name);
   int cenv_need_free = 0;
   if (cenv == NULL) {
     cenv = virtual_machine_t_new(binary_file, binary_length);
@@ -138,25 +138,25 @@ void describe(virtual_machine_t *cenv) {
     return;
   }
   if (cenv->debug_info) {
-    printf("source files: %s", CYAN_BOLD);
+    printf("%ssource files: %s", CYAN_BOLD, TERM_RESET);
     for (int i = 0; i < cenv->debug_info->n_files; i++)
       printf("%s ", cenv->debug_info->files[i]);
     printf("%s\n", TERM_RESET);
   }
-  printf("memory mode:  %s\n", mode_name(cenv->mem_mode));
+  printf("%smemory mode:  %s%s\n", CYAN_BOLD, TERM_RESET, mode_name(cenv->mem_mode));
   printf("%sinput variables%s\n", CYAN_BOLD, TERM_RESET);
   print_io_vars(outw, cenv, cenv->n_in_vars, cenv->in_vars);
   printf("%soutput variables%s\n", CYAN_BOLD, TERM_RESET);
   print_io_vars(outw, cenv, cenv->n_out_vars, cenv->out_vars);
-  printf("--\n");
-  printf("CODE\n");
-  print_code(outw, cenv->code, cenv->code_size);
-  printf("HEADER\n");
+  printf("-----\n");
+  printf("%sHEADER%s\n", CYAN_BOLD, TERM_RESET);
   dump_header(outw, cenv);
-  printf("TYPES\n");
-  print_types(outw, cenv);
-  printf("DEBUG INFO\n");
+  printf("%sDEBUG INFO%s\n", CYAN_BOLD, TERM_RESET);
   dump_debug_info(outw, cenv);
+  printf("-----\n");
+  printf("%sCODE%s\n", CYAN_BOLD, TERM_RESET);
+  print_code(outw, cenv->code, cenv->code_size);
+
   input_needed = 0;
   if (cenv->n_in_vars > 0) input_needed = 1;
   if (cenv_need_free)

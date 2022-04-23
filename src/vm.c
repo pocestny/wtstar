@@ -1366,8 +1366,8 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
 
 void print_types(writer_t *w, virtual_machine_t *env) {
   if (!env->debug_info) return;
-  if (env->debug_info->n_types <= 4) return;
-  out_text(w, "types:\n");
+  // if (env->debug_info->n_types <= 4) return;
+  out_text(w, "types [%d]:\n", env->debug_info->n_types);
   for (int i = 0; i < env->debug_info->n_types; i++) {
     int nm = env->debug_info->types[i].n_members;
     if (nm == 0) continue;  // don't write basic types (?)
@@ -1693,25 +1693,19 @@ void print_array(writer_t *w, virtual_machine_t *env, input_layout_item_t *var,
 }
 
 void write_output(writer_t *w, virtual_machine_t *env, int i) {
-  if (env->out_vars[i].num_dim > 0) {
-    // int elem_size = count_size(&(env->out_vars[i])); // TODO! why is this unused
-    uint8_t *global_mem =
-        STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0]->mem->data;
-    uint32_t base = lval(global_mem + env->out_vars[i].addr, uint32_t);
-
-    uint8_t nd = env->out_vars[i].num_dim;
+  input_layout_item_t *var = &env->out_vars[i];
+  uint8_t *global_mem =
+      STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0]->mem->data;
+  uint8_t *base = global_mem + var->addr;
+  if (var->num_dim > 0) {
+    uint8_t nd = var->num_dim;
     int *sizes = (int *)malloc(nd * sizeof(int));
     for (int j = 0; j < nd; j++)
-      sizes[j] =
-          lval(global_mem + env->out_vars[i].addr + 4 * (j + 2), uint32_t);
-    print_array(w, env, &(env->out_vars[i]), nd, sizes, base, 0, 0);
+      sizes[j] = lval(base + 4 * (j + 2), uint32_t);
+    print_array(w, env, var, nd, sizes, lval(base, uint32_t), 0, 0);
     free(sizes);
   } else
-    print_var(
-        w,
-        STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0]->mem->data +
-            env->out_vars[i].addr,
-        &(env->out_vars[i]));
+    print_var(w, base, var);
   out_text(w, "\n");
 }
 

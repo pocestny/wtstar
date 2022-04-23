@@ -237,7 +237,7 @@ int scan_array(reader_t *r, writer_t *w, input_layout_item_t *var, int *sizes,
 void print_io_vars(writer_t *w, virtual_machine_t *env, int n,
                    input_layout_item_t *vars);
 
-//! dump the  code
+//! dump the code
 void print_code(writer_t *w, uint8_t *code, int size);
 //! print a variable
 void print_var(writer_t *w, uint8_t *addr, input_layout_item_t *var);
