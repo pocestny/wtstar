@@ -527,9 +527,6 @@ int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node) {
       // only implicit type conversion is int->float
       int fi = 1, ff = 1, si = 1, sf = 1;
 
-      printf("compound %d %d\n",
-        binexpr->first->val.e->type->compound,
-        binexpr->second->val.e->type->compound);
       if (binexpr->first->val.e->type->compound)
         fi = ff = 0;
       else {
