@@ -145,7 +145,7 @@ void make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
   int role = ident_role(ast, ident, NULL);
 
   if (role != IDENT_FREE) {
-    yyerror(rloc, ast,
+    yyerror(rloc, ast, NULL,
             "name of the newly defined type '%s' already belongs to a %s",
             ident, role_name(role));
     static_type_member_t_delete(members);
@@ -165,7 +165,7 @@ void make_typedef(ast_t *ast, YYLTYPE *rloc, char *ident, YYLTYPE *iloc,
   list_for_end;
 
   if (err) {
-    yyerror(rloc, ast,
+    yyerror(rloc, ast, NULL,
             "name of a member is the same as the newly defined type '%s'",
             ident);
     ast_node_t_delete(nt);
@@ -188,7 +188,7 @@ void append_variables(ast_t *ast, ast_node_t *list) {
   list_for(v, ast_node_t, list) {
     v->next = NULL;
     if (ident_role(ast, v->val.v->name, NULL) & IDENT_LOCAL_VAR) {
-      yyerror(&v->loc, ast, "redefinition of local variable %s",
+      yyerror(&v->loc, ast, NULL, "redefinition of local variable %s",
               v->val.v->name);
       ast_node_t_delete(v);
     } else {
@@ -217,7 +217,7 @@ void init_array(ast_t *ast, ast_node_t *var, ast_node_t *exprlist) {
   }
 
   if (!exprlist) {
-    yyerror(&(var->loc), ast, "array '%s' must have at least one dimension",
+    yyerror(&(var->loc), ast, NULL, "array '%s' must have at least one dimension",
             var->val.v->name);
     return;
   }
@@ -226,7 +226,7 @@ void init_array(ast_t *ast, ast_node_t *var, ast_node_t *exprlist) {
   for (ast_node_t *e = exprlist; e; e = e->next, current_dim++)
     if (!expr_int(e->val.e)) {
       char *tname = inferred_type_name(e->val.e->type);
-      yyerror(&(e->loc), ast,
+      yyerror(&(e->loc), ast, NULL,
               "%d-th array dimesion must be integral expression, has type %s",
               current_dim, tname);
       free(tname);
@@ -244,7 +244,7 @@ void init_input_array(ast_t *ast, ast_node_t *var, int num_dim) {
   if (!var) return;
 
   if (num_dim < 1) {
-    yyerror(&(var->loc), ast,
+    yyerror(&(var->loc), ast, NULL,
             "input array '%s' must have at least one dimension",
             var->val.v->name);
     return;
@@ -259,12 +259,12 @@ void init_input_array(ast_t *ast, ast_node_t *var, int num_dim) {
 ast_node_t *init_variable(ast_t *ast, YYLTYPE *loc, char *vname) {
   int role = ident_role(ast, vname, NULL);
   if (role & IDENT_LOCAL_VAR) {
-    yyerror(loc, ast, "redefinition of variable %s", vname);
+    yyerror(loc, ast, NULL, "redefinition of variable %s", vname);
     free(vname);
     return NULL;
   }
   if (role & IDENT_FUNCTION) {
-    yyerror(loc, ast, "redefinition of %s as different kind of symbol", vname);
+    yyerror(loc, ast, NULL, "redefinition of %s as different kind of symbol", vname);
     free(vname);
     return NULL;
   }
@@ -287,11 +287,11 @@ ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
     // check parameters
     function_t *f = fn->val.f;
     if (f->root_scope) {
-      yyerror(nameloc, ast, "redefinition of function %s", name);
+      yyerror(nameloc, ast, NULL, "redefinition of function %s", name);
       __define_function_abort__
     }
     if (!static_type_equal(f->out_type, type)) {
-      yyerror(loc, ast, "type mismatch in function definition");
+      yyerror(loc, ast, NULL, "type mismatch in function definition");
       __define_function_abort__
     }
     if (length(f->params) != length(params)) {
@@ -303,24 +303,24 @@ ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
     }
     for (ast_node_t *x = params, *y = f->params; x; x = x->next, y = y->next) {
       if (strcmp(x->val.v->name, y->val.v->name)) {
-        yyerror(&x->loc, ast,
+        yyerror(&x->loc, ast, NULL,
                 "parameter name mismatch (%s was previously defined as %s)",
                 x->val.v->name, y->val.v->name);
         __define_function_abort__
       }
       if (!static_type_equal(x->val.v->base_type, y->val.v->base_type)) {
-        yyerror(&y->loc, ast, "parameter type mismatch");
+        yyerror(&y->loc, ast, NULL, "parameter type mismatch");
         __define_function_abort__
       }
       if (x->val.v->num_dim != y->val.v->num_dim) {
-        yyerror(&y->loc, ast, "parameter number of dimensions mismatch");
+        yyerror(&y->loc, ast, NULL, "parameter number of dimensions mismatch");
         __define_function_abort__
       }
     }
     ast_node_t_delete(params);
 
   } else if (role != IDENT_FREE) {
-    yyerror(nameloc, ast, "redefinition of %s as different kind of symbol",
+    yyerror(nameloc, ast, NULL, "redefinition of %s as different kind of symbol",
             name);
     __define_function_abort__
   } else {
@@ -337,7 +337,7 @@ ast_node_t *define_function(ast_t *ast, YYLTYPE *loc, static_type_t *type,
 ast_node_t *create_specifier_expr(YYLTYPE *loc, ast_t *ast, ast_node_t *expr,
                                   char *ident, YYLTYPE *iloc) {
   if (expr->val.e->type->compound) {
-    yyerror(loc, ast, "specifier of uncasted type");
+    yyerror(loc, ast, NULL, "specifier of uncasted type");
     free(ident);
     ast_node_t_delete(expr);
     return 0;
@@ -347,7 +347,7 @@ ast_node_t *create_specifier_expr(YYLTYPE *loc, ast_t *ast, ast_node_t *expr,
       static_type_member_find(expr->val.e->type->type->members, ident);
 
   if (!t) {
-    yyerror(loc, ast, "type %s does not have a member %s",
+    yyerror(loc, ast, NULL, "type %s does not have a member %s",
             expr->val.e->type->type->name, ident);
     free(ident);
     ast_node_t_delete(expr);
@@ -367,7 +367,7 @@ ast_node_t *expression_variable(ast_t *ast, YYLTYPE *loc, char *name) {
   ast_node_t *vn;
   int role = ident_role(ast, name, &vn);
   if (!(role & IDENT_VAR)) {
-    yyerror(loc, ast, "%s is not a variable", name);
+    yyerror(loc, ast, NULL, "%s is not a variable", name);
     free(name);
     return NULL;
   }
@@ -385,21 +385,21 @@ ast_node_t *expression_sizeof(ast_t *ast, YYLTYPE *loc, char *name,
   ast_node_t *vn;
   int role = ident_role(ast, name, &vn);
   if (!(role & IDENT_VAR)) {
-    yyerror(loc, ast, "%s is not a variable", name);
+    yyerror(loc, ast, NULL, "%s is not a variable", name);
     free(name);
     ast_node_t_delete(dim);
     return NULL;
   }
   variable_t *var = vn->val.v;
   if (var->num_dim == 0) {
-    yyerror(loc, ast, "%s is not an array", name);
+    yyerror(loc, ast, NULL, "%s is not an array", name);
     free(name);
     ast_node_t_delete(dim);
     return NULL;
   }
 
   if (dim && (!expr_int(dim->val.e))) {
-    yyerror(loc, ast, "non integral array dimension");
+    yyerror(loc, ast, NULL, "non integral array dimension");
     free(name);
     ast_node_t_delete(dim);
     return NULL;
@@ -418,13 +418,13 @@ ast_node_t *array_dimensions(ast_t *ast, YYLTYPE *loc, char *name) {
   ast_node_t *vn;
   int role = ident_role(ast, name, &vn);
   if (!(role & IDENT_VAR)) {
-    yyerror(loc, ast, "%s is not a variable", name);
+    yyerror(loc, ast, NULL, "%s is not a variable", name);
     free(name);
     return NULL;
   }
   variable_t *var = vn->val.v;
   if (var->num_dim == 0) {
-    yyerror(loc, ast, "%s is not an array", name);
+    yyerror(loc, ast, NULL, "%s is not an array", name);
     free(name);
     return NULL;
   }
@@ -447,7 +447,7 @@ ast_node_t *expression_call(ast_t *ast, YYLTYPE *loc, char *name,
   ast_node_t *fn;
   int role = ident_role(ast, name, &fn);
   if (!(role & IDENT_FUNCTION)) {
-    yyerror(loc, ast, "%s is not a function", name);
+    yyerror(loc, ast, NULL, "%s is not a function", name);
     free(name);
     ast_node_t_delete(params);
     return NULL;
@@ -471,13 +471,13 @@ ast_node_t *expression_sort(ast_t *ast, YYLTYPE *loc, char *name,
   ast_node_t *var;
   int role = ident_role(ast, name, &var);
   if (!(role & IDENT_VAR)) {
-    yyerror(loc, ast, "%s is not a variable", name);
+    yyerror(loc, ast, NULL, "%s is not a variable", name);
     free(name);
     ast_node_t_delete(params);
     return NULL;
   }
   if (var->val.v->num_dim != 1) {
-    yyerror(loc, ast,
+    yyerror(loc, ast, NULL,
             "only 1-dimensional arrays can be sorted; %s has %d dimensions",
             name, var->val.v->num_dim);
     free(name);
@@ -489,7 +489,7 @@ ast_node_t *expression_sort(ast_t *ast, YYLTYPE *loc, char *name,
   while (p->val.e->variant == EXPR_SPECIFIER) p = p->val.e->val.s->ex;
   if (p->val.e->type->compound ||
       !static_type_equal(var->val.v->base_type, p->val.e->type->type)) {
-    yyerror(loc, ast, "type mismatch");
+    yyerror(loc, ast, NULL, "type mismatch");
     free(name);
     ast_node_t_delete(params);
     return NULL;
@@ -552,7 +552,7 @@ int fix_expression_type(ast_t *ast, YYLTYPE *loc, ast_node_t *node) {
         } else
           e->type->type = ast->__type__float->val.t;
       } else {
-        yyerror(loc, ast, "type check error %d %d %d %d", fi, ff, si, sf);
+        yyerror(loc, ast, NULL, "type check error %d %d %d %d", fi, ff, si, sf);
         return 0;
       }
     }

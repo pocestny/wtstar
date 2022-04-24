@@ -174,7 +174,7 @@ sort/[^a-zA-Z0-9]    { return TOK_SORT; }
     if (!strcmp(symbols[i],yytext)) 
     return yytext[0];
 
-  yyerror(yylloc,ast,"lexical error, unexpected token %s",yytext);
+  yyerror(yylloc,ast,NULL,"lexical error, unexpected token %s",yytext);
 }
 
 
@@ -197,7 +197,7 @@ sort/[^a-zA-Z0-9]    { return TOK_SORT; }
 %%
 
 
-void yyerror(YYLTYPE *yylloc_param, ast_t *r,  const char  *s, ...) { 
+void yyerror(YYLTYPE *yylloc_param, ast_t *r, yyscan_t scanner,  const char  *s, ...) { 
   error_t *err = error_t_new();
   append_error_msg(err,"%s:%d:%d: ", yylloc_param->fn, yylloc_param->fl,  yylloc_param->fc);
   va_list args;

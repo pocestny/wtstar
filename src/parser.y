@@ -27,7 +27,7 @@
    #define YY_DECL \
        int yylex(YYSTYPE * yylval_param, YYLTYPE * yylloc_param, ast_t* ast, yyscan_t yyscanner)
    YY_DECL;
-  void yyerror (YYLTYPE *yylloc_param, ast_t *, char const *, ...);
+  void yyerror (YYLTYPE *yylloc_param, ast_t *, yyscan_t, char const *, ...);
   #include <parser_utils.c>
 
 }
@@ -200,7 +200,7 @@ typedef_ident_list:
         {
           $$=$1;
           if (static_type_member_find($1,$3)) {
-            yyerror(&@3,ast,"duplicate type member '%s' in type definition",$3);
+            yyerror(&@3,ast,scanner,"duplicate type member '%s' in type definition",$3);
           } else {
             static_type_member_t *nt = static_type_member_t_new($3,NULL);
             list_append(static_type_member_t,&$$,nt);
@@ -340,7 +340,7 @@ input_variable_declarator:
       }
     | 
     static_variable_declarator '[' error ']' {
-      yyerror(&@1,ast,"wrong list of placeholders");
+      yyerror(&@1,ast,scanner,"wrong list of placeholders");
       $$=$1;
     }
     ;
@@ -439,7 +439,7 @@ nonempty_parameter_declarator_list:
         $$=$1;
         if ($3) {
           if (ast_node_find($$,$3->val.v->name))
-            yyerror(&@3,ast,"redefinition of parameter");
+            yyerror(&@3,ast,scanner,"redefinition of parameter");
           else
             list_append(ast_node_t,&$$,$3);
         }
