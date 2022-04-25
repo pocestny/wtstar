@@ -1445,6 +1445,21 @@ void print_io_vars(writer_t *w, virtual_machine_t *env, int n,
   }
 }
 
+void print_root_vars(writer_t *w, virtual_machine_t *env) {
+  if (!env->debug_info) return;
+  for (int j = 0; j < env->debug_info->scopes[0].n_vars; j++) {
+    int addr = env->debug_info->scopes[0].vars[j].addr;
+    char c = ' ';
+    for (int i = 0; i < env->n_in_vars; i++)
+      if (env->in_vars[i].addr == addr) c = 'i';
+    for (int i = 0; i < env->n_out_vars; i++)
+      if (env->out_vars[i].addr == addr) c = 'o';
+    out_text(w, " %010u (%08x) %c", addr, addr, c);
+    print_var_name(w, env, addr);
+    out_text(w, "\n");
+  }
+}
+
 int count_size(input_layout_item_t *var) {
   int n = 0;
   for (int i = 0; i < var->n_elems; i++) switch (var->elems[i]) {
@@ -1747,17 +1762,7 @@ void dump_debug_info(writer_t *w, virtual_machine_t *env) {
     out_text(w, "  %s\n", env->debug_info->files[i]);
   print_types(w, env);
   out_text(w, "root variables:\n");
-  for (int j = 0; j < env->debug_info->scopes[0].n_vars; j++) {
-    int addr = env->debug_info->scopes[0].vars[j].addr;
-    char c = ' ';
-    for (int i = 0; i < env->n_in_vars; i++)
-      if (env->in_vars[i].addr == addr) c = 'i';
-    for (int i = 0; i < env->n_out_vars; i++)
-      if (env->out_vars[i].addr == addr) c = 'o';
-    out_text(w, " %010u (%08x) %c", addr, addr, c);
-    print_var_name(w, env, addr);
-    out_text(w, "\n");
-  }
+  print_root_vars(w, env);
 }
 
 char *mode_name(int mode) {
