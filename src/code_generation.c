@@ -1084,10 +1084,10 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_step_in(code); printf("%d for condition\n", code->pos);
           emit_code_expression(code, B, 0, 0);
           add_instr(code, STEP_OUT, 0);
-          add_instr(code, SPLIT, JOIN, 0);
+          add_instr(code, SPLIT, 0);
           if (D) emit_code_node(code, D);
           emit_code_node(code, C);
-          add_instr(code, JMP, 9, JOIN_JMP, 9, 0);
+          add_instr(code, JMP, 10, JOIN, JOIN_JMP, 10, JOIN, 0);
           add_instr(code, JOIN_JMP, ret - code->pos - 1, MEM_FREE, 0);
         } break;
         case STMT_WHILE: {
@@ -1101,10 +1101,10 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_step_in(code); printf("%d while condition\n", code->pos);
           emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, STEP_OUT, 0);
-          add_instr(code, SPLIT, JOIN, 0);
+          add_instr(code, SPLIT, 0);
           emit_code_node(code, node->val.s->par[1]->val.sc->items);
-          add_instr(code, JMP, 9, JOIN_JMP, 9, 0);
-          add_instr(code, JOIN_JMP, ret - code->pos - 1, 0);
+          add_instr(code, JMP, 10, JOIN, JOIN_JMP, 10, JOIN, 0);
+          add_instr(code, JOIN_JMP, ret - code->pos - 1, MEM_FREE, 0);
         }; break;
         case STMT_DO: {
           if (!node->val.s->par[0] || !node->val.s->par[1]) return;
@@ -1118,8 +1118,8 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_step_in(code); printf("%d do condition\n", code->pos);
           emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, STEP_OUT, 0);
-          add_instr(code, SPLIT, JOIN, 0);
-          add_instr(code, JMP, 9, JOIN_JMP, 9, 0);
+          add_instr(code, SPLIT, 0);
+          add_instr(code, JMP, 10, JOIN, JOIN_JMP, 10, JOIN, 0);
           add_instr(code, JOIN_JMP, ret - code->pos - 1, 0);
         }; break;
         case STMT_PARDO: {
@@ -1148,9 +1148,9 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, STEP_OUT, 0);
           add_instr(code, SPLIT, 0);
-          emit_code_node(code, node->val.s->par[1]->val.sc->items->next);
-          add_instr(code, JOIN, 0);
           emit_code_node(code, node->val.s->par[1]->val.sc->items);
+          add_instr(code, JOIN, 0);
+          emit_code_node(code, node->val.s->par[1]->val.sc->items->next);
           add_instr(code, JOIN, 0);
         } break;
         case STMT_RETURN: {
@@ -1169,7 +1169,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
               free(casts);
             } else {
               error(&(node->loc),
-                    "incpomatible types in return satement: function %s should "
+                    "incompatible types in return satement: function %s should "
                     "return %s",
                     node->val.s->ret_fn->name,
                     node->val.s->ret_fn->out_type->name);

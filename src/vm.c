@@ -602,6 +602,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
   env->state = VM_RUNNING;
   for (int t = 0; t < env->n_thr; t++) env->thr[t]->bp_hit = 0;
   uint8_t opcode = lval(env->code + env->pc, uint8_t);
+  printf("%3d: %s\n", env->pc, instr_names[opcode]);
   if (opcode == ENDVM) {
     env->state = VM_OK;
     return -1;
@@ -680,10 +681,10 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
               stack_t_push(nonzero, (void *)(&(env->thr[t])),
                            sizeof(thread_t *));
           }
-        stack_t_push(env->threads, (void *)(&nonzero), sizeof(stack_t *));
         stack_t_push(env->threads, (void *)(&zero), sizeof(stack_t *));
-        env->thr = STACK(zero, thread_t *);
-        env->n_thr = STACK_SIZE(zero, thread_t *);
+        stack_t_push(env->threads, (void *)(&nonzero), sizeof(stack_t *));
+        env->thr = STACK(nonzero, thread_t *);
+        env->n_thr = STACK_SIZE(nonzero, thread_t *);
         env->a_thr = env->n_thr;
       } else
         env->virtual_grps += 2;
