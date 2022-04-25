@@ -207,7 +207,7 @@ int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp);
 
 /**
  * @brief perform one instruction
- *
+ * @param stop_on_bp mask of: 1 = stop on BREAK, 2 = stop on BREAKSLOT
  * return value: endvm = -1, breakpoint x = x (>0), error <-1, ok = 0
  */
 int instruction(virtual_machine_t *env, int stop_on_bp);

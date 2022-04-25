@@ -777,7 +777,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         bp_id = lval(env->code + env->pc, uint32_t);
         env->pc += 4;
       }
-      if(!stop_on_bp)
+      if(!(stop_on_bp & 1))
         break;
       int hits = 0;
       for (int t = 0; t < env->n_thr; t++) {
@@ -795,9 +795,13 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
           hits++;
         }
       }
+      if (env->pc < env->code_size &&
+          lval(env->code + env->pc, uint8_t) == BREAKSLOT)
+        env->pc += 1;
       if (hits)
         return bp_id;
     } break;
+
     case BREAKOUT: {
       for (int t = 0; t < env->n_thr; t++) {
         if (env->thr[t]->returned)
@@ -808,6 +812,11 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         _PUSH(f, 4); // push result back on stack
       }
       return -10;
+    } break;
+
+    case BREAKSLOT: {
+      if (stop_on_bp & 2)
+        return -11;
     } break;
 
     case RETURN: {

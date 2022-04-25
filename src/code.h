@@ -217,9 +217,9 @@ ALLOC,        /*!<  `c,... -> addr,....` (c,addr:uint32_t):
 
 ENDVM,      //!< halt the machine
 
-LAST_BIT,     /*!< `c,... -> d,...` (int32):
-             d : position (from right) of the last non-zero bit
-             */
+LAST_BIT,   /*!< `c,... -> d,...` (int32):
+              d : position (from right) of the last non-zero bit
+            */
 
 SORT,       /*!< `addr, size, offs, type, ... -> ...` :
               `addr` is a 1-dimensional array of elements of `size`, 
@@ -228,12 +228,16 @@ SORT,       /*!< `addr, size, offs, type, ... -> ...` :
                type = `TYPE_INT`, `TYPE_FLOAT`, or `TYPE_CHAR`
              */  
 
-LOGF,         //!<  `a... -> b...` (a,b:float) b=log2
-LOG,          //!<  `a... -> b...` (a,b:int) b = ceiling log2
-SQRT,         //!<  `a... -> b...` (a,b:int) b = ceiling(sqrt(a))
-SQRTF,        //!<  `a... -> b...` (a,b:float) b = sqrt(a)
-BREAK,        //!<  followed by x (4B)  : `a ... -> ....` if `(a)`, fire breakpoint number `x`
-BREAKOUT
+LOGF,       //!<  `a... -> b...` (a,b:float) b=log2
+LOG,        //!<  `a... -> b...` (a,b:int) b = ceiling log2
+SQRT,       //!<  `a... -> b...` (a,b:int) b = ceiling(sqrt(a))
+SQRTF,      //!<  `a... -> b...` (a,b:float) b = sqrt(a)
+BREAK,      //!<  followed by x (4B)  : `a ... -> ....` if `(a)`, fire breakpoint number `x`
+BREAKOUT,
+BREAKSLOT,  /*!<  NOOP hinting the debugger that the previous instruction is
+                  also NOOP, and can be used for inserting breakpoints. It is
+                  also used to mark halt points for debugger stepping.
+             */
 } instruction_t;
 
 

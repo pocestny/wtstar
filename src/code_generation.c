@@ -75,6 +75,13 @@ void add_noop(code_block_t *out) {
   code_block_push(out, buf, 1);
 }
 
+void add_breakpoint_slot(code_block_t *out) {
+  uint8_t buf[2];
+  buf[0] = NOOP;
+  buf[1] = BREAKSLOT;
+  code_block_push(out, buf, 2);
+}
+
 // add one instruction with parameters to code block
 void add_instr(code_block_t *out, int code, ...) {
   static uint8_t buf[4096];
@@ -980,10 +987,10 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
   if (!node || node->emitted) return;
   node->emitted = 1;
   node->code_from = code->pos;
-  add_noop(code);
   switch (node->node_type) {
     // ................................
     case AST_NODE_VARIABLE:
+      add_breakpoint_slot(code);
       // init array
       if (node->val.v->num_dim > 0) {
         variable_t *v = node->val.v;
@@ -1052,7 +1059,9 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
       break;
     // ................................
     case AST_NODE_EXPRESSION:
+      add_breakpoint_slot(code);
       // clear was changed to 0 so that code generates for breakpoints
+      // TODO change it back to 1
       emit_code_expression(code, node, 0, 0);
       break;
     // ................................
