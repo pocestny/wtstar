@@ -796,7 +796,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         }
       }
       if (env->pc < env->code_size &&
-          lval(env->code + env->pc, uint8_t) == BREAKSLOT)
+          lval(env->code + env->pc, uint8_t) == STEP_IN)
         env->pc += 1;
       if (hits)
         return bp_id;
@@ -814,8 +814,13 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
       return -10;
     } break;
 
-    case BREAKSLOT: {
+    case STEP_IN: {
       if (stop_on_bp & 2)
+        return -11;
+    } break;
+
+    case STEP_OUT: {
+      if (stop_on_bp & 4)
         return -11;
     } break;
 

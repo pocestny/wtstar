@@ -234,10 +234,11 @@ SQRT,       //!<  `a... -> b...` (a,b:int) b = ceiling(sqrt(a))
 SQRTF,      //!<  `a... -> b...` (a,b:float) b = sqrt(a)
 BREAK,      //!<  followed by x (4B)  : `a ... -> ....` if `(a)`, fire breakpoint number `x`
 BREAKOUT,
-BREAKSLOT,  /*!<  NOOP hinting the debugger that the previous instruction is
+STEP_IN,    /*!<  NOOP hinting the debugger that the previous instruction is
                   also NOOP, and can be used for inserting breakpoints. It is
                   also used to mark halt points for debugger stepping.
              */
+STEP_OUT   //!<  NOOP used to mark halt points for debugger stepping.
 } instruction_t;
 
 
