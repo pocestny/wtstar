@@ -602,7 +602,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
   env->state = VM_RUNNING;
   for (int t = 0; t < env->n_thr; t++) env->thr[t]->bp_hit = 0;
   uint8_t opcode = lval(env->code + env->pc, uint8_t);
-  printf("%3d: %s\n", env->pc, instr_names[opcode]);
+  // printf("%3d: %s\n", env->pc, instr_names[opcode]);
   if (opcode == ENDVM) {
     env->state = VM_OK;
     return -1;

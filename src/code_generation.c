@@ -988,7 +988,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
   switch (node->node_type) {
     // ................................
     case AST_NODE_VARIABLE:
-      add_step_in(code); printf("%d variable\n", code->pos);
+      add_step_in(code);
       // init array
       if (node->val.v->num_dim > 0) {
         variable_t *v = node->val.v;
@@ -1058,7 +1058,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
       break;
     // ................................
     case AST_NODE_EXPRESSION:
-      add_step_in(code); printf("%d expression\n", code->pos);
+      add_step_in(code);
       // clear was changed to 0 so that code generates for breakpoints
       // TODO change it back to 1
       emit_code_expression(code, node, 0, 0);
@@ -1081,7 +1081,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           }
           emit_code_node(code, A);
           int ret = code->pos;
-          add_step_in(code); printf("%d for condition\n", code->pos);
+          add_step_in(code);
           emit_code_expression(code, B, 0, 0);
           add_instr(code, STEP_OUT, 0);
           add_instr(code, SPLIT, 0);
@@ -1098,7 +1098,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
-          add_step_in(code); printf("%d while condition\n", code->pos);
+          add_step_in(code);
           emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, STEP_OUT, 0);
           add_instr(code, SPLIT, 0);
@@ -1115,7 +1115,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
             return;
           }
           emit_code_node(code, node->val.s->par[1]->val.sc->items);
-          add_step_in(code); printf("%d do condition\n", code->pos);
+          add_step_in(code);
           emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, STEP_OUT, 0);
           add_instr(code, SPLIT, 0);
@@ -1129,7 +1129,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
-          add_step_in(code); printf("%d pardo condition\n", code->pos);
+          add_step_in(code);
           emit_code_expression(code, node->val.s->par[1], 0, 0);
           add_instr(code, STEP_OUT, 0);
           emit_code_var_addr(code, node->val.s->par[0]->val.sc->items->val.v);
@@ -1144,7 +1144,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
             error(&(node->loc), "condition must be of integral type");
             return;
           }
-          add_step_in(code); printf("%d if condition\n", code->pos);
+          add_step_in(code);
           emit_code_expression(code, node->val.s->par[0], 0, 0);
           add_instr(code, STEP_OUT, 0);
           add_instr(code, SPLIT, 0);
@@ -1158,7 +1158,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
             error(&(node->loc), "return statement outside of function");
             return;
           }
-          add_step_in(code); printf("%d return\n", code->pos);
+          add_step_in(code);
           if (node->val.s->par[0]) {
             int *casts, n_casts;
             if (inferred_type_compatible(node->val.s->ret_fn->out_type,
