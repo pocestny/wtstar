@@ -58,9 +58,12 @@
 %token <static_type_val>  TYPENAME
 
 %token TYPE INPUT OUTPUT
-%token IF ELSE FOR WHILE PARDO DO
+%token IF NO_ELSE ELSE FOR WHILE PARDO DO
 %token RETURN SIZE DIM SORT BREAKPOINT
 %token MODE_CREW MODE_EREW MODE_CCRCW
+
+%nonassoc NO_ELSE
+%nonassoc ELSE
 
 %token < > EQ "=="
 %token < > NEQ "!="
@@ -924,7 +927,7 @@ stmt_cond
          ;
 
 maybe_else 
-          : %empty  
+          : %prec NO_ELSE %empty
             {
                 list_append(ast_node_t,&ast->current_scope->items,
                       ast_node_t_new(&@$,AST_NODE_EXPRESSION,EXPR_EMPTY));
