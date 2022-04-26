@@ -51,13 +51,16 @@
   static_type_t *         static_type_val;
 }
 
-%token <int_val>          INT_LITERAL  BREAKPOINT  
+%token <int_val>          INT_LITERAL  
 %token <float_val>        FLOAT_LITERAL  
 %token <char_val>         CHAR_LITERAL   
 %token <string_val>       STRING_LITERAL IDENT 
 %token <static_type_val>  TYPENAME
 
-%token TYPE INPUT OUTPUT IF ELSE FOR WHILE PARDO DO RETURN SIZE DIM SORT MODE_CREW MODE_EREW MODE_CCRCW
+%token TYPE INPUT OUTPUT
+%token IF ELSE FOR WHILE PARDO DO
+%token RETURN SIZE DIM SORT BREAKPOINT
+%token MODE_CREW MODE_EREW MODE_CCRCW
 
 %token < > EQ "=="
 %token < > NEQ "!="
@@ -1024,14 +1027,12 @@ stmt_jump
           |
           BREAKPOINT {
             ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_BREAKPOINT);
-            n->val.s->tag=$1;
             n->val.s->par[0]=expression_int_val(ast, 1);
             list_append(ast_node_t,&ast->current_scope->items,n);
           }
           |
           BREAKPOINT '(' expr ')' {
             ast_node_t * n=ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_BREAKPOINT);
-            n->val.s->tag=$1;
             n->val.s->par[0]=$3;
             list_append(ast_node_t,&ast->current_scope->items,n);
           }

@@ -346,7 +346,7 @@ typedef enum {
   STMT_FOR = 72,        //!< for loop
   STMT_PARDO = 73,      //!< pardo
   STMT_RETURN = 74,     //!< return
-  STMT_BREAKPOINT = 75  //!< breapoint
+  STMT_BREAKPOINT = 75  //!< breakpoint
 } statement_variant_t;
 
 /**
@@ -381,7 +381,6 @@ typedef enum {
 typedef struct _statement_t {
   int variant;                 //!< variant
   struct _ast_node_t *par[2];  //!< parameters ( owned)
-  int tag;                     //!< used for breakpoints
   function_t *ret_fn;          //!< external, only used for return
 } statement_t;
 

@@ -88,11 +88,6 @@ END \n|\r\n
   /* single line comment */
 "//".*\n             yylineno++;yycolumn=1;
 
-@[1-9]{DIGIT}* {
-  yylval->int_val = atoi(yytext+1);
-  return TOK_BREAKPOINT;
-}
-
 {DIGIT}+ { 
     yylval->int_val = atoi(yytext); 
     return TOK_INT_LITERAL; 
@@ -133,6 +128,7 @@ pardo/[^a-zA-Z0-9]       { return TOK_PARDO; }
 do/[^a-zA-Z0-9]        { return TOK_DO; }
 return/[^a-zA-Z0-9]    { return TOK_RETURN; }
 sort/[^a-zA-Z0-9]    { return TOK_SORT; }
+BRK { return TOK_BREAKPOINT; }
 #mode[ \t]+EREW    { return TOK_MODE_EREW; }
 #mode[ \t]+CREW    { return TOK_MODE_CREW; }
 #mode[ \t]+cCRCW    { return TOK_MODE_CCRCW; }

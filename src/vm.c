@@ -451,7 +451,7 @@ int add_breakpoint(
   uint32_t code_size
 ) {
   uint32_t 
-    bp_id = 10000 + env->bps->full, // start from big to avoid collision
+    bp_id = 1000000000 + env->bps->full, // start from big to avoid collision
     code_pos = -1,
     new_size = env->code_size;
   if (code != NULL) {
@@ -557,7 +557,6 @@ int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp) {
           printf(" %d", lval(&env->code[env->pc + 1], int32_t));
           break;
         case CALL:
-        case BREAK:
           printf(" %d", lval(&env->code[env->pc + 1], uint32_t));
           break;
         case PUSHB:
@@ -782,10 +781,8 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         int resp = execute_breakpoint_condition(env);
         if(resp != -10)
           return resp;
-      } else {
-        bp_id = lval(env->code + env->pc, uint32_t);
-        env->pc += 4;
-      }
+      } else
+        bp_id = bp_pos;
       int hits = 0;
       for (int t = 0; t < env->n_thr; t++) {
         if (env->thr[t]->returned)
@@ -1505,7 +1502,6 @@ void print_code(writer_t *w, uint8_t *code, int size) {
         i += 4;
         break;
       case CALL:
-      case BREAK:
         out_text(w, " %d", lval(&code[i + 1], uint32_t));
         i += 4;
         break;

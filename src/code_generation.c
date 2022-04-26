@@ -94,7 +94,6 @@ void add_instr(code_block_t *out, int code, ...) {
       case JMP:
       case CALL:
       case JOIN_JMP:
-      case BREAK:
         lval(buf + len, int32_t) = va_arg(args, int);
         len += 4;
         break;
@@ -1193,7 +1192,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
             return;
           }
           emit_code_expression(code, node->val.s->par[0], 0, 0);
-          add_instr(code, BREAK, node->val.s->tag, 0);
+          add_instr(code, BREAK, 0);
         } break;
       }
       break;
