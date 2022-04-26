@@ -189,11 +189,7 @@ int get_dynamic_bp_id(virtual_machine_t *env, uint32_t bp_pos);
  * puts result onto stack
  * does nothing if breakpoint was present at compile time
  */
-int execute_breakpoint_condition(
-  virtual_machine_t *env,
-  uint32_t bp_pos,
-  int t
-);
+int execute_breakpoint_condition(virtual_machine_t *env);
 
 /** 
  * @brief execute the virtual machine

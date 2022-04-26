@@ -509,17 +509,18 @@ int get_dynamic_bp_id(virtual_machine_t *env, uint32_t bp_pos) {
   return bp == NULL ? 0 : bp->id;
 }
 
-int execute_breakpoint_condition(
-  virtual_machine_t *env,
-  uint32_t bp_pos,
-  int t
-) {
+int execute_breakpoint_condition(virtual_machine_t *env) {
+  uint32_t bp_pos = env->pc - 1;
   if(!get_dynamic_bp_id(env, bp_pos)) // static breakpoint
     return -10;
   breakpoint_t *bp = hash_get(env->bps, bp_pos);
-  if (bp->code_pos == -1) { // dynamic breakpoint withou condition
+  if (bp->code_pos == -1) { // dynamic breakpoint without condition
     uint32_t f = 1;
-    _PUSH(f, 4);
+    for (int t = 0; t < env->n_thr; t++) {
+      if (env->thr[t]->returned)
+        continue;
+      _PUSH(f, 4);
+    }
     return -10;
   }
   int pc = env->pc, stored_pc = env->stored_pc;
@@ -777,19 +778,18 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
     case BREAK: {
       uint32_t bp_pos = env->pc - 1;
       int bp_id = get_dynamic_bp_id(env, bp_pos);
-      if(!bp_id) {
+      if(bp_id) {
+        int resp = execute_breakpoint_condition(env);
+        if(resp != -10)
+          return resp;
+      } else {
         bp_id = lval(env->code + env->pc, uint32_t);
         env->pc += 4;
       }
-      if(!(stop_on_bp & 1))
-        break;
       int hits = 0;
       for (int t = 0; t < env->n_thr; t++) {
         if (env->thr[t]->returned)
           continue;
-        int resp = execute_breakpoint_condition(env, bp_pos, t);
-        if(resp != -10)
-          return resp;
         uint32_t f;
         _POP(f, 4);
         if (f) {
@@ -799,11 +799,12 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
           hits++;
         }
       }
-      if (env->pc < env->code_size &&
-          lval(env->code + env->pc, uint8_t) == STEP_IN)
-        env->pc += 1;
-      if (hits)
+      if (hits && (stop_on_bp & 1)) {
+        // if (env->pc < env->code_size &&
+        //     lval(env->code + env->pc, uint8_t) == STEP_IN)
+        //   env->pc += 1;
         return bp_id;
+      }
     } break;
 
     case BREAKOUT: {
