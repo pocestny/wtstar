@@ -512,13 +512,16 @@ int get_dynamic_bp_id(virtual_machine_t *env, uint32_t bp_pos) {
 int execute_breakpoint_condition(
   virtual_machine_t *env,
   uint32_t bp_pos,
-  int thr_id
+  int t
 ) {
-  if(!get_dynamic_bp_id(env, bp_pos))
+  if(!get_dynamic_bp_id(env, bp_pos)) // static breakpoint
     return -10;
   breakpoint_t *bp = hash_get(env->bps, bp_pos);
-  if (bp->code_pos == -1)
+  if (bp->code_pos == -1) { // dynamic breakpoint withou condition
+    uint32_t f = 1;
+    _PUSH(f, 4);
     return -10;
+  }
   int pc = env->pc, stored_pc = env->stored_pc;
   env->pc = bp->code_pos;
   int resp = execute(env, -1, 0, 0); // TODO stop_on_bp set to 1

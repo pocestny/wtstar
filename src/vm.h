@@ -192,7 +192,7 @@ int get_dynamic_bp_id(virtual_machine_t *env, uint32_t bp_pos);
 int execute_breakpoint_condition(
   virtual_machine_t *env,
   uint32_t bp_pos,
-  int thr_id
+  int t
 );
 
 /** 
