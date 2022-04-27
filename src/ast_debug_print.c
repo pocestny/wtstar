@@ -84,6 +84,10 @@ static void print_token(int op) {
   }
 }
 
+static int get_id(ast_node_t *node) {
+  return node ? node->id : -1;
+}
+
 static void print_expr_params(int ofs, expression_t *e) {
   switch (e->variant) {
     case EXPR_BINARY:
@@ -139,7 +143,7 @@ static void print_node(int ofs, ast_node_t *node) {
     if (name) free(name);
   }
 
-  MSG("this:%lx ", (unsigned long)node);
+  MSG("this:%s%d%s ", COLOR(CYAN_BOLD, get_id(node)));
   if (ast_node_name(node)) MSG("name:'%s' ", ast_node_name(node));
 
   if (node->node_type == AST_NODE_VARIABLE) {
@@ -160,7 +164,7 @@ static void print_node(int ofs, ast_node_t *node) {
     MSG("size: %d ", node->val.t->size);
   }
 
-  MSG("next:%lx ", (unsigned long)node->next);
+  MSG("next:%s%d%s ", COLOR(CYAN_BOLD, get_id(node->next)));
 
   if (node->node_type == AST_NODE_SCOPE) {
     MSG("\n");
@@ -219,8 +223,10 @@ static void print_scope(int ofs, scope_t *s) {
     return;
   }
   OFS(ofs);
-  MSG("scope this:%lx parent:%lx\n", (unsigned long)s,
-      (unsigned long)s->parent);
+  MSG("scope this:%lx[%s%d%s] parent:%lx[%s%d%s]\n",
+      (unsigned long)s, COLOR(CYAN_BOLD, get_id(s->items)),
+      (unsigned long)s->parent,
+      COLOR(CYAN_BOLD, get_id(s->parent ? s->parent->items : NULL)));
   if (s->fn) {
     OFS(ofs);
     MSG("params:\n");

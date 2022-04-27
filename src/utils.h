@@ -97,3 +97,13 @@ typedef struct YYLTYPE {
   }
 
 #endif
+
+#define CYAN_BOLD "\x1b[36;1m"
+#define RED_BOLD "\x1b[31;1m"
+#define YELLOW_BOLD "\x1b[93;1m"
+#define GREEN_BOLD "\x1b[32;1m"
+#define WHITE_BOLD "\x1b[37;1m"
+#define WHITE "\x1b[37;0m"
+#define MAGENTA_BOLD "\x1b[35;1m"
+#define TERM_RESET "\x1b[0m"
+#define COLOR(col, text) col, text, TERM_RESET
