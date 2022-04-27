@@ -463,8 +463,8 @@ int add_breakpoint(
     ))
       return -1;
 
-    uint32_t code_pos = env->code_size;
-    int new_size = env->code_size + code_size + 1;
+    code_pos = env->code_size;
+    new_size = env->code_size + code_size + 1;
 
     env->code = (uint8_t*) realloc(env->code, new_size);
     memcpy(env->code + code_pos, code, code_size);
@@ -803,7 +803,6 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         return bp_id;
       }
     } break;
-
     case BREAKOUT: {
       for (int t = 0; t < env->n_thr; t++) {
         if (env->thr[t]->returned)
