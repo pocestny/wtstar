@@ -914,15 +914,15 @@ stmt_expr
 stmt_cond 
          : IF '(' expr ')' 
           {
-            ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_COND);
-            n->val.s->par[0]=$3;
-            n->val.s->par[1]= ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
-            ast->current_scope=n->val.s->par[1]->val.sc;
-            $<ast_node_val>$ = n;  
+            $<ast_node_val>$= ast_node_t_new(&@$,AST_NODE_SCOPE,ast->current_scope);
+            ast->current_scope=$<ast_node_val>$->val.sc;
           }
           stmt maybe_else {
-            ast->current_scope=ast->current_scope->parent;
-            list_append(ast_node_t,&ast->current_scope->items,$<ast_node_val>5);
+            ast_node_t *n =ast_node_t_new(&@$,AST_NODE_STATEMENT,STMT_COND);
+            ast->current_scope=$<ast_node_val>5->val.sc->parent;
+            n->val.s->par[0]=$3;
+            n->val.s->par[1]=$<ast_node_val>5;
+            list_append(ast_node_t,&ast->current_scope->items,n);
           }
          ;
 
