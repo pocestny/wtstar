@@ -18,4 +18,11 @@
 //! print the AST tree to the writer
 void ast_debug_print(ast_t*ast, writer_t *wrt);
 
+void ast_debug_set_writer(writer_t *wrt);
+void ast_debug_print_token(int op);
+void ast_debug_print_expr_params(int ofs, expression_t *e);
+void ast_debug_print_expr_props(expression_t *e);
+void ast_debug_print_node(int ofs, ast_node_t *node);
+void ast_debug_print_scope(int ofs, scope_t *s);
+
 #endif

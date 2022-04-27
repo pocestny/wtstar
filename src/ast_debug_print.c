@@ -29,10 +29,14 @@ static const char *const expr_names[] = {
 static const char *const ioflag_names[] = {"IO_FLAG_NONE", "IO_FLAG_IN",
                                            "IO_FLAG_OUT"};
 
-static void print_scope(int ofs, scope_t *s);
-static void print_node(int ofs, ast_node_t *node);
+void ast_debug_print_scope(int ofs, scope_t *s);
+void ast_debug_print_node(int ofs, ast_node_t *node);
 
-static void print_token(int op) {
+void ast_debug_set_writer(writer_t *wrt) {
+  writer = wrt;
+}
+
+void ast_debug_print_token(int op) {
   switch (op) {
     case TOK_EQ:
       MSG("==");
@@ -88,19 +92,19 @@ static int get_id(ast_node_t *node) {
   return node ? node->id : -1;
 }
 
-static void print_expr_params(int ofs, expression_t *e) {
+void ast_debug_print_expr_params(int ofs, expression_t *e) {
   switch (e->variant) {
     case EXPR_BINARY:
-      print_node(ofs, e->val.o->first);
-      print_node(ofs, e->val.o->second);
+      ast_debug_print_node(ofs, e->val.o->first);
+      ast_debug_print_node(ofs, e->val.o->second);
       break;
     case EXPR_PREFIX:
     case EXPR_POSTFIX:
-      print_node(ofs, e->val.o->first);
+      ast_debug_print_node(ofs, e->val.o->first);
   }
 }
 
-static void print_expr_props(expression_t *e) {
+void ast_debug_print_expr_props(expression_t *e) {
   if (e->variant == EXPR_VAR_NAME) MSG("var:'%s' ", e->val.v->var->name);
 
   if (e->variant == EXPR_LITERAL) {
@@ -116,12 +120,12 @@ static void print_expr_props(expression_t *e) {
   if (e->variant == EXPR_BINARY || e->variant == EXPR_PREFIX ||
       e->variant == EXPR_POSTFIX) {
     MSG("'");
-    print_token(e->val.o->oper);
+    ast_debug_print_token(e->val.o->oper);
     MSG("' ");
   }
 }
 
-static void print_node(int ofs, ast_node_t *node) {
+void ast_debug_print_node(int ofs, ast_node_t *node) {
   if (!node) {
     OFS(ofs);
     MSG("[NULL]\n");
@@ -137,7 +141,7 @@ static void print_node(int ofs, ast_node_t *node) {
 
   if (node->node_type == AST_NODE_EXPRESSION) {
     MSG("%s ", expr_names[node->val.e->variant - EXPR_BASE]);
-    print_expr_props(node->val.e);
+    ast_debug_print_expr_props(node->val.e);
     char *name = inferred_type_name(node->val.e->type);
     MSG("type:'%s' ", name);
     if (name) free(name);
@@ -168,7 +172,7 @@ static void print_node(int ofs, ast_node_t *node) {
 
   if (node->node_type == AST_NODE_SCOPE) {
     MSG("\n");
-    print_scope(ofs + 5, node->val.sc);
+    ast_debug_print_scope(ofs + 5, node->val.sc);
     OFS(ofs);
     MSG("]\n");
   } else
@@ -180,19 +184,19 @@ static void print_node(int ofs, ast_node_t *node) {
         OFS(ofs + 5);
         MSG("par%d\n", i);
         for (ast_node_t *nn = node->val.s->par[i]; nn; nn = nn->next)
-          print_node(ofs + 5, nn);
+          ast_debug_print_node(ofs + 5, nn);
       }
 
   if (node->node_type == AST_NODE_EXPRESSION)
-    print_expr_params(ofs + 5, node->val.e);
+    ast_debug_print_expr_params(ofs + 5, node->val.e);
 
   if (node->node_type == AST_NODE_VARIABLE) {
     for (ast_node_t *t = node->val.v->ranges; t; t = t->next)
-      print_node(ofs + 5, t);
+      ast_debug_print_node(ofs + 5, t);
     if (node->val.v->initializer) {
       OFS(ofs + 5);
       MSG("init\n");
-      print_node(ofs + 5, node->val.v->initializer);
+      ast_debug_print_node(ofs + 5, node->val.v->initializer);
     }
   }
 
@@ -201,22 +205,22 @@ static void print_node(int ofs, ast_node_t *node) {
        node->val.e->variant == EXPR_SIZEOF ||
        node->val.e->variant == EXPR_CALL)) {
     for (ast_node_t *t = node->val.e->val.v->params; t; t = t->next)
-      print_node(ofs + 5, t);
+      ast_debug_print_node(ofs + 5, t);
   }
 
   if (node->node_type == AST_NODE_EXPRESSION &&
       node->val.e->variant == EXPR_INITIALIZER)
     for (ast_node_t *nd = node->val.e->val.i; nd; nd = nd->next) {
-      print_node(ofs + 5, nd);
+      ast_debug_print_node(ofs + 5, nd);
     }
 
   if (node->node_type == AST_NODE_EXPRESSION &&
       node->val.e->variant == EXPR_CAST) {
-    print_node(ofs + 5, node->val.e->val.c->ex);
+    ast_debug_print_node(ofs + 5, node->val.e->val.c->ex);
   }
 }
 
-static void print_scope(int ofs, scope_t *s) {
+void ast_debug_print_scope(int ofs, scope_t *s) {
   if (!s) {
     OFS(ofs);
     MSG("empty scope\n");
@@ -230,21 +234,21 @@ static void print_scope(int ofs, scope_t *s) {
   if (s->fn) {
     OFS(ofs);
     MSG("params:\n");
-    list_for(it, ast_node_t, s->fn->params) { print_node(ofs, it); }
+    list_for(it, ast_node_t, s->fn->params) { ast_debug_print_node(ofs, it); }
     list_for_end;
   }
   OFS(ofs);
   MSG("items:\n");
-  list_for(it, ast_node_t, s->items) { print_node(ofs, it); }
+  list_for(it, ast_node_t, s->items) { ast_debug_print_node(ofs, it); }
   list_for_end;
   OFS(ofs);
   MSG("scope end (%lx)\n", (unsigned long)s);
 }
 
 void ast_debug_print(ast_t *ast, writer_t *wrt) {
-  writer = wrt;
+  ast_debug_set_writer(wrt);
   MSG("ast->types:\n");
-  list_for(tt, ast_node_t, ast->types) print_node(0, tt);
+  list_for(tt, ast_node_t, ast->types) ast_debug_print_node(0, tt);
   list_for_end;
 
   // functions
@@ -255,13 +259,13 @@ void ast_debug_print(ast_t *ast, writer_t *wrt) {
     }
     list_for_end;
     MSG("):\n");
-    print_scope(0, tt->val.f->root_scope);
+    ast_debug_print_scope(0, tt->val.f->root_scope);
     MSG("\n");
   }
   list_for_end;
 
   MSG("\nast->root_scope:\n");
-  print_scope(0, ast->root_scope);
+  ast_debug_print_scope(0, ast->root_scope);
 }
 
 #undef MSG
