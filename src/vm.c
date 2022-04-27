@@ -803,15 +803,24 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         return bp_id;
       }
     } break;
+
     case BREAKOUT: {
+      uint32_t *fs = malloc(sizeof(uint32_t) * env->n_thr);
+      uint32_t f;
       for (int t = 0; t < env->n_thr; t++) {
         if (env->thr[t]->returned)
           continue;
-        uint32_t f;
         _POP(f, 4); // take result from stack
+        fs[t] = f;
         instruction(env, 0); // execute final MEM_FREE
+      }
+      for (int t = 0; t < env->n_thr; t++) {
+        if (env->thr[t]->returned)
+          continue;
+        f = fs[t];
         _PUSH(f, 4); // push result back on stack
       }
+      free(fs);
       return -10;
     } break;
 
