@@ -124,7 +124,9 @@ static void print_node(int ofs, ast_node_t *node) {
     return;
   }
   OFS(ofs);
-  MSG("[ %s ", node_names[node->node_type - AST_NODE_NAME_BASE]);
+  MSG("[");
+  MSG(" %d:%d:%d:%d", node->loc.fl, node->loc.fc, node->loc.ll, node->loc.lc);
+  MSG(" %s ", node_names[node->node_type - AST_NODE_NAME_BASE]);
 
   if (node->node_type == AST_NODE_STATEMENT)
     MSG("%s ", stmt_names[node->val.s->variant - STMT_BASE]);
