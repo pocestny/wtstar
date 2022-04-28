@@ -469,21 +469,22 @@ int add_breakpoint(
 
     code_pos = env->code_size;
     new_size = env->code_size + code_size + 1;
-
     env->code = (uint8_t*) realloc(env->code, new_size);
     memcpy(env->code + code_pos, code, code_size);
-    // replace MEM_FREE with BREAKOUT to remember result
+    // insert BREAKOUT before MEM_FREE to remember result
     env->code[new_size - 2] = BREAKOUT;
     env->code[new_size - 1] = MEM_FREE;
+    code_size++;
   } else {
     if (code_size != 0)
       return -1;
   }
-  env->code[bp_pos] = BREAK;
 
+  remove_breakpoint(env, bp_pos);
+  env->code[bp_pos] = BREAK;
+  env->code_size = new_size;
   breakpoint_t *bp = breakpoint_t_new(bp_id, bp_pos, code_pos, code_size);
   hash_put(env->bps, bp_pos, bp);
-  env->code_size = new_size;
 
   return bp_id;
 }
