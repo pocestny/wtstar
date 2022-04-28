@@ -162,6 +162,8 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len);
 //! destructor
 DESTRUCTOR(virtual_machine_t);
 
+breakpoint_t* get_breakpoint(virtual_machine_t *env, uint32_t bp_pos);
+
 //! add runtime breakpoint with condition
 int add_breakpoint(
   virtual_machine_t *env,

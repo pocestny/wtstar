@@ -444,6 +444,10 @@ DESTRUCTOR(breakpoint_t) {
   free(r);
 }
 
+breakpoint_t* get_breakpoint(virtual_machine_t *env, uint32_t bp_pos) {
+  return hash_get(env->bps, bp_pos);
+}
+
 int add_breakpoint(
   virtual_machine_t *env,
   uint32_t bp_pos,
@@ -485,16 +489,17 @@ int add_breakpoint(
 }
 
 int remove_breakpoint(virtual_machine_t *env, uint32_t bp_pos) {
-  breakpoint_t *bp = hash_get(env->bps, bp_pos);
+  breakpoint_t *bp = get_breakpoint(env, bp_pos);
   if(bp == NULL)
     return -1;
   env->code[bp->bp_pos] = NOOP;
-  // we do not remove entry from hash table to enable breakout
+  hash_remove(env->bps, bp->id);
+  // we do not remove code to enable breakout
   return 0;
 }
 
 int enable_breakpoint(virtual_machine_t *env, uint32_t bp_pos, int enabled) {
-  breakpoint_t *bp = hash_get(env->bps, bp_pos);
+  breakpoint_t *bp = get_breakpoint(env, bp_pos);
   if(bp == NULL)
     return -1;
   if (enabled)
@@ -505,15 +510,15 @@ int enable_breakpoint(virtual_machine_t *env, uint32_t bp_pos, int enabled) {
 }
 
 int get_dynamic_bp_id(virtual_machine_t *env, uint32_t bp_pos) {
-  breakpoint_t *bp = hash_get(env->bps, bp_pos);
+  breakpoint_t *bp = get_breakpoint(env, bp_pos);
   return bp == NULL ? 0 : bp->id;
 }
 
 int execute_breakpoint_condition(virtual_machine_t *env) {
   uint32_t bp_pos = env->pc - 1;
-  if(!get_dynamic_bp_id(env, bp_pos)) // static breakpoint
+  breakpoint_t *bp = get_breakpoint(env, bp_pos);
+  if(!bp) // static breakpoint
     return -10;
-  breakpoint_t *bp = hash_get(env->bps, bp_pos);
   if (bp->code_pos == -1) { // dynamic breakpoint without condition
     uint32_t f = 1;
     for (int t = 0; t < env->n_thr; t++) {
@@ -812,6 +817,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
           continue;
         _POP(f, 4); // take result from stack
         fs[t] = f;
+        printf("breakout hit in thread %d with value %d\n", t, f);
         instruction(env, 0); // execute final MEM_FREE
       }
       for (int t = 0; t < env->n_thr; t++) {
