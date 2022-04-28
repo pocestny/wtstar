@@ -451,7 +451,7 @@ breakpoint_t* get_breakpoint(virtual_machine_t *env, uint32_t bp_pos) {
 int add_breakpoint(
   virtual_machine_t *env,
   uint32_t bp_pos,
-  uint8_t *code,
+  const uint8_t *code,
   uint32_t code_size
 ) {
   uint32_t 
