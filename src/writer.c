@@ -48,7 +48,7 @@ void out_text(writer_t *w, const char *format, ...) {
   va_end(args);
 }
 
-void out_raw(writer_t *w, void *base, int n) {
+void out_raw(writer_t *w, const void *base, int n) {
   if (w->type == WRITER_STRING) {
     while (n >= w->str.size - w->str.ptr) {
       w->str.base = (char *)realloc(w->str.base, 2 * w->str.size);

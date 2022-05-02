@@ -53,6 +53,6 @@ void out_text(writer_t *w, const char *format, ...);
 void out_vtext(writer_t *w, int len, const char *format, va_list args);
 
 //! write `n` bytes from a buffer to the writer 
-void out_raw(writer_t *w, void *base, int n);
+void out_raw(writer_t *w, const void *base, int n);
 
 #endif
