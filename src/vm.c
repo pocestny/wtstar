@@ -395,6 +395,10 @@ void *get_addr(thread_t *thr, uint32_t addr, uint32_t len) {
   return (void *)(thr->mem->data + (addr - thr->mem_base));
 }
 
+uint32_t get_nth_dimension_size(thread_t *t, uint32_t base, uint32_t dim) {
+      return lval(get_addr(t, base + 4 * (2 + dim), 4), uint32_t);
+}
+
 static void mem_mark(frame_t *frame, virtual_machine_t *env, int n_thr,
                      thread_t **thr) {
   stack_t_push(frame->heap_mark, (void *)&(env->heap->top), 4);

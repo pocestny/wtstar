@@ -72,6 +72,8 @@ DESTRUCTOR(thread_t);
 //! len bytes are allocated
 void *get_addr(thread_t *thr, uint32_t addr, uint32_t len);
 
+uint32_t get_nth_dimension_size(thread_t *t, uint32_t base, uint32_t dim);
+
 //! find thread by id
 thread_t *get_thread(uint64_t tid);
 

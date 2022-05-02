@@ -445,8 +445,7 @@ void print_variable_in_thread(char *name) {
     printf("[");
     for (int d = 0; d < var->num_dim; d++) {
       if (d > 0) printf(",");
-      uint32_t size = lval(get_addr(t, (addr + 4 * (2 + d)), 4), uint32_t);
-      printf("%d", size);
+      printf("%d", get_nth_dimension_size(t, addr, d));
     }
     printf("]");
   }
@@ -456,8 +455,8 @@ void print_variable_in_thread(char *name) {
     print_var(outw, get_addr(t, addr, 4), &it);
   else {
     int *sizes = (int *)malloc(var->num_dim * sizeof(int));
-    for (int i = 0; i < var->num_dim; i++)
-      sizes[i] = lval(get_addr(t, (addr + 4 * (2 + i)), 4), uint32_t);
+    for (int d = 0; d < var->num_dim; d++)
+      sizes[d] = get_nth_dimension_size(t, addr, d);
     print_array(outw, env, &it, var->num_dim, sizes,
                 lval(get_addr(t, addr, 4), uint32_t), 0, 0);
     free(sizes);
