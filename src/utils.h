@@ -5,6 +5,7 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 #include <inttypes.h>
+#include <assert.h>
 
 #define COUNT_OF(x) ((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
 

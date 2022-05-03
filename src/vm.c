@@ -201,6 +201,8 @@ DESTRUCTOR(frame_t) {
   }
 
 CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
+  if (len <= 0)
+    return NULL;
   // printf("machine constructor\n");
   ALLOC_VAR(r, virtual_machine_t)
 
@@ -534,11 +536,28 @@ int execute_breakpoint_condition(virtual_machine_t *env) {
     }
     return -10;
   }
+  if (env->a_thr == 0)
+    return -10;
+
+  stack_t *active = stack_t_new();
+  for (int t = 0; t < env->n_thr; t++) {
+    thread_t *thr = env->thr[t];
+    if (!thr->returned)
+      continue;
+    thr->refcnt++;
+    stack_t_push(active, (void *)(&(thr)), sizeof(thread_t *));
+  }
+  stack_t_push(env->threads, (void *)(&active), sizeof(stack_t *));
+  env->thr = STACK(active, thread_t *);
+  env->n_thr = STACK_SIZE(active, thread_t *);
+  env->a_thr = env->n_thr;
+
   int pc = env->pc, stored_pc = env->stored_pc;
   env->pc = bp->code_pos;
   int resp = execute(env, -1, 1, 0); // TODO stop_on_bp set to 1
   env->pc = pc;
   env->stored_pc = stored_pc;
+
   return resp;
 }
 
@@ -734,7 +753,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         env->T++;
         for (int t = 0; t < env->n_thr; t++) env->thr[t]->returned = 1;
         env->a_thr = 0;
-        for (int t = 0; t < env->n_thr; t++)
+        for (int t = 0; t < env->n_thr; t++) // TODO wtf, this is redundant
           if (!env->thr[t]->returned) env->a_thr++;
       }
     } break;
@@ -820,17 +839,22 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
       uint32_t *fs = malloc(sizeof(uint32_t) * env->n_thr);
       uint32_t f;
       for (int t = 0; t < env->n_thr; t++) {
-        if (env->thr[t]->returned)
-          continue;
-        _POP(f, 4); // take result from stack
-        fs[t] = f;
-        printf("breakout hit in thread %d with value %d\n", t, f);
+        if (!env->thr[t]->returned) {
+          fs[t] = 0;
+          printf("breakpoint did not return in thread %d\n", t);
+        } else {
+          _POP(f, 4); // take result from stack
+          fs[t] = f;
+          printf("breakout hit in thread %d with value %d\n", t, f);
+        }
       }
       instruction(env, 0); // execute final MEM_FREE
+      perform_join(env);
+      uint ai = 0;
       for (int t = 0; t < env->n_thr; t++) {
         if (env->thr[t]->returned)
           continue;
-        f = fs[t];
+        f = fs[ai++];
         _PUSH(f, 4); // push result back on stack
       }
       free(fs);

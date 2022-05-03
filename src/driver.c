@@ -134,11 +134,11 @@ static char *normalize_filename(include_file_t *prefix, const char *f) {
 
 // can start from existing ast and with set current scope
 ast_t *driver_parse_from(
-  ast_t *from,
+  ast_t *ast,
   include_project_t *_ip,
   const char *filename
 ) {
-  ast_t *ast = from; // TODO create copy
+  // TODO create copy
   GLOBAL_ast = ast;
   //TODO! extra lineno = 1
   yyextra_t extra;

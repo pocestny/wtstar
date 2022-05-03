@@ -50,7 +50,7 @@ void driver_init(include_project_t *ip);
 void driver_set_file(include_project_t *ip, const char *filename, const char *content);
 
 ast_t *driver_parse_from(
-  ast_t *from,
+  ast_t *ast,
   include_project_t *_ip,
   const char *filename
 );

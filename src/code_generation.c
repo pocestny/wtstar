@@ -8,6 +8,8 @@
 #include <errors.h>
 #include <parser.h>
 
+int generating_breakpoint = 0;
+
 #define NODEBUG
 
 #ifdef NODEBUG
@@ -16,14 +18,13 @@
 #define DEBUG(...) printf(__VA_ARGS__)
 #endif
 
-static int was_error = 0;
 static void emit_code_scope(code_block_t *code, scope_t *sc);
 
 /* ----------------------------------------------------------------------------
  * create error, and insert into errors.h log
  */
 static void error(YYLTYPE *loc, const char *format, ...) {
-  was_error = 1;
+  GLOBAL_ast->error_occured++;
   error_t *err = error_t_new();
   int n;
   get_printed_length(format, n);
@@ -32,6 +33,7 @@ static void error(YYLTYPE *loc, const char *format, ...) {
   va_start(args, format);
   append_error_vmsg(err, n, format, args);
   va_end(args);
+  printf("here\n");
   emit_error_handle(err, GLOBAL_ast->error_handler, GLOBAL_ast->error_handler_data);
 }
 
@@ -1151,14 +1153,21 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
           add_instr(code, JOIN, 0);
         } break;
         case STMT_RETURN: {
-          if (!node->val.s->ret_fn) {
+          function_t *fn = node->val.s->ret_fn;
+          int need_fn_cleanup = 0;
+          if (generating_breakpoint && !fn) {
+            need_fn_cleanup = 1;
+            fn = function_t_new("breakpoint_f");
+            fn->out_type = GLOBAL_ast->__type__int->val.t;
+          }
+          if (!fn) {
             error(&(node->loc), "return statement outside of function");
             return;
           }
           add_step_in(code);
           if (node->val.s->par[0]) {
             int *casts, n_casts;
-            if (inferred_type_compatible(node->val.s->ret_fn->out_type,
+            if (inferred_type_compatible(fn->out_type,
                                          node->val.s->par[0]->val.e->type,
                                          &casts, &n_casts)) {
               emit_code_expression(code, node->val.s->par[0], 0, 0);
@@ -1168,16 +1177,19 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
               error(&(node->loc),
                     "incompatible types in return satement: function %s should "
                     "return %s",
-                    node->val.s->ret_fn->name,
-                    node->val.s->ret_fn->out_type->name);
+                    fn->name,
+                    fn->out_type->name);
               return;
             }
-          } else if (strcmp(node->val.s->ret_fn->out_type->name, "void")) {
+          } else if (strcmp(fn->out_type->name, "void")) {
             error(&(node->loc),
                   "return statement without parameter in a function "
                   "returning %s",
-                  node->val.s->ret_fn->out_type->name);
+                  fn->out_type->name);
             return;
+          }
+          if (need_fn_cleanup) {
+            function_t_delete(fn);
           }
           add_instr(code, SETR, 0);
           add_instr(code, STEP_OUT, 0);
@@ -1308,8 +1320,8 @@ static void write_io_variables(writer_t *out, int flag) {
 /* ----------------------------------------------------------------------------
  * main entry
  */
-int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
-  GLOBAL_ast = _ast;
+int emit_code(ast_t *ast, writer_t *out, int no_debug) {
+  GLOBAL_ast = ast;
 
   // just for debugging: write all types
   DEBUG("types\n");
@@ -1384,9 +1396,9 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
       if (sz > global_size) global_size = sz;
     }
 
-  if (was_error) {
+  if (GLOBAL_ast->error_occured) {
     code_block_t_delete(code);
-    return was_error;
+    return GLOBAL_ast->error_occured;
   }
 
   // write the binary file (see code.h)
@@ -1459,17 +1471,17 @@ int emit_code(ast_t *_ast, writer_t *out, int no_debug) {
   return 0;
 }
 
-int emit_code_scope_section(ast_t *_ast, scope_t *scope, writer_t *out) {
-  GLOBAL_ast = _ast;
+int emit_code_scope_section(ast_t *ast, scope_t *scope, writer_t *out) {
+  GLOBAL_ast = ast;
 
   // main part - generate the code block
   code_block_t *code = code_block_t_new();
   emit_code_scope(code, scope);
   add_instr(code, ENDVM, 0);
 
-  if (was_error) {
+  if (GLOBAL_ast->error_occured) {
     code_block_t_delete(code);
-    return was_error;
+    return GLOBAL_ast->error_occured;
   }
 
   out_raw(out, code->data, code->pos);
