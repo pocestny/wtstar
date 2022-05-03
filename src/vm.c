@@ -825,8 +825,8 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         _POP(f, 4); // take result from stack
         fs[t] = f;
         printf("breakout hit in thread %d with value %d\n", t, f);
-        instruction(env, 0); // execute final MEM_FREE
       }
+      instruction(env, 0); // execute final MEM_FREE
       for (int t = 0; t < env->n_thr; t++) {
         if (env->thr[t]->returned)
           continue;
