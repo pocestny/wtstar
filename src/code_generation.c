@@ -1058,9 +1058,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
     // ................................
     case AST_NODE_EXPRESSION:
       add_step_in(code);
-      // clear was changed to 0 so that code generates for breakpoints
-      // TODO change it back to 1
-      emit_code_expression(code, node, 0, 0);
+      emit_code_expression(code, node, 0, 1);
       add_instr(code, STEP_OUT, 0);
       break;
     // ................................
@@ -1204,6 +1202,7 @@ static void emit_code_node(code_block_t *code, ast_node_t *node) {
       break;
   }
   node->code_to = code->pos - 1;
+  // printf("%d:%d:%d:%d %d %d-%d\n", node->loc.fl, node->loc.fc, node->loc.ll, node->loc.lc, node->node_type, node->code_from, node->code_to);
 }
 
 /* ----------------------------------------------------------------------------

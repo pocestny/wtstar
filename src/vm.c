@@ -123,6 +123,7 @@ void stack_t_alloc(stack_t *s, uint32_t len) {
   while (s->size - s->top <= len) {
     s->size *= 2;
     s->data = (uint8_t *)realloc(s->data, s->size);
+    memset(s->data + s->top, 0, s->size - s->top);
   }
   s->top += len;
 }
@@ -535,7 +536,7 @@ int execute_breakpoint_condition(virtual_machine_t *env) {
   }
   int pc = env->pc, stored_pc = env->stored_pc;
   env->pc = bp->code_pos;
-  int resp = execute(env, -1, 0, 0); // TODO stop_on_bp set to 1
+  int resp = execute(env, -1, 1, 0); // TODO stop_on_bp set to 1
   env->pc = pc;
   env->stored_pc = stored_pc;
   return resp;
@@ -578,13 +579,14 @@ int execute(virtual_machine_t *env, int limit, int trace_on, int stop_on_bp) {
           printf("\n\n");
           break;
       }
+      printf("\n");
     }
     int res = instruction(env, stop_on_bp);
     if (res < 0) return res;  // error/ENDVM
     if (res > 0) return res;  // breakpoint
 
     if (trace_on) {
-      printf("\nthread groups: ");
+      printf("thread groups: ");
       for (int i = 0; i < STACK_SIZE(env->threads, stack_t *); i++)
         printf(" %lu ",
                STACK_SIZE(STACK(env->threads, stack_t *)[i], thread_t *));
@@ -615,7 +617,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
   env->state = VM_RUNNING;
   for (int t = 0; t < env->n_thr; t++) env->thr[t]->bp_hit = 0;
   uint8_t opcode = lval(env->code + env->pc, uint8_t);
-  // printf("%3d: %s\n", env->pc, instr_names[opcode]);
+  printf("%3d: %s\n", env->pc, instr_names[opcode]);
   if (opcode == ENDVM) {
     env->state = VM_OK;
     return -1;
