@@ -176,12 +176,13 @@ DESTRUCTOR(thread_t) {
   }
 }
 
-CONSTRUCTOR(frame_t, uint32_t base) {
+CONSTRUCTOR(frame_t, uint32_t base, char *fn) {
   ALLOC_VAR(r, frame_t)
 
   r->base = base;
   r->heap_mark = stack_t_new();
   r->mem_mark = stack_t_new();
+  r->func_name = fn;
   return r;
 }
 
@@ -217,7 +218,7 @@ CONSTRUCTOR(virtual_machine_t, uint8_t *in, int len) {
   r->W = r->T = r->pc = r->stored_pc = r->virtual_grps = r->last_global_pc = 0;
   r->n_thr = r->a_thr = 1;
 
-  frame_t *tf = frame_t_new(0);
+  frame_t *tf = frame_t_new(0, NULL);
   stack_t_push(r->frames, (void *)(&tf), sizeof(frame_t *));
 
   thread_t *main_thread = thread_t_new();
@@ -788,9 +789,13 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         env->n_thr = STACK_SIZE(grp, thread_t *);
         env->a_thr = env->n_thr;
 
+        uint32_t fn_i = lval(env->code + env->pc, uint32_t);
+
         // create new frame
         frame_t *nf =
-            frame_t_new(env->thr[0]->mem->top + env->thr[0]->mem_base);
+            frame_t_new(
+              env->thr[0]->mem->top + env->thr[0]->mem_base,
+              env->debug_info ? env->debug_info->fn_names[fn_i] : NULL);
         nf->ret_addr = ra;
         mem_mark(env->frame, env, env->n_thr, env->thr);
 
@@ -798,10 +803,10 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         env->frame = nf;
         nf->op_stack_end =
             env->thr[0]->op_stack->top +
-            env->fnmap[lval(env->code + env->pc, uint32_t)].out_size;
+            env->fnmap[fn_i].out_size;
 
         // jump
-        env->pc = env->fnmap[lval(env->code + env->pc, uint32_t)].addr;
+        env->pc = env->fnmap[fn_i].addr;
       } else
         env->pc += 4;
       break;

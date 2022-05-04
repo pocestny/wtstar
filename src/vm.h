@@ -88,11 +88,12 @@ typedef struct {
       *mem_mark;       //!< use this to mark/free data memory in current frame
   //! where the operand stack should end after the call, i.e.
   //! after removing from stack the parameters, and inserting the return value
-  int op_stack_end;    
+  int op_stack_end;
+  char *func_name;  //!< name of the call function (not owned)
 } frame_t;
 
 //! constructor
-CONSTRUCTOR(frame_t, uint32_t base);
+CONSTRUCTOR(frame_t, uint32_t base, char *fn);
 //! destructor
 DESTRUCTOR(frame_t);
 
