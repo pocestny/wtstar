@@ -135,15 +135,22 @@ static int assign_single_variable_address(uint32_t base, variable_t *var) {
   return base;
 }
 
+static int assign_node_variable_addresses(uint32_t base, ast_node_t *node);
+
+static int assign_scope_variable_addresses(uint32_t base, scope_t *sc) {
+  int b = base;
+  for (ast_node_t *p = sc->items; p; p = p->next)
+    b = assign_node_variable_addresses(b, p);
+  return base;
+}
+
 static int assign_node_variable_addresses(uint32_t base, ast_node_t *node) {
   switch (node->node_type) {
     case AST_NODE_VARIABLE:
       base = assign_single_variable_address(base, node->val.v);
       break;
     case AST_NODE_SCOPE: {
-      int b = base;
-      for (ast_node_t *p = node->val.sc->items; p; p = p->next)
-        b = assign_node_variable_addresses(b, p);
+      assign_scope_variable_addresses(base, node->val.sc);
     } break;
     case AST_NODE_STATEMENT:
       if (node->val.s->variant == STMT_FOR ||
@@ -154,13 +161,6 @@ static int assign_node_variable_addresses(uint32_t base, ast_node_t *node) {
         base = assign_node_variable_addresses(base, node->val.s->par[1]);
       break;
   }
-  return base;
-}
-
-static int assign_scope_variable_addresses(uint32_t base, scope_t *sc) {
-  int b = base;
-  for (ast_node_t *p = sc->items; p; p = p->next)
-    b = assign_node_variable_addresses(b, p);
   return base;
 }
 
@@ -1473,6 +1473,24 @@ int emit_code(ast_t *ast, writer_t *out, int no_debug) {
 
 int emit_code_scope_section(ast_t *ast, scope_t *scope, writer_t *out) {
   GLOBAL_ast = ast;
+
+  // global variables have lowest addresses, even if they are defined
+  // late in the source
+  uint32_t base = 0;
+  DEBUG("root variables\n");
+  for (ast_node_t *p = GLOBAL_ast->root_scope->items; p; p = p->next)
+    if (p->node_type == AST_NODE_VARIABLE)
+      base = assign_node_variable_addresses(base, p);
+
+  // assign addresses to variables in subscopes
+  DEBUG("root subscopes\n");
+  for (ast_node_t *p = GLOBAL_ast->root_scope->items; p; p = p->next)
+    if (p->node_type != AST_NODE_VARIABLE)
+      base = assign_node_variable_addresses(base, p);
+  
+  int b = 1000;
+  for (ast_node_t *p = scope->items; p; p = p->next)
+    b = assign_node_variable_addresses(b, p);
 
   // main part - generate the code block
   code_block_t *code = code_block_t_new();
