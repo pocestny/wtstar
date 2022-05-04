@@ -92,6 +92,7 @@ void hash_remove(hash_table_t *t, uint64_t key) {
       if (t->data_delete) (t->data_delete)(t->data[h]->val);
       free(t->data[h]);
       t->data[h] = NULL;
+      t->full--;
       return;
     }
     h = (h + 1) % t->size;

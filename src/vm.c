@@ -501,7 +501,7 @@ int remove_breakpoint(virtual_machine_t *env, uint32_t bp_pos) {
   if(bp == NULL)
     return -1;
   env->code[bp->bp_pos] = NOOP;
-  hash_remove(env->bps, bp->id);
+  hash_remove(env->bps, bp_pos);
   // we do not remove code to enable breakout
   return 0;
 }
