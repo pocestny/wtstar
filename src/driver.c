@@ -14,6 +14,7 @@
  * web module displays error in a panel.
  */
 static void driver_error_handler(const char *s, ...) {
+  GLOBAL_ast->error_occured++;
   error_t *err = error_t_new();
   append_error_msg(err, "driver error: ");
   va_list args;
