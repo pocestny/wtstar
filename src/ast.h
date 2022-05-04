@@ -415,6 +415,7 @@ typedef struct _ast_node_t {
   struct _ast_node_t *next;  //!< next node in the linked list
   int emitted;  //!< used in code generation - whether the code has already been
                 //!< emitted
+  int base_addr_min, base_addr_max;  //!< range of addresses for variables
 } ast_node_t;
 
 /**

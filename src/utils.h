@@ -97,7 +97,8 @@ typedef struct YYLTYPE {
     va_end(_args);                          \
   }
 
-#endif
+static inline int imin(int a, int b) { return a < b ? a : b; }
+static inline int imax(int a, int b) { return a > b ? a : b; }
 
 #define CYAN_BOLD "\x1b[36;1m"
 #define RED_BOLD "\x1b[31;1m"
@@ -108,3 +109,5 @@ typedef struct YYLTYPE {
 #define MAGENTA_BOLD "\x1b[35;1m"
 #define TERM_RESET "\x1b[0m"
 #define COLOR(col, text) col, text, TERM_RESET
+
+#endif

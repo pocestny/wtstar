@@ -125,42 +125,45 @@ void add_instr(code_block_t *out, int code, ...) {
  * closing a scope ends the visibility of the variables, so the base returned
  * from assign_scope_variable_addresses is not incremented
  */
-static int assign_single_variable_address(uint32_t base, variable_t *var) {
+static int assign_single_variable_address(uint32_t base, variable_t *var, int *max_base) {
   var->addr = base;
   if (var->num_dim > 0)
     base += 4 * (var->num_dim + 2);
   else
     base += var->base_type->size;
   DEBUG("'%s' %lx %u\n", var->name, (unsigned long)var, var->addr);
+  if (max_base) *max_base = imax(*max_base, base);
   return base;
 }
 
-static int assign_node_variable_addresses(uint32_t base, ast_node_t *node);
+static int assign_node_variable_addresses(uint32_t base, ast_node_t *node, int *max_base);
 
-static int assign_scope_variable_addresses(uint32_t base, scope_t *sc) {
+static int assign_scope_variable_addresses(uint32_t base, scope_t *sc, int *max_base) {
   int b = base;
   for (ast_node_t *p = sc->items; p; p = p->next)
-    b = assign_node_variable_addresses(b, p);
+    b = assign_node_variable_addresses(b, p, max_base);
   return base;
 }
 
-static int assign_node_variable_addresses(uint32_t base, ast_node_t *node) {
+static int assign_node_variable_addresses(uint32_t base, ast_node_t *node, int *max_base) {
+  node->base_addr_max = node->base_addr_min = base;
   switch (node->node_type) {
     case AST_NODE_VARIABLE:
-      base = assign_single_variable_address(base, node->val.v);
+      base = assign_single_variable_address(base, node->val.v, &node->base_addr_max);
       break;
     case AST_NODE_SCOPE: {
-      assign_scope_variable_addresses(base, node->val.sc);
+      assign_scope_variable_addresses(base, node->val.sc, &node->base_addr_max);
     } break;
     case AST_NODE_STATEMENT:
       if (node->val.s->variant == STMT_FOR ||
           node->val.s->variant == STMT_PARDO)
-        base = assign_node_variable_addresses(base, node->val.s->par[0]);
+        base = assign_node_variable_addresses(base, node->val.s->par[0], &node->base_addr_max);
       if (node->val.s->variant == STMT_COND ||
           node->val.s->variant == STMT_WHILE || node->val.s->variant == STMT_DO)
-        base = assign_node_variable_addresses(base, node->val.s->par[1]);
+        base = assign_node_variable_addresses(base, node->val.s->par[1], &node->base_addr_max);
       break;
   }
+  if (max_base) *max_base = imax(*max_base, base);
   return base;
 }
 
@@ -1351,9 +1354,9 @@ int emit_code(ast_t *ast, writer_t *out, int no_debug) {
       uint32_t base = 0;
       DEBUG("\nfunction #%d: %s\n", fn->val.f->n, fn->val.f->name);
       for (ast_node_t *p = fn->val.f->params; p; p = p->next)
-        base = assign_single_variable_address(base, p->val.v);
+        base = assign_single_variable_address(base, p->val.v, &fn->base_addr_max);
       DEBUG("items:\n");
-      assign_scope_variable_addresses(base, fn->val.f->root_scope);
+      assign_scope_variable_addresses(base, fn->val.f->root_scope, &fn->base_addr_max);
       DEBUG("function #%d done\n\n", fn->val.f->n);
     }
   }
@@ -1362,16 +1365,17 @@ int emit_code(ast_t *ast, writer_t *out, int no_debug) {
   // late in the source
   uint32_t base = 0;
   scope_t *root_scope = GLOBAL_ast->root_node->val.sc;
+  GLOBAL_ast->root_node->base_addr_min = 0;
   DEBUG("root variables\n");
   for (ast_node_t *p = root_scope->items; p; p = p->next)
     if (p->node_type == AST_NODE_VARIABLE)
-      base = assign_node_variable_addresses(base, p);
+      base = assign_node_variable_addresses(base, p, &GLOBAL_ast->root_node->base_addr_max);
 
   // assign addresses to variables in subscopes
   DEBUG("root subscopes\n");
   for (ast_node_t *p = root_scope->items; p; p = p->next)
     if (p->node_type != AST_NODE_VARIABLE)
-      base = assign_node_variable_addresses(base, p);
+      base = assign_node_variable_addresses(base, p, &GLOBAL_ast->root_node->base_addr_max);
 
   // main part - generate the code block
   code_block_t *code = code_block_t_new();
@@ -1473,31 +1477,19 @@ int emit_code(ast_t *ast, writer_t *out, int no_debug) {
   return 0;
 }
 
-int emit_code_scope_section(ast_t *ast, scope_t *scope, writer_t *out) {
+int emit_code_scope_section(
+  ast_t *ast,
+  int base_addr,
+  ast_node_t *scope_node,
+  writer_t *out
+) {
   GLOBAL_ast = ast;
-
-  // global variables have lowest addresses, even if they are defined
-  // late in the source
-  uint32_t base = 0;
-  scope_t *root_scope = GLOBAL_ast->root_node->val.sc;
-  DEBUG("root variables\n");
-  for (ast_node_t *p = root_scope->items; p; p = p->next)
-    if (p->node_type == AST_NODE_VARIABLE)
-      base = assign_node_variable_addresses(base, p);
-
-  // assign addresses to variables in subscopes
-  DEBUG("root subscopes\n");
-  for (ast_node_t *p = root_scope->items; p; p = p->next)
-    if (p->node_type != AST_NODE_VARIABLE)
-      base = assign_node_variable_addresses(base, p);
   
-  int b = 1000;
-  for (ast_node_t *p = scope->items; p; p = p->next)
-    b = assign_node_variable_addresses(b, p);
+  assign_node_variable_addresses(base_addr, scope_node, NULL);
 
   // main part - generate the code block
   code_block_t *code = code_block_t_new();
-  emit_code_scope(code, scope);
+  emit_code_scope(code, scope_node->val.sc);
   add_instr(code, ENDVM, 0);
 
   if (GLOBAL_ast->error_occured) {

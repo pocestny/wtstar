@@ -39,7 +39,12 @@ void add_instr(code_block_t *out, int code, ...);
  */
 int emit_code(ast_t *ast, writer_t *out, int no_debug);
 
-int emit_code_scope_section(ast_t *ast, scope_t *scope, writer_t *out);
+int emit_code_scope_section(
+  ast_t *ast,
+  int base_addr,
+  ast_node_t *scope_node,
+  writer_t *out
+);
 
 extern int generating_breakpoint; // TODO: remove
 

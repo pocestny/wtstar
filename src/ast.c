@@ -533,6 +533,7 @@ CONSTRUCTOR(ast_node_t, YYLTYPE *iloc, int node_type, ...) {
   ALLOC_VAR(r, ast_node_t)
   r->id = __ast_node_t_id__++;
   r->code_from = r->code_to = -1;
+  r->base_addr_min = r->base_addr_max = -1;
   r->next = NULL;
   r->emitted = 0;
 
