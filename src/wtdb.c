@@ -52,10 +52,7 @@ void ast_find_breakpoint(
   ast_node_t *curr_node, scope_t *curr_scope,
   ast_node_t **res_node, scope_t **res_scope
 ) {
-  if(!curr_node) {
-    for(ast_node_t *next = curr_scope->items; next != NULL; next = next->next)
-      ast_find_breakpoint(next, curr_scope, res_node, res_scope);
-  } else if(curr_node->node_type == AST_NODE_SCOPE) {
+  if(curr_node->node_type == AST_NODE_SCOPE) {
     scope_t *scope = curr_node->val.sc;
     for(ast_node_t *next = scope->items; next != NULL; next = next->next)
       ast_find_breakpoint(next, scope, res_node, res_scope);
@@ -82,7 +79,7 @@ int db_add_breakpoint(virtual_machine_t *vm, ast_t *ast, char *fn) {
   ast_node_t *bp_node;
   scope_t *bp_scope;
   // for every item in root scope
-  ast_find_breakpoint(NULL, ast->root_scope, &bp_node, &bp_scope);
+  ast_find_breakpoint(ast->root_node, NULL, &bp_node, &bp_scope);
   ast->current_scope = bp_scope;
   uint32_t bp_code_pos = bp_node->code_from;
   bp_scope->items = NULL;
@@ -90,7 +87,7 @@ int db_add_breakpoint(virtual_machine_t *vm, ast_t *ast, char *fn) {
   list_append(ast_node_t, &bp_scope->items, bp_node);
 
   out = writer_t_new(WRITER_STRING);
-  int resp = emit_code_scope_section(ast, bp_scope->items->val.sc, out);
+  int resp = emit_code_scope_section(ast, 0, bp_scope->items, out);
   
   if (resp) {
     error_t *err = error_t_new();

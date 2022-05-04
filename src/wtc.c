@@ -139,7 +139,7 @@ int main(int argc, char **argv) {
     else {
       int resp;
       if (instr_only)
-        resp = emit_code_scope_section(r, r->root_scope, out);
+        resp = emit_code_scope_section(r, 0, r->root_node, out);
       else
         resp = emit_code(r, out, no_debug);
       

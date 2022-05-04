@@ -264,8 +264,8 @@ void ast_debug_print(ast_t *ast, writer_t *wrt) {
   }
   list_for_end;
 
-  MSG("\nast->root_scope:\n");
-  ast_debug_print_scope(0, ast->root_scope);
+  MSG("\nast->root_node:\n");
+  ast_debug_print_node(0, ast->root_node);
 }
 
 #undef MSG

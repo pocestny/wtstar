@@ -450,7 +450,7 @@ void emit_debug_section(writer_t *out, ast_t *ast, int _code_size) {
   clear_globals();
   n_scopes=1;
   scopes=malloc(sizeof(scope_t*));
-  scopes[0]=ast->root_scope;
+  scopes[0]=ast->root_node->val.sc;
   uint8_t section = SECTION_DEBUG;
   out_raw(out, &section, 1);
 
@@ -461,7 +461,7 @@ void emit_debug_section(writer_t *out, ast_t *ast, int _code_size) {
   for (int i = 0; i < code_size; i++) code_scope[i] = MAP_SENTINEL;
 
   for (ast_node_t *fn = ast->functions; fn; fn = fn->next) gather_node(fn);
-  gather_scope(ast->root_scope);
+  gather_scope(ast->root_node->val.sc);
 
   // write file names
   out_raw(out, &n_files, 4);

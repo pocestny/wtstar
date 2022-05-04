@@ -124,7 +124,7 @@ DESTRUCTOR(variable_t);
  *
  * @brief lexical scope
  *
- * all scopes are descendants of ast->root_scope
+ * all scopes are descendants of ast->root_node->val.sc
  *
  */
 typedef struct _scope_t {
@@ -150,9 +150,9 @@ typedef struct _function_t {
   static_type_t *out_type;  //!< return type (external)
   struct _ast_node_t
       *params;          //!< parameters, list of AST_NODE_VARIABLE (owned)
-  scope_t *root_scope;  //!< root scope (owned), parent is ast->root_scope
+  scope_t *root_scope;  //!< root scope (owned), parent ast->root_node->val.sc
 
-  uint32_t n,  //!< id -  entry in the fnmap table
+  uint32_t n,  //!< id - entry in the fnmap table
       addr;    //!< absolute address in code (set during code generation)
 } function_t;
 
@@ -443,6 +443,8 @@ typedef struct _ast_node_t {
  * EXPR_POSTFIX         | expr, oper
  *
  */
+extern int __ast_node_t_id__;
+
 CONSTRUCTOR(ast_node_t, YYLTYPE *iloc, int node_type, ...);
 
 //! free the whole chain (node and all next)
@@ -467,8 +469,8 @@ void unchain_last(ast_node_t **list);
 typedef struct {
   ast_node_t *types;      //!< list of AST_NODE_STATIC_TYPE
   ast_node_t *functions;  //!< list of AST_NODE_FUNCTION
-  scope_t *root_scope,    //!< global scope, also parent of all function scopes
-      *current_scope;     //!< used while parsing
+  ast_node_t *root_node;  //!< global scope, also parent of all function scopes
+  scope_t    *current_scope;    //!< used while parsing
   static_type_t *current_type;  //!< used while parsing
   int error_occured;            //!< flag if parsing was correct
   int mem_mode;                 //!< last issued token for memory mode

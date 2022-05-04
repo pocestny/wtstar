@@ -1300,10 +1300,11 @@ static void emit_code_function(code_block_t *code, ast_node_t *fn) {
  */
 static void write_io_variables(writer_t *out, int flag) {
   int n = 0;
-  for (ast_node_t *x = GLOBAL_ast->root_scope->items; x; x = x->next)
+  scope_t *root_scope = GLOBAL_ast->root_node->val.sc;
+  for (ast_node_t *x = root_scope->items; x; x = x->next)
     if (x->node_type == AST_NODE_VARIABLE && x->val.v->io_flag == flag) n++;
   out_raw(out, &n, 4);
-  for (ast_node_t *x = GLOBAL_ast->root_scope->items; x; x = x->next)
+  for (ast_node_t *x = root_scope->items; x; x = x->next)
     if (x->node_type == AST_NODE_VARIABLE && x->val.v->io_flag == flag) {
       out_raw(out, &(x->val.v->addr), 4);
       out_raw(out, &(x->val.v->num_dim), 4);
@@ -1360,20 +1361,21 @@ int emit_code(ast_t *ast, writer_t *out, int no_debug) {
   // global variables have lowest addresses, even if they are defined
   // late in the source
   uint32_t base = 0;
+  scope_t *root_scope = GLOBAL_ast->root_node->val.sc;
   DEBUG("root variables\n");
-  for (ast_node_t *p = GLOBAL_ast->root_scope->items; p; p = p->next)
+  for (ast_node_t *p = root_scope->items; p; p = p->next)
     if (p->node_type == AST_NODE_VARIABLE)
       base = assign_node_variable_addresses(base, p);
 
   // assign addresses to variables in subscopes
   DEBUG("root subscopes\n");
-  for (ast_node_t *p = GLOBAL_ast->root_scope->items; p; p = p->next)
+  for (ast_node_t *p = root_scope->items; p; p = p->next)
     if (p->node_type != AST_NODE_VARIABLE)
       base = assign_node_variable_addresses(base, p);
 
   // main part - generate the code block
   code_block_t *code = code_block_t_new();
-  emit_code_scope(code, GLOBAL_ast->root_scope);
+  emit_code_node(code, ast->root_node);
   add_instr(code, ENDVM, 0);
 
   // add code for functions at the end
@@ -1385,7 +1387,7 @@ int emit_code(ast_t *ast, writer_t *out, int no_debug) {
 
   // compute the size of the memory used by global variables
   uint32_t global_size = 0;
-  for (ast_node_t *nd = GLOBAL_ast->root_scope->items; nd; nd = nd->next)
+  for (ast_node_t *nd = root_scope->items; nd; nd = nd->next)
     if (nd->node_type == AST_NODE_VARIABLE) {
       variable_t *var = nd->val.v;
       uint32_t sz = var->addr;
@@ -1477,14 +1479,15 @@ int emit_code_scope_section(ast_t *ast, scope_t *scope, writer_t *out) {
   // global variables have lowest addresses, even if they are defined
   // late in the source
   uint32_t base = 0;
+  scope_t *root_scope = GLOBAL_ast->root_node->val.sc;
   DEBUG("root variables\n");
-  for (ast_node_t *p = GLOBAL_ast->root_scope->items; p; p = p->next)
+  for (ast_node_t *p = root_scope->items; p; p = p->next)
     if (p->node_type == AST_NODE_VARIABLE)
       base = assign_node_variable_addresses(base, p);
 
   // assign addresses to variables in subscopes
   DEBUG("root subscopes\n");
-  for (ast_node_t *p = GLOBAL_ast->root_scope->items; p; p = p->next)
+  for (ast_node_t *p = root_scope->items; p; p = p->next)
     if (p->node_type != AST_NODE_VARIABLE)
       base = assign_node_variable_addresses(base, p);
   

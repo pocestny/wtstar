@@ -527,10 +527,11 @@ DESTRUCTOR(statement_t) {
 /* ----------------------------------------------------------------------------
  * AST node
  */
+int __ast_node_t_id__ = 0;
 
 CONSTRUCTOR(ast_node_t, YYLTYPE *iloc, int node_type, ...) {
   ALLOC_VAR(r, ast_node_t)
-  r->id = GLOBAL_ast->__ast_node_t_id__++;
+  r->id = __ast_node_t_id__++;
   r->code_from = r->code_to = -1;
   r->next = NULL;
   r->emitted = 0;
@@ -677,16 +678,16 @@ void unchain_last(ast_node_t **list) {
 
 CONSTRUCTOR(ast_t) {
   ALLOC_VAR(r, ast_t);
-  r->types = NULL;
-  r->functions = NULL;
-  r->root_scope = scope_t_new();
-  r->current_scope = r->root_scope;
   r->error_occured = 0;
   r->__type__int = NULL;
   r->__type__float = NULL;
   r->__type__void = NULL;
   r->__type__char = NULL;
   r->__ast_node_t_id__ = 0;
+  r->types = NULL;
+  r->functions = NULL;
+  r->root_node = ast_node_t_new(NULL, AST_NODE_SCOPE, NULL);
+  r->current_scope = r->root_node->val.sc;
   return r;
 }
 
@@ -694,7 +695,7 @@ DESTRUCTOR(ast_t) {
   if (r == NULL) return;
   ast_node_t_delete(r->types);
   ast_node_t_delete(r->functions);
-  scope_t_delete(r->root_scope);
+  ast_node_t_delete(r->root_node);
   free(r);
 }
 
@@ -710,14 +711,15 @@ int ident_role(ast_t *ast, char *ident, ast_node_t **result) {
     if (result) (*result) = nd;
   }
 
-  nd = ast_node_find(ast->root_scope->items, ident);
+  scope_t *root_scope = ast->root_node->val.sc;
+  nd = ast_node_find(root_scope->items, ident);
   if (nd) {
     res |= IDENT_GLOBAL_VAR;
     if (result) (*result) = nd;
   }
 
-  if (ast->current_scope != ast->root_scope)
-    for (scope_t *sc = ast->current_scope->parent; sc != ast->root_scope;
+  if (ast->current_scope != root_scope)
+    for (scope_t *sc = ast->current_scope->parent; sc != root_scope;
          sc = sc->parent) {
       nd = NULL;
       if (sc->fn) nd = ast_node_find(sc->fn->params, ident);
