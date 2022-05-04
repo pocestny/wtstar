@@ -542,7 +542,7 @@ int execute_breakpoint_condition(virtual_machine_t *env) {
   stack_t *active = stack_t_new();
   for (int t = 0; t < env->n_thr; t++) {
     thread_t *thr = env->thr[t];
-    if (!thr->returned)
+    if (thr->returned)
       continue;
     thr->refcnt++;
     stack_t_push(active, (void *)(&(thr)), sizeof(thread_t *));
@@ -558,6 +558,7 @@ int execute_breakpoint_condition(virtual_machine_t *env) {
   env->pc = pc;
   env->stored_pc = stored_pc;
 
+  printf("break execute resp %d\n", resp);
   return resp;
 }
 
@@ -845,6 +846,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
         } else {
           _POP(f, 4); // take result from stack
           fs[t] = f;
+          env->thr[t]->returned = 0;
           printf("breakout hit in thread %d with value %d\n", t, f);
         }
       }
