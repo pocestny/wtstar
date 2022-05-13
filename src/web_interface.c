@@ -130,8 +130,7 @@ int web_prepare_vars(uint64_t tid) {
       out_text(out, "[");
       for (int d = 0; d < info[i]->num_dim; d++) {
         if (d > 0) out_text(out, ",");
-        uint32_t size = lval(get_addr(t, (addr + 4 * (2 + d)), 4), uint32_t);
-        out_text(out, "%d", size);
+        out_text(out, "%d", get_nth_dimension_size(t, addr, d));
       }
       out_text(out, "]");
       var_data[i].dims = out->str.base;
@@ -144,8 +143,8 @@ int web_prepare_vars(uint64_t tid) {
       print_var(out, get_addr(t, addr, 4), &it);
     else {
       int *sizes = (int *)malloc(info[i]->num_dim * sizeof(int));
-      for (int j = 0; j < info[i]->num_dim; j++)
-        sizes[j] = lval(get_addr(t, (addr + 4 * (2 + j)), 4), uint32_t);
+      for (int d = 0; d < info[i]->num_dim; d++)
+        sizes[d] = get_nth_dimension_size(t, addr, d);
 
       print_array(out, env, &it, info[i]->num_dim, sizes,
                   lval(get_addr(t, addr, 4), uint32_t), 0, 0);
@@ -163,6 +162,7 @@ int web_prepare_vars(uint64_t tid) {
 
 int web_n_threads() { return env->a_thr; }
 
+// return active thread ids
 uint64_t web_tids() {
   if (!env || (env->state != VM_RUNNING && env->state != VM_OK)) return 0;
   tids = realloc(tids, env->a_thr * 8);
@@ -181,19 +181,20 @@ int64_t web_thread_parent(uint64_t tid) {
 
 static char *index_var = "[index]";
 
+// return name of pardo index variable
 char *web_thread_base_name() {
   if (!env || (env->state != VM_RUNNING && env->state != VM_OK)) return NULL;
   char *name = index_var;
   if (env->debug_info) {
     variable_info_t *var = NULL;
-    int s = code_map_find(env->debug_info->scope_map, env->stored_pc);
+    int s = code_map_find(env->debug_info->scope_map, env->stored_pc); // find current scope
     if (s > -1) {
-      for (int sid = env->debug_info->scope_map->val[s];
+      for (int sid = env->debug_info->scope_map->val[s]; // go through all parent scopes
            !var && sid != MAP_SENTINEL;
            sid = env->debug_info->scopes[sid].parent)
-        for (int i = 0; !var && i < env->debug_info->scopes[sid].n_vars; i++)
-          if (env->thr[0]->mem_base >= env->frame->base &&
-              env->debug_info->scopes[sid].vars[i].addr ==
+        for (int i = 0; !var && i < env->debug_info->scopes[sid].n_vars; i++) // go through all variables in scope
+          if (env->thr[0]->mem_base >= env->frame->base && // check if variable is in current frame
+              env->debug_info->scopes[sid].vars[i].addr == // check if variable is pardo index
                   env->thr[0]->mem_base - env->frame->base)
             var = &env->debug_info->scopes[sid].vars[i];
       if (var) name = var->name;
@@ -202,6 +203,7 @@ char *web_thread_base_name() {
   return name;
 }
 
+// return value of pardo index variable
 int32_t web_thread_base_value(uint64_t tid) {
   thread_t *t = get_thread(tid);
   if (!t) return 0;

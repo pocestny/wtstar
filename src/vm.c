@@ -154,7 +154,7 @@ thread_t *clone_thread(thread_t *src) {
   r->parent = src;
   r->mem_base = src->mem_base + src->mem->top;
   // maybe copy op and acc ?
-  // should not bee needed
+  // should not be needed
   return r;
 }
 
