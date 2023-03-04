@@ -857,7 +857,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
       }
       instruction(env, 0); // execute final MEM_FREE
       perform_join(env);
-      uint ai = 0;
+      uint32_t ai = 0;
       for (int t = 0; t < env->n_thr; t++) {
         if (env->thr[t]->returned)
           continue;
