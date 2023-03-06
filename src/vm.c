@@ -559,7 +559,6 @@ int execute_breakpoint_condition(virtual_machine_t *env) {
   env->pc = pc;
   env->stored_pc = stored_pc;
 
-  printf("break execute resp %d\n", resp);
   return resp;
 }
 
@@ -638,7 +637,7 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
   env->state = VM_RUNNING;
   for (int t = 0; t < env->n_thr; t++) env->thr[t]->bp_hit = 0;
   uint8_t opcode = lval(env->code + env->pc, uint8_t);
-  printf("%3d: %s\n", env->pc, instr_names[opcode]);
+  // printf("%3d: %s\n", env->pc, instr_names[opcode]);
   if (opcode == ENDVM) {
     env->state = VM_OK;
     return -1;
@@ -847,12 +846,12 @@ int instruction(virtual_machine_t *env, int stop_on_bp) {
       for (int t = 0; t < env->n_thr; t++) {
         if (!env->thr[t]->returned) {
           fs[t] = 0;
-          printf("breakpoint did not return in thread %d\n", t);
+          // printf("breakpoint did not return in thread %d\n", t);
         } else {
           _POP(f, 4); // take result from stack
           fs[t] = f;
           env->thr[t]->returned = 0;
-          printf("breakout hit in thread %d with value %d\n", t, f);
+          // printf("breakout hit in thread %d with value %d\n", t, f);
         }
       }
       instruction(env, 0); // execute final MEM_FREE
@@ -1683,7 +1682,6 @@ int scan_array(reader_t *r, writer_t *w, input_layout_item_t *var, int *sizes,
 
 int read_input(reader_t *r, virtual_machine_t *env) {
   thread_t *tt = STACK(STACK(env->threads, stack_t *)[0], thread_t *)[0];
-  printf("reader %s\n", r->str.base);
   for (int i = 0; i < env->n_in_vars; i++) {
     input_layout_item_t *var = &(env->in_vars[i]);
     int elem_size = count_size(var);
